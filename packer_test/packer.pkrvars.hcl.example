@@ -1,0 +1,36 @@
+# ==============================================================================
+# Sample Environment Variables for Ubuntu 24.04 Template Build
+# Rename or copy to packer.pkrvars.hcl and supply infrastructure values.
+# Sensitive passwords (vcenter_password, ssh_password) must NOT be stored here;
+# inject them via memory (PKR_VAR_*) or via scripts/build_packer_secure.sh.
+# ==============================================================================
+
+vcenter_server              = "10.255.242.106"
+vcenter_user                = "administrator@vsphere.local"
+vcenter_insecure_connection = true
+
+vcenter_datacenter          = "Datacenter"
+vcenter_cluster             = "Cluster1"
+vcenter_datastore           = "DS_100_3"
+vcenter_network             = "VM Network"
+vcenter_folder              = "VM Template"
+
+iso_paths = [
+  "[DS_100_3] contentlib-a0bc3584-8b7c-40cc-b2fd-bae7a6b9bf6c/befc5a25-2315-479a-833a-2cc168de715c/ubuntu-24.04.4-live-server-amd64_58a8cfa8-32e5-437c-b161-b18e4dc8d7aa.iso"
+]
+
+vm_name                     = "tpl-ubuntu-2404-golden"
+vm_cpu_cores                = 2
+vm_cpu_sockets              = 1
+vm_mem_size                 = 4096
+vm_disk_size                = 40960
+vm_disk_thin                = true
+
+ssh_username                = "svc_admin"
+ssh_timeout                 = "30m"
+
+http_directory              = "http"
+http_ip                     = "10.255.245.20"
+http_bind_address           = "0.0.0.0"
+http_port_min               = 8120
+http_port_max               = 8130

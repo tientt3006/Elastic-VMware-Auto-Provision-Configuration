@@ -1,0 +1,55 @@
+---
+- name: Install Elastic Agent prerequisites
+  ansible.builtin.apt:
+    name:
+      - curl
+      - tar
+    state: present
+    update_cache: true
+
+- name: Check whether Elastic Agent is installed
+  ansible.builtin.stat:
+    path: /usr/bin/elastic-agent
+  register: elastic_agent_binary
+
+- name: Create Elastic Agent download directory
+  ansible.builtin.file:
+    path: "{{ elastic_agent_download_dir }}"
+    state: directory
+    mode: "0750"
+  when: not elastic_agent_binary.stat.exists
+
+- name: Download Elastic Agent archive
+  ansible.builtin.get_url:
+    url: "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-{{ elastic_version }}-linux-x86_64.tar.gz"
+    dest: "{{ elastic_agent_download_dir }}/elastic-agent.tar.gz"
+    mode: "0640"
+  when: not elastic_agent_binary.stat.exists
+
+- name: Extract Elastic Agent archive
+  ansible.builtin.unarchive:
+    src: "{{ elastic_agent_download_dir }}/elastic-agent.tar.gz"
+    dest: "{{ elastic_agent_download_dir }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+  when: not elastic_agent_binary.stat.exists
+
+- name: Enroll Elastic Agent into Fleet
+  ansible.builtin.command:
+    argv:
+      - "{{ elastic_agent_download_dir }}/elastic-agent"
+      - install
+      - --non-interactive
+      - --force
+      - --url=https://10.255.242.214:8220
+      - --enrollment-token={{ hostvars['localhost']['agent_enrollment_token'] }}
+      - --insecure
+  no_log: true
+  when: not elastic_agent_binary.stat.exists
+
+- name: Remove downloaded Elastic Agent archive
+  ansible.builtin.file:
+    path: "{{ elastic_agent_download_dir }}"
+    state: absent
+  when: not elastic_agent_binary.stat.exists

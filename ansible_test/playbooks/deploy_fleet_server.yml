@@ -1,0 +1,6 @@
+---
+- name: Install Fleet Server natively on the Ubuntu host
+  hosts: fleet_server
+  become: true
+  roles:
+    - fleet_server

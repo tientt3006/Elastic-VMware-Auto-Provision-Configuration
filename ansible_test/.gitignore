@@ -1,0 +1,3 @@
+inventories/lab/group_vars/all/main.yml
+*.retry
+.vault-password-file

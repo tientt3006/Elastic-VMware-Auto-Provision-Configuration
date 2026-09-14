@@ -1,0 +1,5 @@
+---
+- name: Restart Kibana
+  ansible.builtin.systemd:
+    name: kibana
+    state: restarted

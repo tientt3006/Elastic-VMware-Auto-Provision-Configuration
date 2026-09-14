@@ -1,0 +1,58 @@
+---
+- name: Create Elasticsearch data directory
+  ansible.builtin.file:
+    path: "{{ elastic_data_dir }}"
+    state: directory
+    owner: "1000"
+    group: "0"
+    mode: "0770"
+
+- name: Create Compose project directory
+  ansible.builtin.file:
+    path: "{{ elastic_compose_dir }}"
+    state: directory
+    mode: "0750"
+
+- name: Deploy Elastic Stack Compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ elastic_compose_dir }}/compose.yml"
+    mode: "0600"
+  notify: Restart Elastic Stack
+
+- name: Deploy Compose environment file
+  ansible.builtin.template:
+    src: .env.j2
+    dest: "{{ elastic_compose_dir }}/.env"
+    mode: "0600"
+  notify: Restart Elastic Stack
+
+- name: Start Elasticsearch and Kibana containers
+  community.docker.docker_compose_v2:
+    project_src: "{{ elastic_compose_dir }}"
+    state: present
+    wait: true
+
+- name: Wait for Elasticsearch service to be ready
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9200"
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    status_code: 200
+  register: es_ping
+  until: es_ping.status == 200
+  retries: 24
+  delay: 5
+
+- name: Configure password for kibana_system built-in account
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9200/_security/user/kibana_system/_password"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      password: "{{ kibana_system_password }}"
+    status_code: [200, 204]

@@ -1,0 +1,25 @@
+---
+# Copy this file to main.yml and edit it. Do not commit main.yml.
+elastic_version: "8.19.0"
+elastic_cluster_name: "elastic-cluster-lab"
+elastic_heap_size: "2g"
+elastic_compose_dir: /opt/elastic-stack
+elastic_data_dir: /var/lib/elastic-stack/elasticsearch
+
+# Elasticsearch/Kibana access. (Injected via run_ansible_secure.sh wrapper at runtime)
+kibana_encryption_key: "CHANGE_ME_TO_A_LONG_RANDOM_VALUE_32_CHARS"
+
+# Fleet Server is the native Elastic Agent on kibana_gateway.
+fleet_server_host: "0.0.0.0"
+fleet_server_url: "http://10.255.242.214:8220"
+fleet_server_elasticsearch_url: "http://10.255.242.211:9200"
+fleet_server_port: 8220
+fleet_server_enrollment_token: "CHANGE_ME"
+
+# Enrollment token for agents on monitored_nodes.
+elastic_agent_enrollment_token: "CHANGE_ME"
+elastic_agent_policy_id: "CHANGE_ME"
+elastic_agent_download_dir: /var/tmp/elastic-agent
+
+# Set false only for a controlled lab with self-signed HTTP certificates.
+elastic_tls_verify: false

@@ -1,0 +1,84 @@
+---
+- name: Install Fleet Server prerequisites
+  ansible.builtin.apt:
+    name:
+      - curl
+      - tar
+    state: present
+    update_cache: true
+
+- name: Check whether Elastic Agent is installed
+  ansible.builtin.stat:
+    path: /usr/bin/elastic-agent
+  register: elastic_agent_binary
+
+- name: Create Elastic Agent download directory
+  ansible.builtin.file:
+    path: "{{ elastic_agent_download_dir }}"
+    state: directory
+    mode: "0750"
+  when: not elastic_agent_binary.stat.exists
+
+- name: Download Elastic Agent archive
+  ansible.builtin.get_url:
+    url: "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-{{ elastic_version }}-linux-x86_64.tar.gz"
+    dest: "{{ elastic_agent_download_dir }}/elastic-agent.tar.gz"
+    mode: "0640"
+  when: not elastic_agent_binary.stat.exists
+
+- name: Extract Elastic Agent archive
+  ansible.builtin.unarchive:
+    src: "{{ elastic_agent_download_dir }}/elastic-agent.tar.gz"
+    dest: "{{ elastic_agent_download_dir }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+  when: not elastic_agent_binary.stat.exists
+
+- name: Delete old Fleet Server service token (for idempotency)
+  ansible.builtin.uri:
+    url: "{{ hostvars['localhost']['es_api_url'] | default('http://10.255.242.211:9200') }}/_security/service/elastic/fleet-server/credential/token/fleet-server-token"
+    method: DELETE
+    user: "elastic"
+    password: "{{ hostvars['localhost']['elastic_password'] | default('Elas2026') }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  delegate_to: localhost
+  become: false
+  when: not elastic_agent_binary.stat.exists
+
+- name: Generate fresh Service Token for Fleet Server
+  ansible.builtin.uri:
+    url: "{{ hostvars['localhost']['es_api_url'] | default('http://10.255.242.211:9200') }}/_security/service/elastic/fleet-server/credential/token/fleet-server-token"
+    method: POST
+    user: "elastic"
+    password: "{{ hostvars['localhost']['elastic_password'] | default('Elas2026') }}"
+    force_basic_auth: true
+    status_code: [200, 201]
+  register: fleet_server_token_resp
+  delegate_to: localhost
+  become: false
+  when: not elastic_agent_binary.stat.exists
+
+- name: Install Fleet Server as a native Elastic Agent
+  ansible.builtin.command:
+    argv:
+      - "{{ elastic_agent_download_dir }}/elastic-agent"
+      - install
+      - --non-interactive
+      - --force
+      - --url=https://10.255.242.214:8220
+      - --fleet-server-service-token={{ fleet_server_token_resp.json.token.value }}
+      - --fleet-server-es=http://10.255.242.211:9200
+      - --fleet-server-policy=fleet-server-policy
+      - --fleet-server-port=8220
+      - --fleet-server-host=0.0.0.0
+      - --fleet-server-es-insecure
+  no_log: false
+  when: not elastic_agent_binary.stat.exists
+
+- name: Remove downloaded Fleet Server archive
+  ansible.builtin.file:
+    path: "{{ elastic_agent_download_dir }}"
+    state: absent
+  when: elastic_agent_binary.stat.exists == false

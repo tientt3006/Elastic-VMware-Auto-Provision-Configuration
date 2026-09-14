@@ -1,0 +1,6 @@
+---
+- name: Install and enroll Elastic Agent on monitored VMs
+  hosts: monitored_nodes
+  become: true
+  roles:
+    - elastic_agent

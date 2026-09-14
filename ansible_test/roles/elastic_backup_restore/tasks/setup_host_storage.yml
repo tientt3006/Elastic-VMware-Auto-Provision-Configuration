@@ -1,0 +1,31 @@
+---
+# ==============================================================================
+# Host-Level Storage and Configuration for Snapshot Repository
+# Runs on: elastic_cluster nodes (with become: true)
+# ==============================================================================
+
+- name: Create local snapshot repository directory on host
+  ansible.builtin.file:
+    path: "{{ snapshot_repo_location }}"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0775'
+
+- name: Check if path.repo is already configured in elasticsearch.yml
+  ansible.builtin.lineinfile:
+    path: /etc/elasticsearch/elasticsearch.yml
+    regexp: '^path\.repo:'
+    line: 'path.repo: ["{{ snapshot_repo_location }}"]'
+    state: present
+  register: path_repo_result
+
+- name: Display status of path.repo configuration
+  ansible.builtin.debug:
+    msg: "path.repo configured for {{ inventory_hostname }}. Changed: {{ path_repo_result.changed }}"
+
+- name: Conditionally restart Elasticsearch if path.repo changed and restart is enabled
+  ansible.builtin.systemd:
+    name: elasticsearch
+    state: restarted
+  when: path_repo_result.changed and (restart_es_on_config_change | default(false) | bool)

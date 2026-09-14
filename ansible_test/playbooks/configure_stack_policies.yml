@@ -1,0 +1,8 @@
+---
+- name: Configure Elastic Stack Day-2 Policies
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  roles:
+    - elastic_stack_config

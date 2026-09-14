@@ -1,0 +1,14 @@
+---
+# ==============================================================================
+# Playbook: Restore Elasticsearch Data from Snapshot
+# - Closes target active indices/data streams
+# - Restores indices from specified snapshot
+# - Monitors shard recovery progress
+# ==============================================================================
+
+- name: Restore Data from Elasticsearch Snapshot
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: elastic_backup_restore
+      tasks_from: restore.yml

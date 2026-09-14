@@ -1,0 +1,24 @@
+# ==============================================================================
+# Kibana Configuration Template (Connecting to Multi-Node Elastic Cluster)
+# ==============================================================================
+
+server.port: 5601
+server.host: "0.0.0.0"
+
+# Multi-node Elasticsearch endpoints for failover and load distribution
+elasticsearch.hosts:
+{% for host in groups['elastic_cluster'] %}
+  - "http://{{ hostvars[host]['ansible_host'] }}:9200"
+{% endfor %}
+
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "{{ kibana_system_password }}"
+
+# Security encryption keys
+xpack.encryptedSavedObjects.encryptionKey: "{{ kibana_encryption_key }}"
+xpack.security.encryptionKey: "{{ kibana_encryption_key }}"
+xpack.reporting.encryptionKey: "{{ kibana_encryption_key }}"
+
+# Telemetry and reporting
+telemetry.enabled: false
+newsfeed.enabled: false

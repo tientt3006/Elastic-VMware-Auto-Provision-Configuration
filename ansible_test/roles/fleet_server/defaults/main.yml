@@ -1,0 +1,11 @@
+---
+elastic_version: "8.19.0"
+fleet_server_url: "http://127.0.0.1:8220"
+fleet_server_enrollment_token: "CHANGE_ME"
+fleet_server_elasticsearch_url: "http://127.0.0.1:9200"
+fleet_server_policy_id: "CHANGE_ME"
+fleet_server_port: 8220
+fleet_server_host: 0.0.0.0
+fleet_server_insecure_http: true
+fleet_server_es_insecure: true
+elastic_agent_download_dir: /var/tmp/elastic-agent

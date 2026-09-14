@@ -1,0 +1,33 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  apt:
+    fallback: offline-install
+    geoip: false
+  network:
+    version: 2
+    ethernets:
+      all-en-interfaces:
+        match:
+          name: "en*"
+        dhcp4: true
+  storage:
+    layout:
+      name: direct
+  identity:
+    hostname: ubuntu-template
+    username: svc_admin
+    password: "$6$Gdw506CZbqi/IOzb$Rn7Zn15OWCDwpeNBa/Tpuw0nZhmcLWWDt8D0qNtbCxUdE9fGi9Maawqsq71DutX5CJnMgdsV2TGTp67WDHlzD."
+  ssh:
+    install-server: true
+    allow-pw: true
+  shutdown: reboot
+  user-data:
+    disable_root: true
+  late-commands:
+    - echo "svc_admin ALL=(ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/99-svc-admin
+    - chmod 0440 /target/etc/sudoers.d/99-svc-admin
+    - curtin in-target --target=/target -- systemctl enable ssh

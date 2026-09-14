@@ -1,0 +1,83 @@
+---
+- name: Set API URLs
+  ansible.builtin.set_fact:
+    es_api_url: "http://{{ hostvars[groups['elastic_cluster'][0]]['ansible_host'] }}:9200"
+    kibana_api_url: "http://{{ hostvars[groups['kibana_gateway'][0]]['ansible_host'] }}:5601"
+
+- name: Wait for Elasticsearch API to be ready
+  ansible.builtin.uri:
+    url: "{{ es_api_url }}/_cluster/health"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    status_code: 200
+  register: es_status
+  until: es_status.status == 200
+  retries: 30
+  delay: 10
+  delegate_to: localhost
+
+- name: Create FortiGate 15-day ILM Policy
+  ansible.builtin.uri:
+    url: "{{ es_api_url }}/_ilm/policy/fortigate-15-days"
+    method: PUT
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body: |
+      {
+        "policy": {
+          "phases": {
+            "hot": {
+              "actions": {
+                "rollover": {
+                  "max_size": "50gb",
+                  "max_age": "1d"
+                }
+              }
+            },
+            "delete": {
+              "min_age": "15d",
+              "actions": {
+                "delete": {}
+              }
+            }
+          }
+        }
+      }
+    status_code: [200, 201]
+  delegate_to: localhost
+
+- name: Create Metrics and Logs 15-day ILM Policy
+  ansible.builtin.uri:
+    url: "{{ es_api_url }}/_ilm/policy/metrics-15-days"
+    method: PUT
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body: |
+      {
+        "policy": {
+          "phases": {
+            "hot": {
+              "actions": {
+                "rollover": {
+                  "max_size": "50gb",
+                  "max_age": "1d"
+                }
+              }
+            },
+            "delete": {
+              "min_age": "15d",
+              "actions": {
+                "delete": {}
+              }
+            }
+          }
+        }
+      }
+    status_code: [200, 201]
+  delegate_to: localhost

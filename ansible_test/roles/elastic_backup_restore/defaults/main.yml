@@ -1,0 +1,40 @@
+---
+# ==============================================================================
+# Default variables for elastic_backup_restore role
+# ==============================================================================
+
+# Elasticsearch cluster endpoint (defaults to first node of elastic_cluster)
+es_api_url: "http://{{ hostvars[groups['elastic_cluster'][0]]['ansible_host'] }}:9200"
+
+# Snapshot Repository Configuration
+snapshot_repo_name: "elastic_backup_repo"
+snapshot_repo_type: "fs"
+snapshot_repo_location: "/mnt/backups/elasticsearch"
+snapshot_repo_compress: true
+
+# Host filesystem preparation
+configure_host_storage: true
+restart_es_on_config_change: false
+
+# Snapshot Lifecycle Management (SLM) Policy Configuration
+slm_policy_name: "daily-cluster-backup"
+slm_schedule: "0 0 1 * * ?" # 01:00 AM UTC everyday
+slm_snapshot_name_template: "<daily-snap-{now/d}>"
+slm_indices:
+  - ".ds-logs-fortinet.firewall-*"
+  - ".ds-metrics-system.*"
+  - ".kibana*"
+slm_ignore_unavailable: true
+slm_include_global_state: false
+
+# SLM Retention Configuration
+slm_retention_expire_after: "30d"
+slm_retention_min_count: 5
+slm_retention_max_count: 30
+
+# Restore Operation Parameters
+snapshot_to_restore: ""
+restore_indices:
+  - ".ds-logs-fortinet.firewall-*"
+  - ".ds-metrics-system.cpu-*"
+restore_wait_for_completion: true

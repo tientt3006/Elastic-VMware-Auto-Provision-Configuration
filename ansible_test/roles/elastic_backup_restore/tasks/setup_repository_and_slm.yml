@@ -1,0 +1,95 @@
+---
+# ==============================================================================
+# Setup Snapshot Repository and SLM Policy via Elasticsearch API
+# Delegated to localhost
+# ==============================================================================
+
+- name: Set Elasticsearch API URL
+  ansible.builtin.set_fact:
+    target_es_url: "http://{{ hostvars[groups['elastic_cluster'][0]]['ansible_host'] }}:9200"
+
+- name: Wait for Elasticsearch API to be reachable
+  ansible.builtin.uri:
+    url: "{{ target_es_url }}/_cluster/health"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    status_code: [200]
+  register: es_health_check
+  until: es_health_check.status == 200
+  retries: 15
+  delay: 5
+  delegate_to: localhost
+
+- name: Register Elasticsearch Snapshot Repository
+  ansible.builtin.uri:
+    url: "{{ target_es_url }}/_snapshot/{{ snapshot_repo_name }}"
+    method: PUT
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      type: "{{ snapshot_repo_type }}"
+      settings:
+        location: "{{ snapshot_repo_location }}"
+        compress: "{{ snapshot_repo_compress | bool }}"
+    status_code: [200, 201]
+  register: repo_register_result
+  delegate_to: localhost
+
+- name: Verify Snapshot Repository accessibility across cluster nodes
+  ansible.builtin.uri:
+    url: "{{ target_es_url }}/_snapshot/{{ snapshot_repo_name }}/_verify"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    status_code: [200]
+  register: repo_verify_result
+  delegate_to: localhost
+
+- name: Display Snapshot Repository Verification details
+  ansible.builtin.debug:
+    var: repo_verify_result.json
+  when: repo_verify_result.json is defined
+
+- name: Configure Snapshot Lifecycle Management (SLM) Policy
+  ansible.builtin.uri:
+    url: "{{ target_es_url }}/_slm/policy/{{ slm_policy_name }}"
+    method: PUT
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      schedule: "{{ slm_schedule }}"
+      name: "{{ slm_snapshot_name_template }}"
+      repository: "{{ snapshot_repo_name }}"
+      config:
+        indices: "{{ slm_indices }}"
+        ignore_unavailable: "{{ slm_ignore_unavailable | bool }}"
+        include_global_state: "{{ slm_include_global_state | bool }}"
+      retention:
+        expire_after: "{{ slm_retention_expire_after }}"
+        min_count: "{{ slm_retention_min_count | int }}"
+        max_count: "{{ slm_retention_max_count | int }}"
+    status_code: [200, 201]
+  register: slm_policy_result
+  delegate_to: localhost
+
+- name: Fetch and display configured SLM Policy
+  ansible.builtin.uri:
+    url: "{{ target_es_url }}/_slm/policy/{{ slm_policy_name }}"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    status_code: [200]
+  register: slm_query_result
+  delegate_to: localhost
+
+- name: Display SLM Policy confirmation
+  ansible.builtin.debug:
+    msg: "SLM Policy '{{ slm_policy_name }}' successfully configured in repository '{{ snapshot_repo_name }}'."

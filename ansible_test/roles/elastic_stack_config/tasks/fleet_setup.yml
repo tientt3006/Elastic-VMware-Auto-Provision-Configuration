@@ -1,0 +1,160 @@
+---
+- name: Wait for Kibana API to be ready
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/status"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    status_code: 200
+    headers:
+      kbn-xsrf: "true"
+  register: kibana_status
+  until: kibana_status.status == 200
+  retries: 30
+  delay: 10
+  delegate_to: localhost
+
+- name: Setup Fleet in Kibana (Initialize Fleet system indices and default policies)
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/setup"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    status_code: [200, 201, 400]
+  delegate_to: localhost
+
+- name: Create Fleet Server Agent Policy
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/agent_policies"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: |
+      {
+        "name": "Fleet Server Policy",
+        "id": "fleet-server-policy",
+        "namespace": "default",
+        "monitoring_enabled": ["logs", "metrics"]
+      }
+    status_code: [200, 400, 409]
+  delegate_to: localhost
+
+- name: Create Default Agent Policy
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/agent_policies"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: |
+      {
+        "name": "Default Policy",
+        "id": "default-policy",
+        "namespace": "default",
+        "monitoring_enabled": ["logs", "metrics"]
+      }
+    status_code: [200, 400, 409]
+  delegate_to: localhost
+
+- name: Get Fleet Server package version
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/epm/packages/fleet_server"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+  register: fleet_server_package_info
+  delegate_to: localhost
+
+- name: Add Fleet Server Integration to Policy
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: |
+      {
+        "name": "fleet_server-1",
+        "namespace": "default",
+        "policy_id": "fleet-server-policy",
+        "package": {
+          "name": "fleet_server",
+          "title": "Fleet Server",
+          "version": "{{ fleet_server_package_info.json.item.version }}"
+        },
+        "inputs": [
+          {
+            "type": "fleet-server",
+            "enabled": true,
+            "streams": [],
+            "vars": {
+              "host": { "value": "0.0.0.0", "type": "text" },
+              "port": { "value": 8220, "type": "number" }
+            }
+          }
+        ]
+      }
+    status_code: [200, 400, 409]
+  delegate_to: localhost
+  ignore_errors: true
+
+# Fleet Server service token generation has been moved to the fleet_server role
+# so it is only regenerated when Fleet Server actually needs to be installed.
+
+- name: Configure Fleet Settings (Fleet Server Hosts)
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/settings"
+    method: PUT
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: |
+      {
+        "fleet_server_hosts": [
+          "https://10.255.242.214:8220"
+        ]
+      }
+    status_code: [200]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Get Fleet Server Enrollment Tokens
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/enrollment_api_keys"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+  register: enrollment_tokens_response
+  delegate_to: localhost
+
+- name: Extract tokens to variables (Dummy pass for Fleet Server and Elastic Agent roles)
+  ansible.builtin.set_fact:
+    fleet_server_enrollment_token: "{{ enrollment_tokens_response.json.list | selectattr('policy_id', 'equalto', 'fleet-server-policy') | map(attribute='api_key') | first | default('') }}"
+    agent_enrollment_token: "{{ enrollment_tokens_response.json.list | selectattr('policy_id', 'equalto', 'default-policy') | map(attribute='api_key') | first | default('') }}"

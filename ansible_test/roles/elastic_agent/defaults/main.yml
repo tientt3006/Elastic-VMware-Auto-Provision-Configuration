@@ -1,0 +1,6 @@
+---
+elastic_version: "8.19.0"
+fleet_server_url: "http://127.0.0.1:8220"
+elastic_agent_enrollment_token: "CHANGE_ME"
+elastic_agent_policy_id: "CHANGE_ME"
+elastic_agent_download_dir: /var/tmp/elastic-agent

@@ -1,0 +1,6 @@
+---
+# Main task entry point for elastic_stack_config
+
+- import_tasks: ilm.yml
+- import_tasks: fleet_setup.yml
+- import_tasks: integrations.yml

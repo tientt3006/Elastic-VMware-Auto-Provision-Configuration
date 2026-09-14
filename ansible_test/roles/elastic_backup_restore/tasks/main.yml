@@ -1,0 +1,6 @@
+---
+# ==============================================================================
+# Main task entry point for elastic_backup_restore
+# ==============================================================================
+- name: Include Snapshot Repository and SLM Setup Tasks
+  ansible.builtin.import_tasks: setup_repository_and_slm.yml

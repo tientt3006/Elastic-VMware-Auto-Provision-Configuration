@@ -1,0 +1,7 @@
+---
+# Master Site Playbook
+# This playbook orchestrates the entire deployment and Day-2 configuration sequence.
+
+- import_playbook: configure_stack_policies.yml
+- import_playbook: deploy_fleet_server.yml
+- import_playbook: enroll_agents.yml

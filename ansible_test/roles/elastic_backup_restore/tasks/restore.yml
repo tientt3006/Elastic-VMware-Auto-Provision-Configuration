@@ -1,0 +1,78 @@
+---
+# ==============================================================================
+# Restore Data from Elasticsearch Snapshot
+# Delegated to localhost
+# ==============================================================================
+
+- name: Set Elasticsearch API URL
+  ansible.builtin.set_fact:
+    target_es_url: "http://{{ hostvars[groups['elastic_cluster'][0]]['ansible_host'] }}:9200"
+
+- name: Validate snapshot_to_restore parameter
+  ansible.builtin.fail:
+    msg: "Parameter 'snapshot_to_restore' is required. Example: -e 'snapshot_to_restore=daily-snap-2026.09.14-xxxx'"
+  when: snapshot_to_restore is not defined or (snapshot_to_restore | length == 0)
+
+- name: Check if specified snapshot exists in repository
+  ansible.builtin.uri:
+    url: "{{ target_es_url }}/_snapshot/{{ snapshot_repo_name }}/{{ snapshot_to_restore }}"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    status_code: [200]
+  register: snapshot_check_result
+  delegate_to: localhost
+
+- name: Display Snapshot Details before Restoration
+  ansible.builtin.debug:
+    msg:
+      - "Snapshot Name: {{ snapshot_check_result.json.snapshots[0].snapshot }}"
+      - "Snapshot State: {{ snapshot_check_result.json.snapshots[0].state }}"
+      - "Indices in Snapshot: {{ snapshot_check_result.json.snapshots[0].indices }}"
+
+- name: Close target indices/data streams to allow in-place restoration
+  ansible.builtin.uri:
+    url: "{{ target_es_url }}/{{ item }}/_close"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  loop: "{{ restore_indices }}"
+  delegate_to: localhost
+  failed_when: false
+
+- name: Execute Snapshot Restore API
+  ansible.builtin.uri:
+    url: "{{ target_es_url }}/_snapshot/{{ snapshot_repo_name }}/{{ snapshot_to_restore }}/_restore?wait_for_completion={{ restore_wait_for_completion | lower }}"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      indices: "{{ restore_indices }}"
+      ignore_unavailable: true
+      include_global_state: false
+    status_code: [200]
+  register: restore_api_result
+  delegate_to: localhost
+
+- name: Query shard recovery status after restoration
+  ansible.builtin.uri:
+    url: "{{ target_es_url }}/_cat/recovery?v"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    return_content: true
+  register: recovery_cat_result
+  delegate_to: localhost
+
+- name: Display Restoration and Shard Recovery Summary
+  ansible.builtin.debug:
+    msg:
+      - "Restoration API Response: {{ restore_api_result.json | default('OK') }}"
+      - "Shard Recovery Details:"
+      - "{{ recovery_cat_result.content.split('\n')[:25] }}"

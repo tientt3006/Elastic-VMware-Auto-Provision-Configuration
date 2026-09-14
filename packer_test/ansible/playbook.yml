@@ -1,0 +1,123 @@
+---
+# ==============================================================================
+# Playbook: Ubuntu 24.04 Baseline Template Configuration
+# Executed either directly or post-provisioning via WSL Ansible environment
+# ==============================================================================
+
+- name: Apply Enterprise Baseline Configuration on Ubuntu 24.04 Golden Image
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Update apt cache and upgrade system packages
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: dist
+        autoremove: true
+        clean: true
+
+    - name: Ensure required enterprise packages are installed
+      ansible.builtin.apt:
+        name:
+          - open-vm-tools
+          - cloud-init
+          - chrony
+          - ufw
+          - curl
+          - wget
+          - ca-certificates
+          - gnupg
+          - sudo
+          - net-tools
+        state: present
+
+    - name: Ensure open-vm-tools service is enabled and started
+      ansible.builtin.systemd:
+        name: open-vm-tools
+        enabled: true
+        state: started
+
+    - name: Configure Chrony time synchronization service
+      ansible.builtin.systemd:
+        name: chrony
+        enabled: true
+        state: started
+
+    - name: Apply SSH server security hardening
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/99-hardening.conf
+        content: |
+          PermitRootLogin no
+          MaxAuthTries 4
+          PasswordAuthentication yes
+          X11Forwarding no
+          PrintMotd no
+          ClientAliveInterval 300
+          ClientAliveCountMax 2
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart SSH
+
+    - name: Configure UFW default firewall policies
+      community.general.ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { direction: 'incoming', policy: 'deny' }
+        - { direction: 'outgoing', policy: 'allow' }
+
+    - name: Allow SSH traffic through UFW
+      community.general.ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+        comment: 'Administrative SSH'
+
+    - name: Enable UFW service
+      community.general.ufw:
+        state: enabled
+
+    - name: Configure Cloud-Init datasources for VMware vSphere
+      ansible.builtin.copy:
+        dest: /etc/cloud/cloud.cfg.d/99-vmware-datasources.cfg
+        content: |
+          datasource_list: [ VMware, NoCloud, None ]
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Disable Cloud-Init network configuration
+      ansible.builtin.copy:
+        dest: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+        content: |
+          network: {config: disabled}
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Reset Cloud-Init state
+      ansible.builtin.command:
+        cmd: cloud-init clean --logs --seed
+      changed_when: true
+
+    - name: Sanitize machine-id for unique DHCP lease assignment
+      ansible.builtin.shell: |
+        truncate -s 0 /etc/machine-id
+        rm -f /var/lib/dbus/machine-id
+        ln -sf /etc/machine-id /var/lib/dbus/machine-id
+      changed_when: true
+
+    - name: Remove transient SSH host keys
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      with_fileglob:
+        - /etc/ssh/ssh_host_*
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.systemd:
+        name: ssh
+        state: restarted

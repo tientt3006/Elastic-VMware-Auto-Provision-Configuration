@@ -1,0 +1,48 @@
+# ==============================================================================
+# Elasticsearch Cluster Configuration Template (HA Multi-Node)
+# ==============================================================================
+
+cluster.name: {{ elastic_cluster_name | default('elastic-cluster-lab') }}
+node.name: {{ inventory_hostname }}
+
+# Node Roles Definition
+node.roles:
+  - master
+  - data
+  - ingest
+  - remote_cluster_client
+
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+
+# Lock memory to prevent swapping JVM pages
+bootstrap.memory_lock: true
+
+# Network binding
+network.host: 0.0.0.0
+http.port: 9200
+
+# Cluster Discovery and Quorum Bootstrap
+discovery.seed_hosts:
+{% for host in groups['elastic_cluster'] %}
+  - "{{ hostvars[host]['ansible_host'] }}"
+{% endfor %}
+
+cluster.initial_master_nodes:
+{% for host in groups['elastic_cluster'] %}
+  - "{{ host }}"
+{% endfor %}
+
+# ------------------------------------------------------------------------------
+# Security and Multi-Node TLS Encryption
+# ------------------------------------------------------------------------------
+xpack.security.enabled: true
+
+# Transport layer TLS (mTLS on port 9300 between cluster nodes)
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.verification_mode: certificate
+xpack.security.transport.ssl.keystore.path: elastic-certificates.p12
+xpack.security.transport.ssl.truststore.path: elastic-certificates.p12
+
+# HTTP layer SSL (Disabled for internal lab, can be enabled with certs for prod)
+xpack.security.http.ssl.enabled: false

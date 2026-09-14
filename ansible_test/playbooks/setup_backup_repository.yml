@@ -1,0 +1,26 @@
+---
+# ==============================================================================
+# Playbook: Setup Elasticsearch Snapshot Repository and SLM Policy
+# - Prepares storage directory and path.repo on cluster nodes (optional/configurable)
+# - Registers Snapshot Repository via Elasticsearch API
+# - Configures automated Daily Snapshot Lifecycle Management (SLM) Policy
+# ==============================================================================
+
+- name: Prepare Snapshot Repository Directory and Configuration on Cluster Nodes
+  hosts: elastic_cluster
+  become: true
+  roles:
+    - role: elastic_backup_restore
+      tasks_from: setup_host_storage.yml
+      when: configure_host_storage | default(true) | bool
+  tags:
+    - host_prep
+
+- name: Register Snapshot Repository and Configure SLM Policy via API
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: elastic_backup_restore
+      tasks_from: setup_repository_and_slm.yml
+  tags:
+    - api_setup

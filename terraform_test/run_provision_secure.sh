@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Secure In-Memory Terraform Provisioning Wrapper (Decentralized Component)
+# - Run directly from inside terraform_test directory: ./run_provision_secure.sh
+# - Reads target topology directly from ./terraform.tfvars (Zero .env dependency)
+# - Prompts for password interactively via masked input (read -s -p)
+# - Stores credentials strictly in memory (RAM environment variables)
+# - Validates vCenter connectivity via govc pre-flight check in < 1 second
+# - Runs terraform apply with -parallelism=1 to eliminate ObjectStatus(0) panic
+# - Guarantees ZERO passwords written to disk, auto-unsets variables on exit
+# ==============================================================================
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TFVARS="${SCRIPT_DIR}/terraform.tfvars"
+
+# Cleanup trap to guarantee in-memory secrets are deleted
+cleanup() {
+    echo ""
+    echo "Don dep thong tin bi mat khoi bo nho RAM..."
+    unset TF_VAR_vsphere_password || true
+    unset GOVC_PASSWORD || true
+    unset GOVC_URL || true
+    unset GOVC_USERNAME || true
+    unset VSPHERE_PASSWORD || true
+    echo "Hoan tat don dep."
+}
+trap cleanup EXIT INT TERM
+
+echo "=============================================================================="
+echo "He thong dieu phoi cap phat ha tang bao mat In-Memory (Terraform)"
+echo "=============================================================================="
+
+if [[ ! -f "${TFVARS}" ]]; then
+    echo "Loi: Khong tim thay file cau hinh tai: ${TFVARS}" >&2
+    exit 1
+fi
+
+# 1. Trich xuat thong so may chu truc tiep tu terraform.tfvars
+VSPHERE_SERVER=$(grep -E '^\s*vsphere_server\s*=' "${TFVARS}" | head -n 1 | cut -d'"' -f2)
+VSPHERE_USER=$(grep -E '^\s*vsphere_user\s*=' "${TFVARS}" | head -n 1 | cut -d'"' -f2)
+
+# 2. Nhap mat khau an tu terminal
+echo "May chu vCenter: ${VSPHERE_SERVER}"
+echo "Tai khoan:       ${VSPHERE_USER}"
+read -s -p "Nhap mat khau vCenter: " VSPHERE_PASSWORD
+echo ""
+
+if [[ -z "${VSPHERE_PASSWORD}" ]]; then
+    echo "Loi: Mat khau khong duoc de trong." >&2
+    exit 1
+fi
+
+# 3. Nap bien moi truong vao bo nho RAM
+export TF_VAR_vsphere_password="${VSPHERE_PASSWORD}"
+export GOVC_URL="${VSPHERE_SERVER}"
+export GOVC_USERNAME="${VSPHERE_USER}"
+export GOVC_PASSWORD="${VSPHERE_PASSWORD}"
+export GOVC_INSECURE="1"
+
+# 4. Kiem tra truoc (Pre-flight Validation) bang govc
+if command -v govc &>/dev/null; then
+    echo "Dang xac thuc ket noi toi vCenter qua govc API..."
+    if govc about >/dev/null 2>&1; then
+        echo "Xac thuc vCenter thanh cong."
+        govc about
+    else
+        echo "Loi: Xac thuc vCenter that bai. Vui long kiem tra lai mat khau hoac ket noi mang." >&2
+        exit 1
+    fi
+fi
+
+# 5. Thuc thi apply truc tiep voi -parallelism=1 de triet tieu loi ObjectStatus(0)
+cd "${SCRIPT_DIR}"
+
+echo ""
+echo "=============================================================================="
+echo "Khoi chay Terraform apply (che do an toan -parallelism=1)..."
+echo "=============================================================================="
+terraform apply -parallelism=1

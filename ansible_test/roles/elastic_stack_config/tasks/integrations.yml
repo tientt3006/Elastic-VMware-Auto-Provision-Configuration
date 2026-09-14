@@ -1,0 +1,247 @@
+---
+- name: Query existing Fleet Package Policies
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+  register: existing_package_policies
+  delegate_to: localhost
+
+- name: Remove empty or outdated system-default package policy
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies/{{ item.id }}"
+    method: DELETE
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    status_code: [200, 404]
+  loop: "{{ existing_package_policies.json['items'] | default([]) }}"
+  when: item.name == 'system-default' and (item.inputs | length == 0)
+  delegate_to: localhost
+
+- name: Install Fortinet Integration Package (Latest)
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/epm/packages/fortinet"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: "{}"
+    status_code: [200, 400]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Get Fortinet package version
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/epm/packages/fortinet"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+  register: fortinet_package_info
+  delegate_to: localhost
+
+- name: Create FortiGate Integration Policy on UDP 9004
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: |
+      {
+        "name": "fortigate-syslog",
+        "description": "FortiGate Syslog UDP 9004 listener",
+        "namespace": "default",
+        "policy_id": "fleet-server-policy",
+        "package": {
+          "name": "fortinet",
+          "title": "Fortinet FortiGate Firewall",
+          "version": "{{ fortinet_package_info.json.item.version }}"
+        },
+        "inputs": [
+          {
+            "type": "udp",
+            "enabled": true,
+            "streams": [
+              {
+                "id": "udp-fortinet.firewall",
+                "enabled": true,
+                "data_stream": {
+                  "dataset": "fortinet.firewall",
+                  "type": "logs"
+                },
+                "vars": {
+                  "syslog_port": { "value": 9004, "type": "number" },
+                  "syslog_host": { "value": "0.0.0.0", "type": "text" },
+                  "tags": { "value": ["forwarded"], "type": "text" },
+                  "preserve_original_event": { "value": false, "type": "bool" }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    status_code: [200, 400, 409]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Install System Integration Package (Latest)
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/epm/packages/system"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: "{}"
+    status_code: [200, 400]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Get System package version
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/epm/packages/system"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+  register: system_package_info
+  delegate_to: localhost
+
+- name: Create System Integration Policy on Default Policy
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: |
+      {
+        "name": "system-default",
+        "description": "System Integration for Default Policy",
+        "namespace": "default",
+        "policy_id": "default-policy",
+        "package": {
+          "name": "system",
+          "version": "{{ system_package_info.json.item.version }}"
+        },
+        "inputs": {}
+      }
+    status_code: [200, 400, 409]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Create System Integration Policy on Fleet Server Policy
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: |
+      {
+        "name": "system-fleet-server",
+        "description": "System Integration for Fleet Server Gateway",
+        "namespace": "default",
+        "policy_id": "fleet-server-policy",
+        "package": {
+          "name": "system",
+          "version": "{{ system_package_info.json.item.version }}"
+        },
+        "inputs": {}
+      }
+    status_code: [200, 400, 409]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Install Elasticsearch Integration Package (Latest)
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/epm/packages/elasticsearch"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: "{}"
+    status_code: [200, 400]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Get Elasticsearch package version
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/epm/packages/elasticsearch"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+  register: elasticsearch_package_info
+  delegate_to: localhost
+
+- name: Create Elasticsearch Integration Policy on Default Policy
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: "{{ lookup('template', 'elasticsearch_policy.json.j2') }}"
+    status_code: [200, 400, 409]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Update Elasticsearch Integration Policy if already exists
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies/{{ item.id }}"
+    method: PUT
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: "{{ lookup('template', 'elasticsearch_policy.json.j2') }}"
+    status_code: [200, 400]
+  loop: "{{ existing_package_policies.json['items'] | default([]) }}"
+  when: item.name == 'elasticsearch-default'
+  delegate_to: localhost
+  ignore_errors: true

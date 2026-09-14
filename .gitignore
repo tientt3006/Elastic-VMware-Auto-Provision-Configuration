@@ -1,0 +1,33 @@
+# Master environment and sensitive credential files
+.env*
+*.pem
+*.key
+*.pfx
+id_rsa*
+id_ed25519*
+
+# Terraform local states and cache
+**/.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Ansible runtime artifacts and auto-generated shared env
+*.retry
+ansible/inventories/*/group_vars/all/shared_env.yml
+.vault_pass*
+
+# Packer build caches
+packer_cache/
+*.box
+
+# OS, editor, and IDE temporary artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~

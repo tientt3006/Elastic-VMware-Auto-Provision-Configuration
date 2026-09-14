@@ -1,0 +1,41 @@
+---
+# ==============================================================================
+# Master Deployment Playbook: High Availability Elastic Stack Cluster
+# Deploys 3-Node Elasticsearch Cluster with Transport TLS + Kibana Gateway
+# ==============================================================================
+
+- name: Deploy and Configure High Availability Elasticsearch Cluster
+  hosts: elastic_cluster
+  become: true
+  roles:
+    - elastic_cluster
+
+- name: Deploy and Configure Kibana & Observability Gateway
+  hosts: kibana_gateway
+  become: true
+  roles:
+    - kibana_fleet_gateway
+
+- name: Verify Cluster Health
+  hosts: elastic_cluster[0]
+  become: false
+  tasks:
+    - name: Query Elasticsearch Cluster Health API
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9200/_cluster/health?pretty"
+        method: GET
+        user: "elastic"
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        status_code: 200
+      register: cluster_health
+      retries: 10
+      delay: 5
+
+    - name: Display Cluster Health Status
+      ansible.builtin.debug:
+        msg: >
+          Cluster Name: {{ cluster_health.json.cluster_name }} |
+          Status: {{ cluster_health.json.status }} |
+          Total Nodes: {{ cluster_health.json.number_of_nodes }} |
+          Data Nodes: {{ cluster_health.json.number_of_data_nodes }}

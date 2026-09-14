@@ -1,0 +1,79 @@
+# ==============================================================================
+# vCenter Server Connection Configuration (Redacted Example)
+# ==============================================================================
+vsphere_server              = "vcsa.corp.internal"
+vsphere_user                = "administrator@vsphere.local"
+vsphere_password            = "YourSecurePasswordHere"
+vsphere_insecure_connection = true
+
+# ==============================================================================
+# vSphere Infrastructure Targets
+# ==============================================================================
+vsphere_datacenter    = "Datacenter"
+vsphere_cluster       = "Cluster1"
+vsphere_datastore     = "DS_100_3"
+vsphere_template_name = "tpl-ubuntu-2404-golden"
+
+# ==============================================================================
+# Content Library Configuration
+# ==============================================================================
+content_library_name      = "Content Lib DS_100_3_1"
+content_library_item_name = "tpl-ubuntu-2404-golden"
+
+# ==============================================================================
+# Inventory Folder Configuration
+# ==============================================================================
+vm_folders       = ["App_Workloads", "Infra_Services"]
+vm_target_folder = "App_Workloads"
+
+# ==============================================================================
+# ESXi Host & Standard Switch Configuration
+# ==============================================================================
+esxi_hosts          = ["10.255.242.100", "10.255.242.101"]
+virtual_switch_name = "vSwitch0"
+
+port_groups = {
+  "VM Network 3" = { vlan_id = 0 }
+  "VM Network 4" = { vlan_id = 0 }
+}
+
+default_domain_name = "corp.internal"
+default_dns_servers = ["10.255.242.106", "8.8.8.8"]
+
+# ==============================================================================
+# Virtual Machine Workloads
+# ==============================================================================
+vms = {
+  "app_node_01" = {
+    name         = "srv-ubuntu-app-01"
+    hostname     = "app-node-01"
+    vm_id        = 101
+    cpu_count    = 2
+    memory_mb    = 4096
+    disk_size_gb = 40
+    network_name = "VM Network 3"
+    ip_address   = "10.255.242.211"
+    netmask      = 24
+    gateway      = "10.255.242.1"
+    role         = "app_primary"
+    extra_config = {
+      "guestinfo.owner" = "devops-team"
+    }
+  },
+  "app_node_02" = {
+    name         = "srv-ubuntu-app-02"
+    hostname     = "app-node-02"
+    vm_id        = 102
+    cpu_count    = 4
+    memory_mb    = 8192
+    disk_size_gb = 60
+    network_name = "VM Network 4"
+    ip_address   = "10.255.242.212"
+    netmask      = 24
+    gateway      = "10.255.242.1"
+    role         = "app_worker"
+    extra_config = {
+      "guestinfo.owner" = "devops-team"
+    }
+  }
+}

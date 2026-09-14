@@ -1,0 +1,64 @@
+---
+# ==============================================================================
+# Tasks for role: kibana_fleet_gateway (Kibana UI + Fleet Server)
+# ==============================================================================
+
+- name: Ensure apt-transport-https and ca-certificates are installed
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+
+- name: Add Elastic APT signing key
+  ansible.builtin.get_url:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    dest: /usr/share/keyrings/elasticsearch-keyring.asc
+    mode: "0644"
+
+- name: Add Elastic APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.asc] https://artifacts.elastic.co/packages/8.x/apt stable main"
+    state: present
+    filename: elastic-8.x
+
+- name: Install Kibana package
+  ansible.builtin.apt:
+    name: "kibana={{ elastic_version | default('8.19.0') }}*"
+    state: present
+    update_cache: true
+
+- name: Allow Kibana (5601) and Fleet Server (8220) ports through firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+  loop:
+    - { port: "5601", proto: "tcp" }
+    - { port: "8220", proto: "tcp" }
+    - { port: "9004", proto: "udp" }
+
+- name: Deploy kibana.yml configuration
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    owner: root
+    group: kibana
+    mode: "0660"
+  notify: Restart Kibana
+
+- name: Ensure Kibana service is enabled and started
+  ansible.builtin.systemd:
+    name: kibana
+    enabled: true
+    state: started
+
+- name: Wait for Kibana HTTP port to become active
+  ansible.builtin.wait_for:
+    port: 5601
+    host: 127.0.0.1
+    timeout: 300
+    delay: 5
