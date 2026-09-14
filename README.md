@@ -27,23 +27,32 @@ Toàn bộ tài liệu kiến trúc, hướng dẫn vận hành và sổ tay k�
 
 ```text
 auto_provision_configuration/
-├── 00_... đến 09_...                           # Các tài liệu đặc tả kiến trúc và sổ tay vận hành
-├── README.md                                   # Tài liệu tổng quan và hướng dẫn khởi động nhanh
+├── automation_seed/                            # Bộ công cụ khởi tạo trạm điều khiển Ubuntu và quản lý ISO
+│   ├── setup_automation_env.sh                 # Cài đặt tự động Packer, Terraform, Ansible, govc
+│   ├── download_iso.sh                         # Tự động tải ISO Ubuntu/VCSA kèm kiểm tra SHA256
+│   └── upload_iso_to_vcenter.sh                # Đẩy ISO lên Datastore hoặc vCenter Content Library
+├── vcsa_deploy/                                # Bộ tự động hóa cài đặt vCenter Server Appliance (VCSA)
+│   ├── deploy_vcsa_unattended.sh               # Kịch bản điều phối cài đặt VCSA qua vcsa-deploy
+│   ├── templates/embedded_vcs_on_esxi.json.tpl # Bản mẫu đặc tả cấu hình JSON cho VCSA
+│   ├── vcsa_vars.env.example                   # Tệp khai báo biến hạ tầng mẫu cho VCSA
+│   └── 01_vcsa_unattended_deployment_runbook.md# Sổ tay quy trình kỹ thuật cài đặt VCSA không giám sát
+├── packer_test/                                # Bộ mã nguồn đóng gói mẫu máy ảo Ubuntu 24.04 Golden Image
+│   ├── ubuntu-24.04.pkr.hcl                    # Định nghĩa Packer HCL template cho vSphere
+│   ├── build_packer_secure.sh                  # Kịch bản khởi tạo template an toàn
+│   └── http/user-data                          # Tệp cấu hình tự động cài đặt Cloud-Init / Autoinstall
 ├── terraform_test/                             # Bộ mã nguồn Terraform khởi tạo hạ tầng vSphere
 │   ├── main.tf, variables.tf, outputs.tf       # Khối khai báo tài nguyên trung tâm
 │   ├── terraform.tfvars                        # Khai báo thông số cụm máy ảo và mạng
 │   ├── run_provision_secure.sh                 # Kịch bản triển khai hạ tầng với cơ chế tiêm mật khẩu RAM
 │   └── modules/                                # Các module: folder, content_library, network, compute, cluster_rules
-├── ansible_test/                               # Bộ mã nguồn Ansible cấu hình dịch vụ
-│   ├── ansible.cfg, inventories/lab/           # Cấu hình môi trường và định nghĩa danh sách host
-│   ├── run_ansible_secure.sh                   # Kịch bản cài đặt cụm Elasticsearch HA và Kibana Gateway
-│   ├── run_observability_setup.sh              # Kịch bản tự động hóa 100% hệ thống quan sát Day-2 (Fleet & Agents)
-│   ├── playbooks/                              # Các playbook triển khai, cấu hình policy và teardown
-│   └── roles/                                  # Các role: elastic_cluster, kibana_fleet_gateway, elastic_stack_config, fleet_server, elastic_agent
-└── packer_test/                                # Bộ mã nguồn đóng gói mẫu máy ảo Ubuntu 24.04 Golden Image
-    ├── ubuntu-24.04.pkr.hcl                    # Định nghĩa Packer HCL template cho vSphere
-    ├── build_packer_secure.sh                  # Kịch bản khởi tạo template an toàn
-    └── http/user-data                          # Tệp cấu hình tự động cài đặt Cloud-Init / Autoinstall
+└── ansible_test/                               # Bộ mã nguồn Ansible cấu hình dịch vụ
+    ├── ansible.cfg, inventories/lab/           # Cấu hình môi trường và định nghĩa danh sách host
+    ├── run_ansible_secure.sh                   # Kịch bản cài đặt cụm Elasticsearch HA và Kibana Gateway
+    ├── run_observability_setup.sh              # Kịch bản tự động hóa 100% hệ thống quan sát Day-2
+    ├── run_backup_restore.sh                   # Kịch bản quản lý sao lưu và phục hồi thảm họa
+    ├── playbooks/                              # Các playbook triển khai, cấu hình policy và teardown
+    └── roles/                                  # Các role: elastic_cluster, kibana_fleet_gateway, elastic_stack_config, fleet_server, elastic_agent, elastic_backup_restore
+
 ```
 
 ---

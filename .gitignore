@@ -1,10 +1,15 @@
 # Master environment and sensitive credential files
 .env*
+*.env
+!*.env.example
 *.pem
 *.key
 *.pfx
 id_rsa*
 id_ed25519*
+*.iso
+iso_cache/
+
 
 # Terraform local states and cache
 **/.terraform/
