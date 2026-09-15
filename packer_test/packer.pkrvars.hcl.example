@@ -26,11 +26,6 @@ vm_mem_size                 = 4096
 vm_disk_size                = 40960
 vm_disk_thin                = true
 
+
 ssh_username                = "svc_admin"
 ssh_timeout                 = "30m"
-
-http_directory              = "http"
-http_ip                     = "10.255.245.20"
-http_bind_address           = "0.0.0.0"
-http_port_min               = 8120
-http_port_max               = 8130
