@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Master Orchestrator Script for One-Click Deployment (Version 2)
+# Master Orchestrator Script for One-Click Deployment (Version 3)
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="${SCRIPT_DIR}/deploy_$(date +%Y%m%d_%H%M%S).log"
+PKR_FILE="${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl"
+TF_FILE="${SCRIPT_DIR}/terraform_test/terraform.tfvars"
+ANS_FILE="${SCRIPT_DIR}/ansible_test/inventories/lab/hosts.yml"
 
-# 1. Mở tmux session nếu chưa ở trong tmux
+# ==============================================================================
+# 0. Mở tmux session nếu chưa ở trong tmux
+# ==============================================================================
 if [[ -z "${TMUX:-}" ]]; then
-    echo "Đang kiểm tra môi trường tmux..."
     if command -v tmux &> /dev/null; then
         echo "Khởi tạo phiên tmux (deploy_session) để chống đứt kết nối SSH..."
         exec tmux new-session -s deploy_session "bash \"$0\" \"$@\" 2>&1 | tee \"${LOG_FILE}\""
     else
-        echo "CẢNH BÁO: tmux chưa được cài đặt. Tiến trình vẫn tiếp tục nhưng nếu đứt SSH sẽ bị gián đoạn."
+        echo "CẢNH BÁO: tmux chưa được cài đặt. Nếu đứt SSH sẽ bị gián đoạn."
         exec > >(tee -a "${LOG_FILE}") 2>&1
     fi
 else
@@ -22,111 +26,190 @@ else
 fi
 
 echo "=============================================================================="
-echo "HỆ THỐNG ĐIỀU PHỐI TỰ ĐỘNG - ONE CLICK DEPLOYMENT"
+echo "HỆ THỐNG ĐIỀU PHỐI TỰ ĐỘNG - ONE CLICK DEPLOYMENT (v3)"
 echo "Log file: ${LOG_FILE}"
 echo "=============================================================================="
 
-# 2. Khởi tạo tệp cấu hình từ mẫu (.example) nếu chưa có
+# ==============================================================================
+# 1. Khởi tạo tệp cấu hình từ mẫu (.example) nếu chưa có
+# ==============================================================================
 echo ""
 echo "--- KIỂM TRA VÀ KHỞI TẠO TỆP CẤU HÌNH ---"
 
-if [[ ! -f "${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl" ]]; then
-    cp "${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl.example" "${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl"
+if [[ ! -f "${PKR_FILE}" ]]; then
+    cp "${PKR_FILE}.example" "${PKR_FILE}"
     echo "Đã tạo: packer_test/packer.pkrvars.hcl"
 fi
 
-if [[ ! -f "${SCRIPT_DIR}/terraform_test/terraform.tfvars" ]]; then
-    cp "${SCRIPT_DIR}/terraform_test/terraform.tfvars.example" "${SCRIPT_DIR}/terraform_test/terraform.tfvars"
+if [[ ! -f "${TF_FILE}" ]]; then
+    cp "${TF_FILE}.example" "${TF_FILE}"
     echo "Đã tạo: terraform_test/terraform.tfvars"
 fi
 
-if [[ ! -f "${SCRIPT_DIR}/ansible_test/inventories/lab/hosts.yml" ]]; then
-    cp "${SCRIPT_DIR}/ansible_test/inventories/lab/hosts.yml.example" "${SCRIPT_DIR}/ansible_test/inventories/lab/hosts.yml"
+if [[ ! -f "${ANS_FILE}" ]]; then
+    cp "${ANS_FILE}.example" "${ANS_FILE}"
     echo "Đã tạo: ansible_test/inventories/lab/hosts.yml"
 fi
 
-# 3. Thu thập thông tin động để tự cấu hình
+# ==============================================================================
+# 2. Thu thập thông tin dùng chung và tự động điền vào cả 3 tệp cấu hình
+# ==============================================================================
 echo ""
-echo "--- CẤU HÌNH HẠ TẦNG CƠ BẢN ---"
-read -p "Nhập IP hoặc FQDN của vCenter (ví dụ: 10.0.6.30): " SITE_VCSA_IP
-if [[ -z "${SITE_VCSA_IP}" ]]; then
-    echo "Lỗi: IP vCenter không được để trống." >&2
-    exit 1
-fi
+echo "=============================================================================="
+echo "CẤU HÌNH HẠ TẦNG DÙNG CHUNG (TỰ ĐỘNG ĐIỀN VÀO CẢ 3 TỆP)"
+echo "=============================================================================="
 
-read -p "Nhập tên Datastore để lưu ISO cài đặt (ví dụ: DS_100_3): " ISO_DATASTORE
-if [[ -z "${ISO_DATASTORE}" ]]; then
-    echo "Lỗi: Datastore không được để trống." >&2
-    exit 1
-fi
+# --- vCenter Server ---
+read -p "IP hoặc FQDN của vCenter (ví dụ: 10.0.6.30 hoặc vcsa.bvnttwhcm.int): " SITE_VCSA_IP
+[[ -z "${SITE_VCSA_IP}" ]] && echo "Lỗi: Không được để trống." >&2 && exit 1
+sed -i -E "s/(vcenter_server\s*=\s*\")[^\"]+(\")/\1${SITE_VCSA_IP}\2/" "${PKR_FILE}"
+sed -i -E "s/(vsphere_server\s*=\s*\")[^\"]+(\")/\1${SITE_VCSA_IP}\2/" "${TF_FILE}"
 
-echo "Đang cập nhật địa chỉ vCenter và Datastore vào tệp cấu hình..."
-sed -i -E "s/(vcenter_server\s*=\s*\")[^\"]+(\")/\1${SITE_VCSA_IP}\2/" "${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl"
-sed -i -E "s/(vsphere_server\s*=\s*\")[^\"]+(\")/\1${SITE_VCSA_IP}\2/" "${SCRIPT_DIR}/terraform_test/terraform.tfvars"
-sed -i -E "s/(vcenter_datastore\s*=\s*\")[^\"]+(\")/\1${ISO_DATASTORE}\2/" "${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl"
+# --- vCenter User ---
+read -p "Tài khoản vCenter [Enter = administrator@vsphere.local]: " VCENTER_USER
+VCENTER_USER="${VCENTER_USER:-administrator@vsphere.local}"
+sed -i -E "s/(vcenter_user\s*=\s*\")[^\"]+(\")/\1${VCENTER_USER}\2/" "${PKR_FILE}"
+sed -i -E "s/(vsphere_user\s*=\s*\")[^\"]+(\")/\1${VCENTER_USER}\2/" "${TF_FILE}"
 
-# Dùng sed thay thế toàn bộ block iso_paths đa dòng
+# --- Datacenter ---
+read -p "Tên Datacenter trên vCenter [Enter = Datacenter]: " VCENTER_DC
+VCENTER_DC="${VCENTER_DC:-Datacenter}"
+sed -i -E "s/(vcenter_datacenter\s*=\s*\")[^\"]+(\")/\1${VCENTER_DC}\2/" "${PKR_FILE}"
+sed -i -E "s/(vsphere_datacenter\s*=\s*\")[^\"]+(\")/\1${VCENTER_DC}\2/" "${TF_FILE}"
+
+# --- Cluster ---
+read -p "Tên Compute Cluster [Enter = Cluster1]: " VCENTER_CLUSTER
+VCENTER_CLUSTER="${VCENTER_CLUSTER:-Cluster1}"
+sed -i -E "s/(vcenter_cluster\s*=\s*\")[^\"]+(\")/\1${VCENTER_CLUSTER}\2/" "${PKR_FILE}"
+sed -i -E "s/(vsphere_cluster\s*=\s*\")[^\"]+(\")/\1${VCENTER_CLUSTER}\2/" "${TF_FILE}"
+
+# --- Datastore ---
+read -p "Tên Datastore lưu ISO và VM (ví dụ: DS-LD01-SSD): " ISO_DATASTORE
+[[ -z "${ISO_DATASTORE}" ]] && echo "Lỗi: Không được để trống." >&2 && exit 1
+sed -i -E "s/(vcenter_datastore\s*=\s*\")[^\"]+(\")/\1${ISO_DATASTORE}\2/" "${PKR_FILE}"
+sed -i -E "s/(vsphere_datastore\s*=\s*\")[^\"]+(\")/\1${ISO_DATASTORE}\2/" "${TF_FILE}"
+# Cập nhật iso_paths
 sed -i -e '/^iso_paths[[:space:]]*=[[:space:]]*\[/,/^[[:space:]]*\]/c\
 iso_paths = [\
   "['"${ISO_DATASTORE}"'] iso/ubuntu-24.04.1-live-server-amd64.iso"\
-]' "${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl"
-echo "Đã cập nhật xong."
+]' "${PKR_FILE}"
 
-# 4. Tạm dừng để người dùng sửa các tham số chi tiết khác
-echo ""
-echo "=============================================================================="
-echo "CẢNH BÁO TRƯỚC KHI CHẠY (PRE-FLIGHT WARNING)"
-echo "=============================================================================="
-echo "Hệ thống đã tự động điền: vcenter_server, vcenter_datastore, iso_paths."
-echo "Bạn CẦN MỞ TERMINAL KHÁC (hoặc dùng nano/vim) để chỉnh sửa các biến còn lại."
-echo ""
-echo "--- [1/3] packer_test/packer.pkrvars.hcl ---"
-echo "  vcenter_user          : Tài khoản vCenter (mặc định: administrator@vsphere.local)"
-echo "  vcenter_datacenter    : Tên Datacenter trên vCenter"
-echo "  vcenter_cluster       : Tên Compute Cluster chứa ESXi Host"
-echo "  vcenter_network       : Tên Port Group có DHCP (dùng khi build template)"
-echo "  vcenter_folder        : Thư mục lưu template trên vCenter (ví dụ: VM Template)"
-echo "  vm_name               : Tên template sẽ tạo (ví dụ: tpl-ubuntu-2404-golden)"
-echo "  vm_cpu_cores          : Số CPU core cho template VM"
-echo "  vm_mem_size           : RAM cho template VM (đơn vị MB)"
-echo "  vm_disk_size          : Dung lượng ổ đĩa cho template VM (đơn vị MB)"
-echo "  ssh_username          : Tài khoản SSH tạo trên template (mặc định: svc_admin)"
-echo ""
-echo "--- [2/3] terraform_test/terraform.tfvars ---"
-echo "  vsphere_user              : Tài khoản vCenter"
-echo "  vsphere_datacenter        : Tên Datacenter"
-echo "  vsphere_cluster           : Tên Cluster"
-echo "  vsphere_datastore         : Tên Datastore lưu VM"
-echo "  content_library_name      : Tên Content Library (nếu dùng)"
-echo "  content_library_item_name : Tên item trong Content Library"
-echo "  vm_folders                : Danh sách thư mục VM cần tạo"
-echo "  vm_target_folder          : Thư mục đích đặt VM"
-echo "  esxi_hosts                : Danh sách IP các ESXi Host"
-echo "  virtual_switch_name       : Tên vSwitch trên ESXi (ví dụ: vSwitch0)"
-echo "  port_groups               : Tên Port Group và VLAN ID cần tạo"
-echo "  default_domain_name       : Tên miền nội bộ (ví dụ: bvnttwhcm.int)"
-echo "  default_dns_servers       : Danh sách DNS Server"
-echo "  vms -> name               : Tên hiển thị của từng VM (ví dụ: srv-elastic-01)"
-echo "  vms -> hostname           : Hostname gán cho từng VM"
-echo "  vms -> cpu_count          : Số CPU cho từng VM"
-echo "  vms -> memory_mb          : RAM cho từng VM (đơn vị MB)"
-echo "  vms -> disk_size_gb       : Dung lượng ổ đĩa cho từng VM (đơn vị GB)"
-echo "  vms -> network_name       : Port Group gán cho từng VM"
-echo "  vms -> ip_address         : Địa chỉ IP tĩnh của từng VM"
-echo "  vms -> netmask            : Subnet mask (ví dụ: 24)"
-echo "  vms -> gateway            : Default gateway"
-echo ""
-echo "--- [3/3] ansible_test/inventories/lab/hosts.yml ---"
-echo "  ansible_user                   : Tài khoản SSH (phải trùng ssh_username ở Packer)"
-echo "  elastic_cluster -> ansible_host: IP tĩnh của srv-elastic-01, 02, 03 (trùng vms -> ip_address)"
-echo "  kibana_gateway  -> ansible_host: IP tĩnh của srv-kibana-gw (trùng vms -> ip_address)"
-echo ""
-echo "LƯU Ý: Các biến vcenter_server, vsphere_server, vcenter_datastore, iso_paths,"
-echo "        vsphere_template_name ĐÃ ĐƯỢC TỰ ĐỘNG CẬP NHẬT. KHÔNG cần sửa thủ công."
-echo "=============================================================================="
-read -p "Sau khi bạn ĐÃ CẤU HÌNH XONG 3 tệp trên, hãy nhấn Enter để tiếp tục..." IGNORE_VAR
+# --- VM Network cho Packer (Port Group có DHCP) ---
+read -p "Tên Port Group có DHCP cho Packer build template [Enter = VM Network]: " PKR_NETWORK
+PKR_NETWORK="${PKR_NETWORK:-VM Network}"
+sed -i -E "s/(vcenter_network\s*=\s*\")[^\"]+(\")/\1${PKR_NETWORK}\2/" "${PKR_FILE}"
 
-# 5. Thu thập Mật khẩu (1 LẦN DUY NHẤT)
+# --- Folder ---
+read -p "Thư mục VM trên vCenter (ví dụ: App_Workloads) [Enter = App_Workloads]: " VM_FOLDER
+VM_FOLDER="${VM_FOLDER:-App_Workloads}"
+sed -i -E "s/(vcenter_folder\s*=\s*\")[^\"]+(\")/\1${VM_FOLDER}\2/" "${PKR_FILE}"
+sed -i -E "s/(vm_target_folder\s*=\s*\")[^\"]+(\")/\1${VM_FOLDER}\2/" "${TF_FILE}"
+
+# --- Template Name ---
+read -p "Tên VM Template Packer sẽ tạo [Enter = tpl-ubuntu-2404-golden]: " TPL_NAME
+TPL_NAME="${TPL_NAME:-tpl-ubuntu-2404-golden}"
+sed -i -E "s/(vm_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${PKR_FILE}"
+sed -i -E "s/(vsphere_template_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_FILE}"
+sed -i -E "s/(content_library_item_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_FILE}"
+
+# --- SSH Username ---
+read -p "Tài khoản SSH trên VM (dùng cho Packer + Ansible) [Enter = svc_admin]: " SSH_USER
+SSH_USER="${SSH_USER:-svc_admin}"
+sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${PKR_FILE}"
+sed -i -E "s/(ansible_user:\s*).*/\1${SSH_USER}/" "${ANS_FILE}"
+
+# --- IP tĩnh 4 VM (điền vào cả Terraform và Ansible) ---
+echo ""
+echo "--- ĐỊA CHỈ IP TĨNH CHO 4 MÁY ẢO ---"
+read -p "IP tĩnh srv-elastic-01 [Enter = 10.0.6.101]: " IP_E01
+IP_E01="${IP_E01:-10.0.6.101}"
+read -p "IP tĩnh srv-elastic-02 [Enter = 10.0.6.102]: " IP_E02
+IP_E02="${IP_E02:-10.0.6.102}"
+read -p "IP tĩnh srv-elastic-03 [Enter = 10.0.6.103]: " IP_E03
+IP_E03="${IP_E03:-10.0.6.103}"
+read -p "IP tĩnh srv-kibana-gw  [Enter = 10.0.6.104]: " IP_KBN
+IP_KBN="${IP_KBN:-10.0.6.104}"
+read -p "Default Gateway        [Enter = 10.0.6.1]: " GW
+GW="${GW:-10.0.6.1}"
+read -p "Subnet Mask (CIDR)     [Enter = 24]: " NETMASK
+NETMASK="${NETMASK:-24}"
+
+# Điền IP vào Terraform (sed từng block elastic_01 -> elastic_03, kibana_gw)
+# Sử dụng cơ chế tìm block theo key rồi thay ip_address và gateway trong block đó
+python3 - "${TF_FILE}" "${IP_E01}" "${IP_E02}" "${IP_E03}" "${IP_KBN}" "${GW}" "${NETMASK}" << 'PYEOF'
+import sys, re
+tf_file = sys.argv[1]
+ips = {"elastic_01": sys.argv[2], "elastic_02": sys.argv[3], "elastic_03": sys.argv[4], "kibana_gw": sys.argv[5]}
+gw = sys.argv[6]
+netmask = sys.argv[7]
+
+with open(tf_file, 'r') as f:
+    content = f.read()
+
+for key, ip in ips.items():
+    # Match the block for this key and replace ip_address, gateway, netmask inside it
+    pattern = r'("' + key + r'"\s*=\s*\{)(.*?)(\n\s*\})'
+    def replacer(m):
+        block = m.group(2)
+        block = re.sub(r'(ip_address\s*=\s*")[^"]+(")', r'\g<1>' + ip + r'\2', block)
+        block = re.sub(r'(gateway\s*=\s*")[^"]+(")', r'\g<1>' + gw + r'\2', block)
+        block = re.sub(r'(netmask\s*=\s*)\d+', r'\g<1>' + netmask, block)
+        return m.group(1) + block + m.group(3)
+    content = re.sub(pattern, replacer, content, flags=re.DOTALL)
+
+with open(tf_file, 'w') as f:
+    f.write(content)
+PYEOF
+
+# Điền IP vào Ansible hosts.yml
+sed -i -E "/srv-elastic-01/{n;s/(ansible_host:\s*).*/\1${IP_E01}/}" "${ANS_FILE}"
+sed -i -E "/srv-elastic-02/{n;s/(ansible_host:\s*).*/\1${IP_E02}/}" "${ANS_FILE}"
+sed -i -E "/srv-elastic-03/{n;s/(ansible_host:\s*).*/\1${IP_E03}/}" "${ANS_FILE}"
+sed -i -E "/srv-kibana-gw/{n;s/(ansible_host:\s*).*/\1${IP_KBN}/}" "${ANS_FILE}"
+
+echo ""
+echo "Đã tự động điền tất cả thông tin dùng chung vào 3 tệp cấu hình."
+
+# ==============================================================================
+# 3. Cảnh báo các biến còn lại cần sửa thủ công (không lặp lại)
+# ==============================================================================
+echo ""
+echo "=============================================================================="
+echo "CẢNH BÁO: CÁC BIẾN CÒN LẠI CẦN KIỂM TRA THỦ CÔNG"
+echo "=============================================================================="
+echo "Hệ thống ĐÃ TỰ ĐỘNG ĐIỀN các biến dùng chung (vcenter_server, user,"
+echo "datacenter, cluster, datastore, iso_paths, folder, template_name,"
+echo "ssh_username, ansible_user, IP tĩnh 4 VM, gateway, netmask)."
+echo ""
+echo "Nếu cần, MỞ TERMINAL KHÁC để kiểm tra hoặc sửa các biến RIÊNG sau:"
+echo ""
+echo "--- packer_test/packer.pkrvars.hcl ---"
+echo "  vm_cpu_cores   : Số CPU core cho template VM (mặc định: 2)"
+echo "  vm_mem_size    : RAM cho template VM, đơn vị MB (mặc định: 4096)"
+echo "  vm_disk_size   : Dung lượng ổ đĩa template, đơn vị MB (mặc định: 40960)"
+echo "  ssh_timeout    : Thời gian chờ SSH kết nối, đơn vị phút (mặc định: 30m)"
+echo ""
+echo "--- terraform_test/terraform.tfvars ---"
+echo "  content_library_name  : Tên Content Library trên vCenter"
+echo "  vm_folders            : Danh sách thư mục VM cần tạo trước"
+echo "  esxi_hosts            : Danh sách IP các ESXi Host vật lý"
+echo "  virtual_switch_name   : Tên vSwitch trên ESXi (mặc định: vSwitch0)"
+echo "  port_groups           : Port Group và VLAN ID cần tạo trên ESXi"
+echo "  default_domain_name   : Tên miền nội bộ (ví dụ: bvnttwhcm.int)"
+echo "  default_dns_servers   : Danh sách DNS Server"
+echo "  drs_rule_mandatory    : Quy tắc DRS (false = Soft, true = Hard)"
+echo "  vms -> cpu_count      : Số CPU cho từng VM"
+echo "  vms -> memory_mb      : RAM cho từng VM, đơn vị MB"
+echo "  vms -> disk_size_gb   : Dung lượng ổ đĩa từng VM, đơn vị GB"
+echo "  vms -> network_name   : Port Group gán cho từng VM"
+echo ""
+echo "LƯU Ý: Nếu các giá trị mặc định phù hợp, có thể bỏ qua bước này."
+echo "=============================================================================="
+read -p "Nhấn Enter để tiếp tục..." IGNORE_VAR
+
+# ==============================================================================
+# 4. Thu thập Mật khẩu (1 LẦN DUY NHẤT)
+# ==============================================================================
 echo ""
 echo "--- THÔNG TIN BẢO MẬT (PASSWORD PROMPTS) ---"
 if [[ -n "${VCENTER_PASS:-}" ]]; then
@@ -143,12 +226,12 @@ else
 fi
 
 if [[ -n "${SSH_PASS:-}" ]]; then
-    read -s -p "Nhập mật khẩu SSH khởi tạo (svc_admin) [Ấn Enter để giữ nguyên]: " INPUT_PASS
+    read -s -p "Nhập mật khẩu SSH (${SSH_USER}) [Ấn Enter để giữ nguyên]: " INPUT_PASS
     echo ""
     [[ -n "${INPUT_PASS}" ]] && export SSH_PASS="${INPUT_PASS}"
 else
     while [[ -z "${SSH_PASS:-}" ]]; do
-        read -s -p "Nhập mật khẩu SSH khởi tạo (svc_admin): " SSH_PASS
+        read -s -p "Nhập mật khẩu SSH (${SSH_USER}): " SSH_PASS
         echo ""
         [[ -z "${SSH_PASS:-}" ]] && echo "Lỗi: Không được để trống." >&2
     done
@@ -197,7 +280,9 @@ fi
 # Map VCENTER_PASS sang VSPHERE_PASSWORD cho Terraform
 export VSPHERE_PASSWORD="${VCENTER_PASS}"
 
-# 6. Xử lý ISO tự động (Download & Upload)
+# ==============================================================================
+# 5. Xử lý ISO tự động (Download & Upload)
+# ==============================================================================
 echo ""
 echo "=============================================================================="
 echo "TIẾN TRÌNH 0/4: XỬ LÝ ISO CÀI ĐẶT UBUNTU"
@@ -215,8 +300,6 @@ fi
 
 echo "-> Kiểm tra ISO trên vCenter Datastore [${ISO_DATASTORE}]..."
 export GOVC_URL="https://${SITE_VCSA_IP}"
-# Cố gắng lấy user vcenter từ packer config, nếu không dùng mặc định
-VCENTER_USER=$(grep -E '^\s*vcenter_user\s*=' "${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl" | head -n 1 | cut -d'"' -f2 || echo "administrator@vsphere.local")
 export GOVC_USERNAME="${VCENTER_USER}"
 export GOVC_PASSWORD="${VCENTER_PASS}"
 export GOVC_INSECURE="1"
@@ -235,7 +318,9 @@ else
     echo "Vui lòng tự đảm bảo ISO đã có trên Datastore trước khi Packer chạy."
 fi
 
-# 7. Thực thi Packer
+# ==============================================================================
+# 6. Thực thi Packer
+# ==============================================================================
 echo ""
 echo "=============================================================================="
 echo "TIẾN TRÌNH 1/4: ĐÓNG GÓI PACKER TEMPLATE"
@@ -243,21 +328,25 @@ echo "==========================================================================
 cd "${SCRIPT_DIR}/packer_test"
 ./build_packer_secure.sh
 
-# 8. Đồng bộ tên Template từ Packer sang Terraform
+# ==============================================================================
+# 7. Đồng bộ tên Template từ Packer sang Terraform (lần cuối, đề phòng user sửa)
+# ==============================================================================
 echo ""
 echo "=============================================================================="
 echo "ĐỒNG BỘ CẤU HÌNH: PACKER -> TERRAFORM"
 echo "=============================================================================="
-TEMPLATE_NAME=$(grep -E '^\s*vm_name\s*=' "${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl" | head -n 1 | cut -d'"' -f2)
+TEMPLATE_NAME=$(grep -E '^\s*vm_name\s*=' "${PKR_FILE}" | head -n 1 | cut -d'"' -f2)
 if [[ -n "${TEMPLATE_NAME}" ]]; then
     echo "Phát hiện tên template từ Packer: ${TEMPLATE_NAME}"
-    sed -i -E "s/(vsphere_template_name\s*=\s*\")[^\"]+(\")/\1${TEMPLATE_NAME}\2/" "${SCRIPT_DIR}/terraform_test/terraform.tfvars"
+    sed -i -E "s/(vsphere_template_name\s*=\s*\")[^\"]+(\")/\1${TEMPLATE_NAME}\2/" "${TF_FILE}"
     echo "Đã đồng bộ tên template sang Terraform thành công."
 else
-    echo "Cảnh báo: Không tìm thấy vm_name trong cấu hình Packer để đồng bộ sang Terraform."
+    echo "Cảnh báo: Không tìm thấy vm_name trong cấu hình Packer."
 fi
 
-# 9. Thực thi Terraform
+# ==============================================================================
+# 8. Thực thi Terraform
+# ==============================================================================
 echo ""
 echo "=============================================================================="
 echo "TIẾN TRÌNH 2/4: KHỞI TẠO HẠ TẦNG VSPHERE (TERRAFORM)"
@@ -265,7 +354,9 @@ echo "==========================================================================
 cd "${SCRIPT_DIR}/terraform_test"
 ./run_provision_secure.sh
 
-# 10. Thực thi Ansible Deploy
+# ==============================================================================
+# 9. Thực thi Ansible Deploy
+# ==============================================================================
 echo ""
 echo "=============================================================================="
 echo "TIẾN TRÌNH 3/4: CẤU HÌNH ELASTIC STACK (ANSIBLE)"
@@ -273,7 +364,9 @@ echo "==========================================================================
 cd "${SCRIPT_DIR}/ansible_test"
 ./run_ansible_secure.sh
 
-# 11. Thực thi Ansible Observability
+# ==============================================================================
+# 10. Thực thi Ansible Observability
+# ==============================================================================
 echo ""
 echo "=============================================================================="
 echo "TIẾN TRÌNH 4/4: KÍCH HOẠT QUAN SÁT TẬP TRUNG (OBSERVABILITY)"
