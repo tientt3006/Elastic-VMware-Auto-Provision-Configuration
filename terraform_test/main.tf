@@ -91,7 +91,7 @@ module "compute" {
   template_scsi_type              = data.vsphere_virtual_machine.source_template.scsi_type
   template_network_interface_type = data.vsphere_virtual_machine.source_template.network_interface_types[0]
   template_disk_thin_provisioned  = data.vsphere_virtual_machine.source_template.disks[0].thin_provisioned
-  folder                          = module.folder.folder_paths[var.vm_target_folder]
+  folder                          = try(module.folder.folder_paths[var.vm_target_folder], null)
   default_domain_name             = var.default_domain_name
   default_dns_servers             = var.default_dns_servers
   ssh_public_key                  = var.ssh_public_key

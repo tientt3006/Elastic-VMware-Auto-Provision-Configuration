@@ -14,18 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TFVARS="${SCRIPT_DIR}/terraform.tfvars"
 
-# Cleanup trap to guarantee in-memory secrets are deleted
-cleanup() {
-    echo ""
-    echo "Don dep thong tin bi mat khoi bo nho RAM..."
-    unset TF_VAR_vsphere_password || true
-    unset GOVC_PASSWORD || true
-    unset GOVC_URL || true
-    unset GOVC_USERNAME || true
-    unset VSPHERE_PASSWORD || true
-    echo "Hoan tat don dep."
-}
-trap cleanup EXIT INT TERM
+
 
 echo "=============================================================================="
 echo "He thong dieu phoi cap phat ha tang bao mat In-Memory (Terraform)"
@@ -40,15 +29,20 @@ fi
 VSPHERE_SERVER=$(grep -E '^\s*vsphere_server\s*=' "${TFVARS}" | head -n 1 | cut -d'"' -f2)
 VSPHERE_USER=$(grep -E '^\s*vsphere_user\s*=' "${TFVARS}" | head -n 1 | cut -d'"' -f2)
 
-# 2. Nhap mat khau an tu terminal
+# 2. Nhap mat khau an tu terminal (Ho tro luu vet trong RAM)
 echo "May chu vCenter: ${VSPHERE_SERVER}"
 echo "Tai khoan:       ${VSPHERE_USER}"
-read -s -p "Nhap mat khau vCenter: " VSPHERE_PASSWORD
-echo ""
 
-if [[ -z "${VSPHERE_PASSWORD}" ]]; then
-    echo "Loi: Mat khau khong duoc de trong." >&2
-    exit 1
+if [[ -n "${VSPHERE_PASSWORD:-}" ]]; then
+    read -s -p "Nhap mat khau vCenter [An Enter de giu nguyen]: " INPUT_PASS
+    echo ""
+    [[ -n "${INPUT_PASS}" ]] && VSPHERE_PASSWORD="${INPUT_PASS}"
+else
+    while [[ -z "${VSPHERE_PASSWORD:-}" ]]; do
+        read -s -p "Nhap mat khau vCenter: " VSPHERE_PASSWORD
+        echo ""
+        [[ -z "${VSPHERE_PASSWORD:-}" ]] && echo "Loi: Khong duoc de trong." >&2
+    done
 fi
 
 # 3. Nap bien moi truong vao bo nho RAM

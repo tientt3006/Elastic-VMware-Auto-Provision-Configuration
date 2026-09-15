@@ -10,49 +10,59 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Hàm dọn dẹp giải phóng biến khỏi bộ nhớ RAM
-cleanup() {
-    echo ""
-    echo "Dọn dẹp thông tin bí mật Ansible khỏi bộ nhớ RAM..."
-    unset SSH_PASS || true
-    unset SUDO_PASS || true
-    unset ELASTIC_PASS || true
-    unset KIBANA_PASS || true
-    echo "Hoàn tất dọn dẹp."
-}
-trap cleanup EXIT INT TERM
+
 
 echo "=============================================================================="
 echo "Hệ thống điều phối triển khai Ansible an toàn In-Memory"
 echo "=============================================================================="
 
-# 1. Nhập mật khẩu ẩn từ terminal
-read -s -p "Nhập mật khẩu SSH (svc_admin): " SSH_PASS
-echo ""
-if [[ -z "${SSH_PASS}" ]]; then
-    echo "Lỗi: Mật khẩu SSH không được để trống." >&2
-    exit 1
+# 1. Nhap mat khau an tu terminal (Ho tro luu vet trong RAM)
+if [[ -n "${SSH_PASS:-}" ]]; then
+    read -s -p "Nhap mat khau SSH (svc_admin) [An Enter de giu nguyen]: " INPUT_PASS
+    echo ""
+    [[ -n "${INPUT_PASS}" ]] && SSH_PASS="${INPUT_PASS}"
+else
+    while [[ -z "${SSH_PASS:-}" ]]; do
+        read -s -p "Nhap mat khau SSH (svc_admin): " SSH_PASS
+        echo ""
+        [[ -z "${SSH_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
+    done
 fi
 
-read -s -p "Nhập mật khẩu sudo (sudo/become): " SUDO_PASS
-echo ""
-if [[ -z "${SUDO_PASS}" ]]; then
-    echo "Lỗi: Mật khẩu sudo không được để trống." >&2
-    exit 1
+if [[ -n "${SUDO_PASS:-}" ]]; then
+    read -s -p "Nhap mat khau sudo (sudo/become) [An Enter de giu nguyen]: " INPUT_PASS
+    echo ""
+    [[ -n "${INPUT_PASS}" ]] && SUDO_PASS="${INPUT_PASS}"
+else
+    while [[ -z "${SUDO_PASS:-}" ]]; do
+        read -s -p "Nhap mat khau sudo (sudo/become): " SUDO_PASS
+        echo ""
+        [[ -z "${SUDO_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
+    done
 fi
 
-read -s -p "Nhập mật khẩu siêu quản trị (elastic): " ELASTIC_PASS
-echo ""
-if [[ -z "${ELASTIC_PASS}" ]]; then
-    echo "Lỗi: Mật khẩu elastic không được để trống." >&2
-    exit 1
+if [[ -n "${ELASTIC_PASS:-}" ]]; then
+    read -s -p "Nhap mat khau sieu quan tri (elastic) [An Enter de giu nguyen]: " INPUT_PASS
+    echo ""
+    [[ -n "${INPUT_PASS}" ]] && ELASTIC_PASS="${INPUT_PASS}"
+else
+    while [[ -z "${ELASTIC_PASS:-}" ]]; do
+        read -s -p "Nhap mat khau sieu quan tri (elastic): " ELASTIC_PASS
+        echo ""
+        [[ -z "${ELASTIC_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
+    done
 fi
 
-read -s -p "Nhập mật khẩu hệ thống Kibana (kibana_system): " KIBANA_PASS
-echo ""
-if [[ -z "${KIBANA_PASS}" ]]; then
-    echo "Lỗi: Mật khẩu kibana_system không được để trống." >&2
-    exit 1
+if [[ -n "${KIBANA_PASS:-}" ]]; then
+    read -s -p "Nhap mat khau he thong Kibana (kibana_system) [An Enter de giu nguyen]: " INPUT_PASS
+    echo ""
+    [[ -n "${INPUT_PASS}" ]] && KIBANA_PASS="${INPUT_PASS}"
+else
+    while [[ -z "${KIBANA_PASS:-}" ]]; do
+        read -s -p "Nhap mat khau he thong Kibana (kibana_system): " KIBANA_PASS
+        echo ""
+        [[ -z "${KIBANA_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
+    done
 fi
 
 # 2. Yêu cầu xác nhận trước khi chạy

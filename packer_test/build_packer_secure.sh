@@ -16,18 +16,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKRVARS="${SCRIPT_DIR}/packer.pkrvars.hcl"
 
-# Ham don dep giai phong bien khoi bo nho RAM
-cleanup() {
-    echo ""
-    echo "Don dep thong tin bi mat Packer khoi bo nho RAM..."
-    unset PKR_VAR_vcenter_password || true
-    unset PKR_VAR_ssh_password || true
-    unset GOVC_PASSWORD || true
-    unset GOVC_URL || true
-    unset GOVC_USERNAME || true
-    echo "Hoan tat don dep."
-}
-trap cleanup EXIT INT TERM
+
 
 echo "=============================================================================="
 echo "He thong dieu phoi dong goi Template Packer an toan In-Memory"
@@ -48,19 +37,29 @@ echo "Tai khoan:       ${VCENTER_USER}"
 echo "Ten template VM: ${VM_NAME}"
 echo "------------------------------------------------------------------------------"
 
-# 2. Nhap mat khau an tu terminal
-read -s -p "Nhap mat khau quan tri vCenter: " VCENTER_PASS
-echo ""
-if [[ -z "${VCENTER_PASS}" ]]; then
-    echo "Loi: Mat khau vCenter khong duoc de trong." >&2
-    exit 1
+# 2. Nhap mat khau an tu terminal (Ho tro luu vet trong RAM)
+if [[ -n "${VCENTER_PASS:-}" ]]; then
+    read -s -p "Nhap mat khau quan tri vCenter [An Enter de giu nguyen]: " INPUT_PASS
+    echo ""
+    [[ -n "${INPUT_PASS}" ]] && VCENTER_PASS="${INPUT_PASS}"
+else
+    while [[ -z "${VCENTER_PASS:-}" ]]; do
+        read -s -p "Nhap mat khau quan tri vCenter: " VCENTER_PASS
+        echo ""
+        [[ -z "${VCENTER_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
+    done
 fi
 
-read -s -p "Nhap mat khau SSH khoi tao may ao (svc_admin): " SSH_PASS
-echo ""
-if [[ -z "${SSH_PASS}" ]]; then
-    echo "Loi: Mat khau SSH khong duoc de trong." >&2
-    exit 1
+if [[ -n "${SSH_PASS:-}" ]]; then
+    read -s -p "Nhap mat khau SSH khoi tao may ao (svc_admin) [An Enter de giu nguyen]: " INPUT_PASS
+    echo ""
+    [[ -n "${INPUT_PASS}" ]] && SSH_PASS="${INPUT_PASS}"
+else
+    while [[ -z "${SSH_PASS:-}" ]]; do
+        read -s -p "Nhap mat khau SSH khoi tao may ao (svc_admin): " SSH_PASS
+        echo ""
+        [[ -z "${SSH_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
+    done
 fi
 
 # 3. Nap bien moi truong vao RAM
