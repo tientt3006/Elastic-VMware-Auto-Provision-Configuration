@@ -1,0 +1,35 @@
+# ==============================================================================
+# Sample Environment Variables for Ansible Inventory
+# Rename or copy to hosts.yml and supply infrastructure values.
+# ==============================================================================
+all:
+  vars:
+    ansible_user: svc_admin
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+
+  children:
+    elastic_cluster:
+      hosts:
+        srv-elastic-01:
+          ansible_host: 10.0.6.101
+        srv-elastic-02:
+          ansible_host: 10.0.6.102
+        srv-elastic-03:
+          ansible_host: 10.0.6.103
+
+    kibana_gateway:
+      hosts:
+        srv-kibana-gw:
+          ansible_host: 10.0.6.104
+
+    fleet_server:
+      children:
+        kibana_gateway
+
+    elastic_agent:
+      children:
+        kibana_gateway
+
+    monitored_nodes:
+      children:
+        elastic_cluster
