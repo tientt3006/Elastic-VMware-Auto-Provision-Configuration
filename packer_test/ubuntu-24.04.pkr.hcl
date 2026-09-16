@@ -24,7 +24,7 @@ source "vsphere-iso" "ubuntu" {
   datacenter = var.vcenter_datacenter
   cluster    = var.vcenter_cluster
   datastore  = var.vcenter_datastore
-  folder     = var.vcenter_folder
+  # folder     = var.vcenter_folder
 
   # Virtual machine identity and lifecycle
   vm_name             = var.vm_name

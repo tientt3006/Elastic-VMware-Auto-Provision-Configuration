@@ -76,12 +76,6 @@ echo "==========================================================================
 echo "Khoi chay Terraform init..."
 echo "=============================================================================="
 terraform init
-
-echo "Auto-import folder ${VM_FOLDER} vao Terraform state (Neu do Packer tao san)..."
-terraform import "module.folder.vsphere_folder.vm_folders[\"${VM_FOLDER}\"]" "/${VCENTER_DC}/vm/${VM_FOLDER}" >/dev/null 2>&1 || true
-# Import luon thu muc Infra_Services neu bi tao do dang
-terraform import "module.folder.vsphere_folder.vm_folders[\"Infra_Services\"]" "/${VCENTER_DC}/vm/Infra_Services" >/dev/null 2>&1 || true
-
 echo ""
 echo "=============================================================================="
 echo "Khoi chay Terraform apply (che do an toan -parallelism=1)..."
