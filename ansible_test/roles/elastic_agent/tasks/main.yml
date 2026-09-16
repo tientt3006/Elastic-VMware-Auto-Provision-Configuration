@@ -42,7 +42,7 @@
       - install
       - --non-interactive
       - --force
-      - --url=https://10.255.242.214:8220
+      - --url={{ fleet_server_url | default('https://10.255.242.214:8220') }}
       - --enrollment-token={{ hostvars['localhost']['agent_enrollment_token'] }}
       - --insecure
   no_log: true

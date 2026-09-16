@@ -63,6 +63,12 @@ if [[ ! -f "${ANS_FILE}" ]]; then
     echo "Đã tạo: ansible_test/inventories/lab/hosts.yml"
 fi
 
+ANS_VARS_FILE="${SCRIPT_DIR}/ansible_test/inventories/lab/group_vars/all/main.yml"
+if [[ ! -f "${ANS_VARS_FILE}" ]]; then
+    cp "${ANS_VARS_FILE}.example" "${ANS_VARS_FILE}"
+    echo "Đã tạo: ansible_test/inventories/lab/group_vars/all/main.yml"
+fi
+
 # ==============================================================================
 # 2. Thu thập thông tin từ tệp vars.conf
 # ==============================================================================
@@ -223,6 +229,10 @@ sed -i -E "/srv-elastic-01/{n;s/(ansible_host:\s*).*/\1${IP_E01}/}" "${ANS_FILE}
 sed -i -E "/srv-elastic-02/{n;s/(ansible_host:\s*).*/\1${IP_E02}/}" "${ANS_FILE}"
 sed -i -E "/srv-elastic-03/{n;s/(ansible_host:\s*).*/\1${IP_E03}/}" "${ANS_FILE}"
 sed -i -E "/srv-kibana-gw/{n;s/(ansible_host:\s*).*/\1${IP_KBN}/}" "${ANS_FILE}"
+
+# Điền IP vào Ansible group_vars (Fleet Server & Elasticsearch URL)
+sed -i -E "s|(fleet_server_url:\s*\").*(\")|\1https://${IP_KBN}:8220\2|" "${ANS_VARS_FILE}"
+sed -i -E "s|(fleet_server_elasticsearch_url:\s*\").*(\")|\1http://${IP_E01}:9200\2|" "${ANS_VARS_FILE}"
 
 echo ""
 echo "Đã tự động điền tất cả thông tin dùng chung vào 3 tệp cấu hình."
