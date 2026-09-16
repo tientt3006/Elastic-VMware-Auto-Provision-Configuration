@@ -70,6 +70,7 @@ cd "${SCRIPT_DIR}"
 
 echo ""
 echo "=============================================================================="
-echo "Khoi chay Terraform apply (che do an toan -parallelism=1)..."
+echo "Khoi chay Terraform init va apply (che do an toan -parallelism=1)..."
 echo "=============================================================================="
+terraform init
 terraform apply -parallelism=1

@@ -102,7 +102,8 @@ fi
 
 # 5. Kiem tra cu phap Packer
 cd "${SCRIPT_DIR}"
-echo "Kiem tra tinh hop le cua cau hinh Packer..."
+echo "Cai dat plugin va kiem tra tinh hop le cua cau hinh Packer..."
+packer init .
 packer validate -var-file="${PKRVARS}" .
 echo "Cau hinh hop le."
 
