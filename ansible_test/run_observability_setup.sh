@@ -58,9 +58,10 @@ fi
 # 2. Yêu cầu xác nhận trước khi chạy
 echo "------------------------------------------------------------------------------"
 read -p "Xác nhận bắt đầu cấu hình Observability (Fleet/ILM)? (yes/no): " CONFIRM
+CONFIRM="${CONFIRM%$'\r'}"
 if [[ "${CONFIRM}" != "yes" ]]; then
     echo "Hủy tiến trình theo yêu cầu của người dùng."
-    exit 0
+    exit 1
 fi
 
 # 3. Kích hoạt Virtual Environment (nếu có)
