@@ -182,6 +182,15 @@ sed -i -E "s/(content_library_item_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "$
 sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${PKR_FILE}"
 sed -i -E "s/(ansible_user:\s*).*/\1${SSH_USER}/" "${ANS_FILE}"
 
+# --- Cập nhật mật khẩu động vào Cloud-init user-data ---
+USER_DATA_FILE="${SCRIPT_DIR}/packer_test/http/user-data"
+if [[ -f "${USER_DATA_FILE}" ]]; then
+    echo "Đang băm mật khẩu SSH (SHA-512) và ghi vào Cloud-init user-data..."
+    SSH_PASS_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}")
+    sed -i -E "s|(password:\s*\").*(\")|\1${SSH_PASS_HASH}\2|" "${USER_DATA_FILE}"
+    sed -i -E "s/(username:\s*).*/\1${SSH_USER}/" "${USER_DATA_FILE}"
+fi
+
 # Điền IP vào Terraform (sed từng block elastic_01 -> elastic_03, kibana_gw)
 # Sử dụng cơ chế tìm block theo key rồi thay ip_address và gateway trong block đó
 python3 - "${TF_FILE}" "${IP_E01}" "${IP_E02}" "${IP_E03}" "${IP_KBN}" "${GW}" "${NETMASK}" << 'PYEOF'
