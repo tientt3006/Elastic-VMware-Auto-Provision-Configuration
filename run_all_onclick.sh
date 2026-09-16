@@ -79,13 +79,6 @@ if [[ ! -f "${VARS_CONF}" ]]; then
 # Điền các giá trị thực tế của site vào đây, sau đó lưu lại.
 # ==============================================================================
 
-# --- Mật khẩu (Sẽ tự động bypass các câu hỏi password ở script con) ---
-export VCENTER_PASS=""
-export SSH_PASS=""
-export SUDO_PASS=""
-export ELASTIC_PASS=""
-export KIBANA_PASS=""
-
 # --- vCenter Server ---
 SITE_VCSA_IP=""
 VCENTER_USER="administrator@vsphere.local"
@@ -110,11 +103,36 @@ GW="10.0.6.1"
 NETMASK="24"
 EOF
     echo "CHÚ Ý: Lần chạy đầu tiên, hệ thống đã tạo tệp cấu hình '${VARS_CONF}'."
-    echo "Vui lòng mở một terminal khác (hoặc dùng nano/vim), điền đầy đủ thông tin (IP, Password, Datastore...) vào file này."
+    echo "Vui lòng mở một terminal khác (hoặc dùng nano/vim), điền đầy đủ thông tin (IP, Datastore, Network...) vào file này."
     read -p "Sau khi lưu file xong, nhấn Enter tại đây để tiếp tục..."
 fi
 
 source "${VARS_CONF}"
+
+echo "------------------------------------------------------------------------------"
+echo "THU THẬP MẬT KHẨU BẢO MẬT (Chỉ hỏi 1 lần và lưu trong RAM)"
+echo "------------------------------------------------------------------------------"
+
+if [[ -z "${VCENTER_PASS:-}" ]]; then
+    read -s -p "Mật khẩu vCenter: " VCENTER_PASS
+    echo ""
+fi
+if [[ -z "${SSH_PASS:-}" ]]; then
+    read -s -p "Mật khẩu SSH (svc_admin): " SSH_PASS
+    echo ""
+fi
+if [[ -z "${SUDO_PASS:-}" ]]; then
+    read -s -p "Mật khẩu Sudo: " SUDO_PASS
+    echo ""
+fi
+if [[ -z "${ELASTIC_PASS:-}" ]]; then
+    read -s -p "Mật khẩu Elastic (elastic): " ELASTIC_PASS
+    echo ""
+fi
+if [[ -z "${KIBANA_PASS:-}" ]]; then
+    read -s -p "Mật khẩu Kibana (kibana_system): " KIBANA_PASS
+    echo ""
+fi
 
 # Đảm bảo các biến này được export cho sub-script
 export VCENTER_PASS
