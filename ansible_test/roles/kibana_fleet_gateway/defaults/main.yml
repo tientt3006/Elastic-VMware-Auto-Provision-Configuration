@@ -1,0 +1,9 @@
+---
+# Default values for kibana_fleet_gateway role
+
+# Kibana requires encryption keys to be at least 32 characters long.
+# It is highly recommended to override this in your inventory group_vars.
+kibana_encryption_key: "4b68e9f2a71c3d5e890123456789abcd4b68e9f2a71c3d5e890123456789abcd"
+
+# Default password for kibana_system user. Usually injected at runtime.
+kibana_system_password: "CHANGE_ME"

@@ -16,6 +16,21 @@ echo "==========================================================================
 echo "Hệ thống điều phối triển khai Ansible an toàn In-Memory"
 echo "=============================================================================="
 
+# 0. Tu dong khoi tao cau hinh neu clone sang may moi
+INVENTORY_VARS_DIR="${SCRIPT_DIR}/inventories/lab/group_vars/all"
+if [[ ! -f "${INVENTORY_VARS_DIR}/main.yml" && -f "${INVENTORY_VARS_DIR}/main.yml.example" ]]; then
+    echo "Phat hien moi truong moi. Dang tu dong khoi tao cau hinh tu template..."
+    cp "${INVENTORY_VARS_DIR}/main.yml.example" "${INVENTORY_VARS_DIR}/main.yml"
+    
+    # Tu dong tao khoa ma hoa ngau nhien cho Kibana (>32 ky tu)
+    RANDOM_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 40 | head -n 1)
+    sed -i "s/CHANGE_ME_TO_A_LONG_RANDOM_VALUE_32_CHARS/${RANDOM_KEY}/g" "${INVENTORY_VARS_DIR}/main.yml"
+    
+    echo "Da tao file ${INVENTORY_VARS_DIR}/main.yml (Tu dong sinh kibana_encryption_key: ${RANDOM_KEY})."
+    echo "LUU Y: Kiem tra va cap nhat cac thong so mang/token trong file neu can."
+    echo "------------------------------------------------------------------------------"
+fi
+
 # 1. Nhap mat khau an tu terminal (Ho tro luu vet trong RAM)
 if [[ -n "${SSH_PASS:-}" ]]; then
     echo "Mat khau SSH da duoc nap tu bien moi truong."

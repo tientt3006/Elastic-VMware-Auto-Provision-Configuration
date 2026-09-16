@@ -28,7 +28,7 @@ if [[ -z "${TMUX:-}" ]]; then
         # Giữ terminal mở sau khi script kết thúc (dù thành công hay lỗi) để đọc log
         # Sử dụng PIPESTATUS[0] để bắt đúng exit code của bash "$0" thay vì của tee
         exec tmux new-session -s deploy_session \
-            "bash -c 'bash \"$0\" \"$@\" 2>&1 | tee \"${LOG_FILE}\"; EXIT_CODE=\${PIPESTATUS[0]}; echo \"\"; echo \"=== Script kết thúc với exit code: \${EXIT_CODE} ===\"; echo \"Nhấn Enter để đóng tmux session...\"; read -r'"
+            "bash -c 'bash \"$0\" \"$@\" 2>&1 | tee \"${LOG_FILE}\"; EXIT_CODE=\${PIPESTATUS[0]}; echo \"\"; echo \"=== Script kết thúc với exit code: \${EXIT_CODE} ===\"; echo \"Bạn đang ở trong tmux. Gõ exit để đóng, hoặc nhấn Ctrl+B rồi ấn D để thoát ẩn (detach).\"; exec bash'"
     else
         echo "CẢNH BÁO: tmux chưa được cài đặt. Nếu đứt SSH sẽ bị gián đoạn."
         exec > >(tee -a "${LOG_FILE}") 2>&1
