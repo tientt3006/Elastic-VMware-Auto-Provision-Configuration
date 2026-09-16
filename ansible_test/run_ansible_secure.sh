@@ -23,7 +23,7 @@ if [[ ! -f "${INVENTORY_VARS_DIR}/main.yml" && -f "${INVENTORY_VARS_DIR}/main.ym
     cp "${INVENTORY_VARS_DIR}/main.yml.example" "${INVENTORY_VARS_DIR}/main.yml"
     
     # Tu dong tao khoa ma hoa ngau nhien cho Kibana (>32 ky tu)
-    RANDOM_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 40 | head -n 1)
+    RANDOM_KEY=$(openssl rand -hex 24)
     sed -i "s/CHANGE_ME_TO_A_LONG_RANDOM_VALUE_32_CHARS/${RANDOM_KEY}/g" "${INVENTORY_VARS_DIR}/main.yml"
     
     echo "Da tao file ${INVENTORY_VARS_DIR}/main.yml (Tu dong sinh kibana_encryption_key: ${RANDOM_KEY})."
