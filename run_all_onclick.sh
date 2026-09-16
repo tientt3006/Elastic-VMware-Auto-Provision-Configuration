@@ -26,8 +26,9 @@ if [[ -z "${TMUX:-}" ]]; then
     if command -v tmux &> /dev/null; then
         echo "Khởi tạo phiên tmux (deploy_session) để chống đứt kết nối SSH..."
         # Giữ terminal mở sau khi script kết thúc (dù thành công hay lỗi) để đọc log
+        # Sử dụng PIPESTATUS[0] để bắt đúng exit code của bash "$0" thay vì của tee
         exec tmux new-session -s deploy_session \
-            "bash \"$0\" \"$@\" 2>&1 | tee \"${LOG_FILE}\"; echo ''; echo '=== Script kết thúc với exit code: '\$?' ==='; echo 'Nhấn Enter để đóng tmux session...'; read"
+            "bash -c 'bash \"$0\" \"$@\" 2>&1 | tee \"${LOG_FILE}\"; EXIT_CODE=\${PIPESTATUS[0]}; echo \"\"; echo \"=== Script kết thúc với exit code: \${EXIT_CODE} ===\"; echo \"Nhấn Enter để đóng tmux session...\"; read -r'"
     else
         echo "CẢNH BÁO: tmux chưa được cài đặt. Nếu đứt SSH sẽ bị gián đoạn."
         exec > >(tee -a "${LOG_FILE}") 2>&1
@@ -63,40 +64,86 @@ if [[ ! -f "${ANS_FILE}" ]]; then
 fi
 
 # ==============================================================================
-# 2. Thu thập thông tin dùng chung và tự động điền vào cả 3 tệp cấu hình
+# 2. Thu thập thông tin từ tệp vars.conf
 # ==============================================================================
 echo ""
 echo "=============================================================================="
 echo "CẤU HÌNH HẠ TẦNG DÙNG CHUNG (TỰ ĐỘNG ĐIỀN VÀO CẢ 3 TỆP)"
 echo "=============================================================================="
 
+VARS_CONF="${SCRIPT_DIR}/vars.conf"
+if [[ ! -f "${VARS_CONF}" ]]; then
+    cat << 'EOF' > "${VARS_CONF}"
+# ==============================================================================
+# TỆP CẤU HÌNH BIẾN CHUNG (Tự động điền vào Packer, Terraform, Ansible)
+# Điền các giá trị thực tế của site vào đây, sau đó lưu lại.
+# ==============================================================================
+
+# --- Mật khẩu (Sẽ tự động bypass các câu hỏi password ở script con) ---
+export VCENTER_PASS=""
+export SSH_PASS=""
+export SUDO_PASS=""
+export ELASTIC_PASS=""
+export KIBANA_PASS=""
+
 # --- vCenter Server ---
-read -p "IP hoặc FQDN của vCenter (ví dụ: 10.0.6.30 hoặc vcsa.bvnttwhcm.int): " SITE_VCSA_IP
-[[ -z "${SITE_VCSA_IP}" ]] && echo "Lỗi: Không được để trống." >&2 && exit 1
+SITE_VCSA_IP=""
+VCENTER_USER="administrator@vsphere.local"
+
+# --- Hạ tầng vSphere ---
+VCENTER_DC="Datacenter"
+VCENTER_CLUSTER="Cluster1"
+ISO_DATASTORE=""
+PKR_NETWORK="VM Network"
+VM_FOLDER="App_Workloads"
+TPL_NAME="tpl-ubuntu-2404-golden"
+
+# --- Tài khoản OS ---
+SSH_USER="svc_admin"
+
+# --- IP tĩnh 4 VM ---
+IP_E01="10.0.6.101"
+IP_E02="10.0.6.102"
+IP_E03="10.0.6.103"
+IP_KBN="10.0.6.104"
+GW="10.0.6.1"
+NETMASK="24"
+EOF
+    echo "CHÚ Ý: Lần chạy đầu tiên, hệ thống đã tạo tệp cấu hình '${VARS_CONF}'."
+    echo "Vui lòng mở một terminal khác (hoặc dùng nano/vim), điền đầy đủ thông tin (IP, Password, Datastore...) vào file này."
+    read -p "Sau khi lưu file xong, nhấn Enter tại đây để tiếp tục..."
+fi
+
+source "${VARS_CONF}"
+
+# Đảm bảo các biến này được export cho sub-script
+export VCENTER_PASS
+export SSH_PASS
+export SUDO_PASS
+export ELASTIC_PASS
+export KIBANA_PASS
+
+# Kiểm tra các biến bắt buộc
+for var in SITE_VCSA_IP VCENTER_PASS ISO_DATASTORE SSH_PASS; do
+    if [[ -z "${!var:-}" ]]; then
+        echo "Lỗi: Biến $var trong vars.conf không được để trống! Hãy sửa file và chạy lại." >&2
+        exit 1
+    fi
+done
+
+# --- Điền thông tin vào tệp cấu hình ---
 sed -i -E "s/(vcenter_server\s*=\s*\")[^\"]+(\")/\1${SITE_VCSA_IP}\2/" "${PKR_FILE}"
 sed -i -E "s/(vsphere_server\s*=\s*\")[^\"]+(\")/\1${SITE_VCSA_IP}\2/" "${TF_FILE}"
 
-# --- vCenter User ---
-read -p "Tài khoản vCenter [Enter = administrator@vsphere.local]: " VCENTER_USER
-VCENTER_USER="${VCENTER_USER:-administrator@vsphere.local}"
 sed -i -E "s/(vcenter_user\s*=\s*\")[^\"]+(\")/\1${VCENTER_USER}\2/" "${PKR_FILE}"
 sed -i -E "s/(vsphere_user\s*=\s*\")[^\"]+(\")/\1${VCENTER_USER}\2/" "${TF_FILE}"
 
-# --- Datacenter ---
-read -p "Tên Datacenter trên vCenter [Enter = Datacenter]: " VCENTER_DC
-VCENTER_DC="${VCENTER_DC:-Datacenter}"
 sed -i -E "s/(vcenter_datacenter\s*=\s*\")[^\"]+(\")/\1${VCENTER_DC}\2/" "${PKR_FILE}"
 sed -i -E "s/(vsphere_datacenter\s*=\s*\")[^\"]+(\")/\1${VCENTER_DC}\2/" "${TF_FILE}"
 
-# --- Cluster ---
-read -p "Tên Compute Cluster [Enter = Cluster1]: " VCENTER_CLUSTER
-VCENTER_CLUSTER="${VCENTER_CLUSTER:-Cluster1}"
 sed -i -E "s/(vcenter_cluster\s*=\s*\")[^\"]+(\")/\1${VCENTER_CLUSTER}\2/" "${PKR_FILE}"
 sed -i -E "s/(vsphere_cluster\s*=\s*\")[^\"]+(\")/\1${VCENTER_CLUSTER}\2/" "${TF_FILE}"
 
-# --- Datastore ---
-read -p "Tên Datastore lưu ISO và VM (ví dụ: DS-LD01-SSD): " ISO_DATASTORE
-[[ -z "${ISO_DATASTORE}" ]] && echo "Lỗi: Không được để trống." >&2 && exit 1
 sed -i -E "s/(vcenter_datastore\s*=\s*\")[^\"]+(\")/\1${ISO_DATASTORE}\2/" "${PKR_FILE}"
 sed -i -E "s/(vsphere_datastore\s*=\s*\")[^\"]+(\")/\1${ISO_DATASTORE}\2/" "${TF_FILE}"
 # Dùng sed thay thế toàn bộ block iso_paths đa dòng
@@ -105,45 +152,17 @@ iso_paths = [\
   "['"${ISO_DATASTORE}"'] iso/ubuntu-24.04.5-live-server-amd64.iso"\
 ]' "${PKR_FILE}"
 
-# --- VM Network cho Packer (Port Group có DHCP) ---
-read -p "Tên Port Group có DHCP cho Packer build template [Enter = VM Network]: " PKR_NETWORK
-PKR_NETWORK="${PKR_NETWORK:-VM Network}"
 sed -i -E "s/(vcenter_network\s*=\s*\")[^\"]+(\")/\1${PKR_NETWORK}\2/" "${PKR_FILE}"
 
-# --- Folder ---
-read -p "Thư mục VM trên vCenter (ví dụ: App_Workloads) [Enter = App_Workloads]: " VM_FOLDER
-VM_FOLDER="${VM_FOLDER:-App_Workloads}"
 sed -i -E "s/(vcenter_folder\s*=\s*\")[^\"]+(\")/\1${VM_FOLDER}\2/" "${PKR_FILE}"
 sed -i -E "s/(vm_target_folder\s*=\s*\")[^\"]+(\")/\1${VM_FOLDER}\2/" "${TF_FILE}"
 
-# --- Template Name ---
-read -p "Tên VM Template Packer sẽ tạo [Enter = tpl-ubuntu-2404-golden]: " TPL_NAME
-TPL_NAME="${TPL_NAME:-tpl-ubuntu-2404-golden}"
 sed -i -E "s/(vm_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${PKR_FILE}"
 sed -i -E "s/(vsphere_template_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_FILE}"
 sed -i -E "s/(content_library_item_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_FILE}"
 
-# --- SSH Username ---
-read -p "Tài khoản SSH trên VM (dùng cho Packer + Ansible) [Enter = svc_admin]: " SSH_USER
-SSH_USER="${SSH_USER:-svc_admin}"
 sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${PKR_FILE}"
 sed -i -E "s/(ansible_user:\s*).*/\1${SSH_USER}/" "${ANS_FILE}"
-
-# --- IP tĩnh 4 VM (điền vào cả Terraform và Ansible) ---
-echo ""
-echo "--- ĐỊA CHỈ IP TĨNH CHO 4 MÁY ẢO ---"
-read -p "IP tĩnh srv-elastic-01 [Enter = 10.0.6.101]: " IP_E01
-IP_E01="${IP_E01:-10.0.6.101}"
-read -p "IP tĩnh srv-elastic-02 [Enter = 10.0.6.102]: " IP_E02
-IP_E02="${IP_E02:-10.0.6.102}"
-read -p "IP tĩnh srv-elastic-03 [Enter = 10.0.6.103]: " IP_E03
-IP_E03="${IP_E03:-10.0.6.103}"
-read -p "IP tĩnh srv-kibana-gw  [Enter = 10.0.6.104]: " IP_KBN
-IP_KBN="${IP_KBN:-10.0.6.104}"
-read -p "Default Gateway        [Enter = 10.0.6.1]: " GW
-GW="${GW:-10.0.6.1}"
-read -p "Subnet Mask (CIDR)     [Enter = 24]: " NETMASK
-NETMASK="${NETMASK:-24}"
 
 # Điền IP vào Terraform (sed từng block elastic_01 -> elastic_03, kibana_gw)
 # Sử dụng cơ chế tìm block theo key rồi thay ip_address và gateway trong block đó

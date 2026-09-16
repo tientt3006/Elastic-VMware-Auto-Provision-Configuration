@@ -33,10 +33,11 @@ VSPHERE_USER=$(grep -E '^\s*vsphere_user\s*=' "${TFVARS}" | head -n 1 | cut -d'"
 echo "May chu vCenter: ${VSPHERE_SERVER}"
 echo "Tai khoan:       ${VSPHERE_USER}"
 
+# Kế thừa từ kịch bản mẹ nếu có
+VSPHERE_PASSWORD="${VCENTER_PASS:-${VSPHERE_PASSWORD:-}}"
+
 if [[ -n "${VSPHERE_PASSWORD:-}" ]]; then
-    read -s -p "Nhap mat khau vCenter [An Enter de giu nguyen]: " INPUT_PASS
-    echo ""
-    [[ -n "${INPUT_PASS}" ]] && VSPHERE_PASSWORD="${INPUT_PASS}"
+    echo "Mat khau vCenter da duoc nap tu bien moi truong."
 else
     while [[ -z "${VSPHERE_PASSWORD:-}" ]]; do
         read -s -p "Nhap mat khau vCenter: " VSPHERE_PASSWORD

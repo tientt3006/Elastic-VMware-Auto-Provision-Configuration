@@ -39,9 +39,7 @@ echo "--------------------------------------------------------------------------
 
 # 2. Nhap mat khau an tu terminal (Ho tro luu vet trong RAM)
 if [[ -n "${VCENTER_PASS:-}" ]]; then
-    read -s -p "Nhap mat khau quan tri vCenter [An Enter de giu nguyen]: " INPUT_PASS
-    echo ""
-    [[ -n "${INPUT_PASS}" ]] && VCENTER_PASS="${INPUT_PASS}"
+    echo "Mat khau vCenter da duoc nap tu bien moi truong."
 else
     while [[ -z "${VCENTER_PASS:-}" ]]; do
         read -s -p "Nhap mat khau quan tri vCenter: " VCENTER_PASS
@@ -51,9 +49,7 @@ else
 fi
 
 if [[ -n "${SSH_PASS:-}" ]]; then
-    read -s -p "Nhap mat khau SSH khoi tao may ao (svc_admin) [An Enter de giu nguyen]: " INPUT_PASS
-    echo ""
-    [[ -n "${INPUT_PASS}" ]] && SSH_PASS="${INPUT_PASS}"
+    echo "Mat khau SSH da duoc nap tu bien moi truong."
 else
     while [[ -z "${SSH_PASS:-}" ]]; do
         read -s -p "Nhap mat khau SSH khoi tao may ao (svc_admin): " SSH_PASS
@@ -80,17 +76,23 @@ if command -v govc &>/dev/null; then
         exit 1
     fi
 
-    # Kiem tra xem template da ton tai tren vCenter hay chua
-    if govc vm.info "${VM_NAME}" >/dev/null 2>&1; then
+    # Kiem tra xem VM hoac template da ton tai tren vCenter hay chua (tim kiem de quy)
+    VM_PATH=$(govc find -type m -name "${VM_NAME}" 2>/dev/null | head -n 1)
+    if [[ -n "${VM_PATH}" ]]; then
         echo "------------------------------------------------------------------------------"
-        echo "CANH BAO: Template '${VM_NAME}' da ton tai tren vCenter."
+        echo "CANH BAO: May ao / Template '${VM_NAME}' da ton tai tren vCenter tai:"
+        echo "Duong dan: ${VM_PATH}"
         echo "Mac dinh Packer se gap loi 'The name already exists' va khong the build tiep."
+        echo "(Ghi chu: Neu ban khong thay no hien thi la Template, co the no la mot may ao (VM) bi kiet do lan build truoc bi loi)."
         echo "------------------------------------------------------------------------------"
-        read -p "Ban co muon xoa template cu de build lai khong? (yes/no): " OVERWRITE
+        read -p "Ban co muon xoa VM/Template cu de build lai khong? (yes/no): " OVERWRITE
         if [[ "${OVERWRITE}" == "yes" ]]; then
-            echo "Dang xoa template cu '${VM_NAME}' tren vCenter..."
-            govc vm.destroy "${VM_NAME}"
-            echo "Da xoa template cu thanh cong."
+            echo "Dang xoa '${VM_PATH}' tren vCenter..."
+            if govc vm.destroy "${VM_PATH}"; then
+                echo "Da xoa thanh cong."
+            else
+                echo "Canh bao: govc khong the xoa. Packer se tiep tuc chay nhung co the gap loi..."
+            fi
         else
             echo "Dung tien trinh. Vui long doi ten 'vm_name' trong ${PKRVARS} de build phien ban moi."
             exit 0

@@ -18,9 +18,7 @@ echo "==========================================================================
 
 # 1. Nhap mat khau an tu terminal (Ho tro luu vet trong RAM)
 if [[ -n "${SSH_PASS:-}" ]]; then
-    read -s -p "Nhap mat khau SSH (svc_admin) [An Enter de giu nguyen]: " INPUT_PASS
-    echo ""
-    [[ -n "${INPUT_PASS}" ]] && SSH_PASS="${INPUT_PASS}"
+    echo "Mat khau SSH da duoc nap tu bien moi truong."
 else
     while [[ -z "${SSH_PASS:-}" ]]; do
         read -s -p "Nhap mat khau SSH (svc_admin): " SSH_PASS
@@ -30,9 +28,7 @@ else
 fi
 
 if [[ -n "${SUDO_PASS:-}" ]]; then
-    read -s -p "Nhap mat khau sudo (sudo/become) [An Enter de giu nguyen]: " INPUT_PASS
-    echo ""
-    [[ -n "${INPUT_PASS}" ]] && SUDO_PASS="${INPUT_PASS}"
+    echo "Mat khau sudo da duoc nap tu bien moi truong."
 else
     while [[ -z "${SUDO_PASS:-}" ]]; do
         read -s -p "Nhap mat khau sudo (sudo/become): " SUDO_PASS
@@ -42,9 +38,7 @@ else
 fi
 
 if [[ -n "${ELASTIC_PASS:-}" ]]; then
-    read -s -p "Nhap mat khau sieu quan tri (elastic) [An Enter de giu nguyen]: " INPUT_PASS
-    echo ""
-    [[ -n "${INPUT_PASS}" ]] && ELASTIC_PASS="${INPUT_PASS}"
+    echo "Mat khau elastic da duoc nap tu bien moi truong."
 else
     while [[ -z "${ELASTIC_PASS:-}" ]]; do
         read -s -p "Nhap mat khau sieu quan tri (elastic): " ELASTIC_PASS
@@ -54,9 +48,7 @@ else
 fi
 
 if [[ -n "${KIBANA_PASS:-}" ]]; then
-    read -s -p "Nhap mat khau he thong Kibana (kibana_system) [An Enter de giu nguyen]: " INPUT_PASS
-    echo ""
-    [[ -n "${INPUT_PASS}" ]] && KIBANA_PASS="${INPUT_PASS}"
+    echo "Mat khau kibana_system da duoc nap tu bien moi truong."
 else
     while [[ -z "${KIBANA_PASS:-}" ]]; do
         read -s -p "Nhap mat khau he thong Kibana (kibana_system): " KIBANA_PASS
