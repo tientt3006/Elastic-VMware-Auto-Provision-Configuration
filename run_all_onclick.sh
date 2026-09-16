@@ -10,13 +10,24 @@ PKR_FILE="${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl"
 TF_FILE="${SCRIPT_DIR}/terraform_test/terraform.tfvars"
 ANS_FILE="${SCRIPT_DIR}/ansible_test/inventories/lab/hosts.yml"
 
+# Cấp quyền thực thi cho toàn bộ script con
+chmod +x "${SCRIPT_DIR}/packer_test/build_packer_secure.sh" \
+         "${SCRIPT_DIR}/terraform_test/run_provision_secure.sh" \
+         "${SCRIPT_DIR}/ansible_test/run_ansible_secure.sh" \
+         "${SCRIPT_DIR}/ansible_test/run_observability_setup.sh" \
+         "${SCRIPT_DIR}/automation_seed/download_iso.sh" \
+         "${SCRIPT_DIR}/automation_seed/upload_iso_to_vcenter.sh" \
+         "${SCRIPT_DIR}/automation_seed/setup_automation_env.sh"
+
 # ==============================================================================
 # 0. Mở tmux session nếu chưa ở trong tmux
 # ==============================================================================
 if [[ -z "${TMUX:-}" ]]; then
     if command -v tmux &> /dev/null; then
         echo "Khởi tạo phiên tmux (deploy_session) để chống đứt kết nối SSH..."
-        exec tmux new-session -s deploy_session "bash \"$0\" \"$@\" 2>&1 | tee \"${LOG_FILE}\""
+        # Giữ terminal mở sau khi script kết thúc (dù thành công hay lỗi) để đọc log
+        exec tmux new-session -s deploy_session \
+            "bash \"$0\" \"$@\" 2>&1 | tee \"${LOG_FILE}\"; echo ''; echo '=== Script kết thúc với exit code: '\$?' ==='; echo 'Nhấn Enter để đóng tmux session...'; read"
     else
         echo "CẢNH BÁO: tmux chưa được cài đặt. Nếu đứt SSH sẽ bị gián đoạn."
         exec > >(tee -a "${LOG_FILE}") 2>&1
