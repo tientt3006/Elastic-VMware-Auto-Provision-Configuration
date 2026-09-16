@@ -40,6 +40,19 @@ resource "vsphere_virtual_machine" "vm" {
 
   clone {
     template_uuid = var.template_id
+
+    customize {
+      linux_options {
+        host_name = each.value.hostname
+        domain    = coalesce(each.value.domain_name, var.default_domain_name)
+      }
+      network_interface {
+        ipv4_address = each.value.ip_address
+        ipv4_netmask = each.value.netmask
+      }
+      ipv4_gateway    = each.value.gateway
+      dns_server_list = coalesce(each.value.dns_servers, var.default_dns_servers)
+    }
   }
 
   wait_for_guest_net_routable = true
@@ -61,31 +74,7 @@ resource "vsphere_virtual_machine" "vm" {
         fqdn: ${each.value.hostname}.${coalesce(each.value.domain_name, var.default_domain_name)}
         manage_etc_hosts: true
 
-        write_files:
-          - path: /etc/netplan/01-netcfg.yaml
-            permissions: '0600'
-            owner: root:root
-            content: |
-              network:
-                version: 2
-                renderer: networkd
-                ethernets:
-                  ens33:
-                    match:
-                      name: "en*"
-                    dhcp4: false
-                    dhcp6: false
-                    addresses:
-                      - ${each.value.ip_address}/${each.value.netmask}
-                    routes:
-                      - to: default
-                        via: ${each.value.gateway}
-                    nameservers:
-                      addresses: [${join(", ", [for dns in coalesce(each.value.dns_servers, var.default_dns_servers) : "\"${dns}\""])}]
-
         runcmd:
-          - rm -f /etc/netplan/50-cloud-init.yaml /etc/netplan/99-netcfg-vmware.yaml
-          - netplan apply
           - mkdir -p /home/svc_admin/.ssh
           - echo "${var.ssh_public_key}" >> /home/svc_admin/.ssh/authorized_keys
           - sort -u /home/svc_admin/.ssh/authorized_keys -o /home/svc_admin/.ssh/authorized_keys
