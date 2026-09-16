@@ -42,15 +42,15 @@ module "folder" {
 # Module: Content Library Synchronization
 # Clones source golden template to target Content Library without deleting source
 # ==============================================================================
-module "content_library" {
-  source = "./modules/content_library"
-
-  content_library_name = var.content_library_name
-  item_name            = var.content_library_item_name
-  item_description     = "Ubuntu 24.04 LTS Golden Template synchronized from VM Template folder"
-  source_vm_uuid       = data.vsphere_virtual_machine.source_template.id
-  item_type            = "ovf"
-}
+# module "content_library" {
+#   source = "./modules/content_library"
+#
+#   content_library_name = var.content_library_name
+#   item_name            = var.content_library_item_name
+#   item_description     = "Ubuntu 24.04 LTS Golden Template synchronized from VM Template folder"
+#   source_vm_uuid       = data.vsphere_virtual_machine.source_template.id
+#   item_type            = "ovf"
+# }
 
 # ==============================================================================
 # Module: Network Provisioning
@@ -104,8 +104,7 @@ module "compute" {
 
   depends_on = [
     module.folder,
-    module.network,
-    module.content_library
+    module.network
   ]
 }
 

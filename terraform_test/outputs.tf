@@ -3,13 +3,13 @@ output "created_folders" {
   value       = module.folder.folders
 }
 
-output "content_library_item" {
-  description = "Details of the Content Library item created from the golden template."
-  value = {
-    id   = module.content_library.item_id
-    name = module.content_library.item_name
-  }
-}
+# output "content_library_item" {
+#   description = "ID and Name of the synchronized Content Library Item"
+#   value = {
+#     id   = module.content_library.item_id
+#     name = module.content_library.item_name
+#   }
+# }
 
 output "provisioned_port_groups" {
   description = "List of standard port groups created across ESXi cluster hosts."
