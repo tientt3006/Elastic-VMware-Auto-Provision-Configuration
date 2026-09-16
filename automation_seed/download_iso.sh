@@ -9,8 +9,8 @@ set -euo pipefail
 DEST_DIR="${ISO_DEST_DIR:-./iso_cache}"
 mkdir -p "${DEST_DIR}"
 
-UBUNTU_2404_URL="https://releases.ubuntu.com/24.04/ubuntu-24.04.1-live-server-amd64.iso"
-UBUNTU_2404_SHA256="e240e4b801f0cb30c23a2fb481504257de8d096ff27974414000e156d4d27341"
+UBUNTU_2404_URL="https://releases.ubuntu.com/24.04/ubuntu-24.04.5-live-server-amd64.iso"
+UBUNTU_2404_SHA256="97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8"
 
 usage() {
     cat << EOF

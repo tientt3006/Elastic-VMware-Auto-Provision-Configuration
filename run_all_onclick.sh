@@ -99,10 +99,10 @@ read -p "Tên Datastore lưu ISO và VM (ví dụ: DS-LD01-SSD): " ISO_DATASTORE
 [[ -z "${ISO_DATASTORE}" ]] && echo "Lỗi: Không được để trống." >&2 && exit 1
 sed -i -E "s/(vcenter_datastore\s*=\s*\")[^\"]+(\")/\1${ISO_DATASTORE}\2/" "${PKR_FILE}"
 sed -i -E "s/(vsphere_datastore\s*=\s*\")[^\"]+(\")/\1${ISO_DATASTORE}\2/" "${TF_FILE}"
-# Cập nhật iso_paths
+# Dùng sed thay thế toàn bộ block iso_paths đa dòng
 sed -i -e '/^iso_paths[[:space:]]*=[[:space:]]*\[/,/^[[:space:]]*\]/c\
 iso_paths = [\
-  "['"${ISO_DATASTORE}"'] iso/ubuntu-24.04.1-live-server-amd64.iso"\
+  "['"${ISO_DATASTORE}"'] iso/ubuntu-24.04.5-live-server-amd64.iso"\
 ]' "${PKR_FILE}"
 
 # --- VM Network cho Packer (Port Group có DHCP) ---
@@ -303,7 +303,7 @@ cd "${SCRIPT_DIR}/automation_seed"
 echo "-> Tải ISO cục bộ (bỏ qua nếu đã tải)..."
 ./download_iso.sh --ubuntu
 
-ISO_FILE="./iso_cache/ubuntu-24.04.1-live-server-amd64.iso"
+ISO_FILE="./iso_cache/ubuntu-24.04.5-live-server-amd64.iso"
 if [[ ! -f "${ISO_FILE}" ]]; then
     echo "Lỗi: Tải ISO thất bại." >&2
     exit 1
@@ -316,12 +316,12 @@ export GOVC_PASSWORD="${VCENTER_PASS}"
 export GOVC_INSECURE="1"
 
 if command -v govc &> /dev/null; then
-    if govc datastore.ls -ds="${ISO_DATASTORE}" iso/ubuntu-24.04.1-live-server-amd64.iso &> /dev/null; then
+    if govc datastore.ls -ds="${ISO_DATASTORE}" iso/ubuntu-24.04.5-live-server-amd64.iso &> /dev/null; then
         echo "ISO đã tồn tại trên Datastore [${ISO_DATASTORE}], bỏ qua việc upload."
     else
         echo "ISO chưa tồn tại trên Datastore, tiến hành upload qua govc..."
         govc datastore.mkdir -ds="${ISO_DATASTORE}" iso || true
-        govc datastore.upload -ds="${ISO_DATASTORE}" "${ISO_FILE}" iso/ubuntu-24.04.1-live-server-amd64.iso
+        govc datastore.upload -ds="${ISO_DATASTORE}" "${ISO_FILE}" iso/ubuntu-24.04.5-live-server-amd64.iso
         echo "Upload thành công."
     fi
 else
