@@ -5,6 +5,7 @@
 all:
   vars:
     ansible_user: ${ssh_username}
+    ansible_ssh_private_key_file: ~/.ssh/id_ed25519
 
   children:
     elastic_cluster:

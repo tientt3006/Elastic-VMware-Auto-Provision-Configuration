@@ -177,6 +177,22 @@ EOF
 
 configure_templates() {
     echo "Đang cấu hình động các file mẫu..."
+
+    # Khởi tạo hoặc tái sử dụng SSH Key tiêu chuẩn (~/.ssh/id_ed25519)
+    mkdir -p "${HOME}/.ssh"
+    chmod 700 "${HOME}/.ssh"
+    local SSH_KEY_PATH="${HOME}/.ssh/id_ed25519"
+    if [[ ! -f "${SSH_KEY_PATH}" ]]; then
+        echo "Chưa tìm thấy SSH key tiêu chuẩn, đang tự động tạo: ${SSH_KEY_PATH}..."
+        ssh-keygen -t ed25519 -N "" -f "${SSH_KEY_PATH}" -C ""
+        chmod 600 "${SSH_KEY_PATH}"
+        chmod 644 "${SSH_KEY_PATH}.pub"
+    else
+        echo "Tái sử dụng SSH key tiêu chuẩn hiện có: ${SSH_KEY_PATH}"
+    fi
+    local SSH_PUB_KEY
+    SSH_PUB_KEY=$(cat "${SSH_KEY_PATH}.pub")
+
     sed -i -E "s/(vcenter_server\s*=\s*\")[^\"]+(\")/\1${SITE_VCSA_IP}\2/" "${PKR_FILE}"
     sed -i -E "s/(vsphere_server\s*=\s*\")[^\"]+(\")/\1${SITE_VCSA_IP}\2/" "${TF_FILE}"
     sed -i -E "s/(vcenter_user\s*=\s*\")[^\"]+(\")/\1${VCENTER_USER}\2/" "${PKR_FILE}"
@@ -195,6 +211,19 @@ configure_templates() {
     sed -i -E "s/(content_library_item_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_FILE}"
     sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${PKR_FILE}"
     sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${TF_FILE}"
+    sed -i -E "s|(ssh_public_key\s*=\s*\")[^\"]+(\")|\1${SSH_PUB_KEY}\2|" "${TF_FILE}"
+
+    if [[ -f "${SCRIPT_DIR}/ansible_test/ansible.cfg" ]]; then
+        sed -i -E "s/(remote_user\s*=\s*).*/\1${SSH_USER}/" "${SCRIPT_DIR}/ansible_test/ansible.cfg"
+    fi
+
+    if [[ -f "${ANS_FILE}" ]]; then
+        sed -i -E "s/(ansible_user\s*:\s*).*/\1${SSH_USER}/" "${ANS_FILE}"
+        if ! grep -q "ansible_ssh_private_key_file" "${ANS_FILE}"; then
+            sed -i "/ansible_user:/a \    ansible_ssh_private_key_file: ~/.ssh/id_ed25519" "${ANS_FILE}"
+        fi
+    fi
+
     # Xử lý chuỗi DNS_SERVER (có thể chứa nhiều IP cách nhau bởi dấu phẩy hoặc khoảng trắng)
     FORMATTED_DNS=""
     for ip in $(echo "${DNS_SERVER}" | tr ',' ' '); do
@@ -207,10 +236,11 @@ configure_templates() {
     sed -i "s|<DNS_SERVERS_LIST>|${FORMATTED_DNS}|g" "${TF_FILE}"
 
     if [[ -f "${USER_DATA_FILE}" ]]; then
-        SSH_PASS_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}")
+        SSH_PASS_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}" 2>/dev/null || openssl passwd -6 "${SSH_PASS}")
         sed -i -E "s|(password:\s*\").*(\")|\1${SSH_PASS_HASH}\2|" "${USER_DATA_FILE}"
         sed -i -E "s/(username:\s*).*/\1${SSH_USER}/" "${USER_DATA_FILE}"
         sed -i "s|<SSH_USER>|${SSH_USER}|g" "${USER_DATA_FILE}"
+        sed -i "s|<SSH_PUB_KEY>|${SSH_PUB_KEY}|g" "${USER_DATA_FILE}"
     fi
 
     python3 - "${TF_FILE}" "${IP_E01}" "${IP_E02}" "${IP_E03}" "${IP_KBN}" "${GW}" "${NETMASK}" << 'PYEOF'

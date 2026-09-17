@@ -24,6 +24,8 @@ autoinstall:
   ssh:
     install-server: true
     allow-pw: true
+    authorized-keys:
+      - "<SSH_PUB_KEY>"
   shutdown: reboot
   user-data:
     disable_root: true
