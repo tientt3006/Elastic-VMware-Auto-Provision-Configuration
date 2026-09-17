@@ -29,7 +29,7 @@ if [[ -z "${TMUX:-}" ]]; then
     if command -v tmux &> /dev/null; then
         echo "Khởi tạo phiên tmux (deploy_session) để chống đứt kết nối SSH..."
         exec tmux new-session -s deploy_session \
-            "bash -c 'bash \"$0\" \"$@\" 2>&1 | tee \"${LOG_FILE}\"; EXIT_CODE=\${PIPESTATUS[0]}; echo \"\"; echo \"=== Script kết thúc với exit code: \${EXIT_CODE} ===\"; echo \"Bạn đang ở trong tmux. Gõ exit để đóng, hoặc nhấn Ctrl+B rồi ấn D để thoát ẩn (detach).\"; exec bash'"
+            "bash -c 'trap \":\" SIGINT; bash \"$0\" \"$@\" 2>&1 | tee \"${LOG_FILE}\"; EXIT_CODE=\${PIPESTATUS[0]}; echo \"\"; echo \"=== Script kết thúc với exit code: \${EXIT_CODE} ===\"; echo \"Bạn đang ở trong tmux. Gõ exit để đóng, hoặc nhấn Ctrl+B rồi ấn D để thoát ẩn (detach).\"; exec bash'"
     else
         echo "CẢNH BÁO: tmux chưa được cài đặt. Nếu đứt SSH sẽ bị gián đoạn."
         exec > >(tee -a "${LOG_FILE}") 2>&1
@@ -83,6 +83,23 @@ prompt_if_placeholder() {
     fi
 }
 
+prompt_password() {
+    local var_name="$1"
+    local prompt_msg="$2"
+    local current_val="${!var_name:-}"
+    local new_val=""
+
+    if [[ -n "${current_val}" ]]; then
+        read -s -p "${prompt_msg} [Đã lưu trong phiên, Enter để giữ nguyên]: " new_val
+        echo ""
+        [[ -n "${new_val}" ]] && eval "${var_name}=\"${new_val}\""
+    else
+        read -s -p "${prompt_msg}: " new_val
+        echo ""
+        eval "${var_name}=\"${new_val}\""
+    fi
+}
+
 gather_vars() {
     if [[ ! -f "${VARS_CONF}" ]]; then
         cat << 'EOF' > "${VARS_CONF}"
@@ -132,16 +149,16 @@ EOF
     prompt_if_placeholder "IP_E03" "Nhập IP tĩnh cho Elasticsearch Node 3 (srv-elastic-03)"
     prompt_if_placeholder "IP_KBN" "Nhập IP tĩnh cho Kibana/Fleet Server (srv-kibana-gw)"
     prompt_if_placeholder "GW" "Nhập Default Gateway (vd: 10.0.6.1)"
-    prompt_if_placeholder "DNS_SERVER" "Nhập IP của DNS Server nội bộ (vd: 10.0.6.1, hoặc 8.8.8.8)"
+    prompt_if_placeholder "DNS_SERVER" "Nhập IP của DNS Server nội bộ (cách nhau bởi dấu phẩy nếu nhiều hơn 1, vd: 10.0.6.1, 8.8.8.8)"
 
     echo "------------------------------------------------------------------------------"
     echo "THU THẬP MẬT KHẨU BẢO MẬT (Chỉ hỏi 1 lần và lưu trong RAM)"
     echo "------------------------------------------------------------------------------"
-    [[ -z "${VCENTER_PASS:-}" ]] && read -s -p "Mật khẩu vCenter: " VCENTER_PASS && echo ""
-    [[ -z "${SSH_PASS:-}" ]] && read -s -p "Mật khẩu SSH (${SSH_USER}): " SSH_PASS && echo ""
-    [[ -z "${SUDO_PASS:-}" ]] && read -s -p "Mật khẩu Sudo (nếu cần đổi quyền gốc): " SUDO_PASS && echo ""
-    [[ -z "${ELASTIC_PASS:-}" ]] && read -s -p "Mật khẩu Elastic (elastic): " ELASTIC_PASS && echo ""
-    [[ -z "${KIBANA_PASS:-}" ]] && read -s -p "Mật khẩu Kibana (kibana_system): " KIBANA_PASS && echo ""
+    prompt_password "VCENTER_PASS" "Mật khẩu vCenter"
+    prompt_password "SSH_PASS" "Mật khẩu SSH (${SSH_USER})"
+    prompt_password "SUDO_PASS" "Mật khẩu Sudo (nếu cần đổi quyền gốc)"
+    prompt_password "ELASTIC_PASS" "Mật khẩu Elastic (elastic)"
+    prompt_password "KIBANA_PASS" "Mật khẩu Kibana (kibana_system)"
 
     export VCENTER_PASS SSH_PASS SUDO_PASS ELASTIC_PASS KIBANA_PASS
     export VSPHERE_PASSWORD="${VCENTER_PASS}"
@@ -178,7 +195,16 @@ configure_templates() {
     sed -i -E "s/(content_library_item_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_FILE}"
     sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${PKR_FILE}"
     sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${TF_FILE}"
-    sed -i -E "s/(default_dns_servers\s*=\s*\[\")[^\"]+(\")/\1${DNS_SERVER}\2/" "${TF_FILE}"
+    # Xử lý chuỗi DNS_SERVER (có thể chứa nhiều IP cách nhau bởi dấu phẩy hoặc khoảng trắng)
+    FORMATTED_DNS=""
+    for ip in $(echo "${DNS_SERVER}" | tr ',' ' '); do
+        if [[ -z "${FORMATTED_DNS}" ]]; then
+            FORMATTED_DNS="\"${ip}\""
+        else
+            FORMATTED_DNS="${FORMATTED_DNS}, \"${ip}\""
+        fi
+    done
+    sed -i "s|<DNS_SERVERS_LIST>|${FORMATTED_DNS}|g" "${TF_FILE}"
 
     if [[ -f "${USER_DATA_FILE}" ]]; then
         SSH_PASS_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}")

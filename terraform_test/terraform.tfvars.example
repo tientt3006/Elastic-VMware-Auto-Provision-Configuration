@@ -36,7 +36,7 @@ port_groups = {
 }
 
 default_domain_name = "corp.internal"
-default_dns_servers = ["<DNS_SERVER>", "8.8.8.8"]
+default_dns_servers = [<DNS_SERVERS_LIST>]
 
 # ==============================================================================
 # DRS Anti-Affinity Configuration
