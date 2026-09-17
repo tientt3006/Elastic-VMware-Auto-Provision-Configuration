@@ -54,6 +54,7 @@ init_config_files() {
     [[ ! -f "${ANS_FILE}" ]] && cp "${ANS_FILE}.example" "${ANS_FILE}" && echo "Đã tạo: hosts.yml"
     [[ ! -f "${ANS_VARS_FILE}" ]] && cp "${ANS_VARS_FILE}.example" "${ANS_VARS_FILE}" && echo "Đã tạo: main.yml"
     [[ ! -f "${USER_DATA_FILE}" && -f "${USER_DATA_FILE}.example" ]] && cp "${USER_DATA_FILE}.example" "${USER_DATA_FILE}" && echo "Đã tạo: user-data"
+    return 0
 }
 
 prompt_if_placeholder() {
