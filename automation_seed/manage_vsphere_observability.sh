@@ -20,9 +20,17 @@ ACTION="${1:-apply}"
 # ==============================================================================
 
 prompt_credentials() {
+
     echo "=============================================================================="
     echo "THIẾT LẬP THAM SỐ GIÁM SÁT VMWARE VSPHERE"
     echo "=============================================================================="
+
+    if [[ -z "${VCENTER_PASS:-}" ]]; then
+        read -s -p "Mật khẩu vCenter Administrator (${VCENTER_USER:-administrator@vsphere.local}): " VCENTER_PASS
+        echo ""
+        export VCENTER_PASS
+        export GOVC_PASSWORD="${VCENTER_PASS}"
+    fi
 
     # 1. Tài khoản Service Account Read-Only
     read -p "Tài khoản Service Account Read-Only [mặc định: svc_elastic_ro]: " INPUT_USER
@@ -44,24 +52,7 @@ prompt_credentials() {
         fi
     done
 
-    # 2. Thông tin vCenter VAMI (Tùy chọn thu thập Log vCenter)
-    echo "------------------------------------------------------------------------------"
-    echo "CẤU HÌNH VCENTER APPLIANCE SYSLOG (TÙY CHỌN)"
-    echo "Lưu ý: VAMI (cổng 5480) yêu cầu tài khoản root của hệ điều hành VCSA."
-    echo "------------------------------------------------------------------------------"
-    read -p "IP vCenter VAMI [mặc định: ${SITE_VCSA_IP:-}]: " INPUT_VAMI_IP
-    VAMI_IP="${INPUT_VAMI_IP:-${SITE_VCSA_IP:-}}"
-
-    read -p "Cổng VAMI [mặc định: 5480]: " INPUT_VAMI_PORT
-    VAMI_PORT="${INPUT_VAMI_PORT:-5480}"
-
-    read -p "Tài khoản VAMI [mặc định: root]: " INPUT_VAMI_USER
-    VAMI_USER="${INPUT_VAMI_USER:-root}"
-
-    read -s -p "Mật khẩu tài khoản '${VAMI_USER}' (Enter để bỏ qua vCenter log): " VAMI_PASS
-    echo ""
-
-    export SVC_USER SVC_PASS VAMI_IP VAMI_PORT VAMI_USER VAMI_PASS
+    export SVC_USER SVC_PASS
 }
 
 # ==============================================================================
@@ -176,37 +167,66 @@ PYEOF
 }
 
 configure_vcsa_syslog() {
-    if [[ -z "${VAMI_PASS:-}" ]]; then
-        echo ""
-        echo "--- [3/4] BỎ QUA CẤU HÌNH VCENTER APPLIANCE SYSLOG (KHÔNG CÓ MẬT KHẨU ROOT) ---"
+    echo ""
+    echo "--- [3/4] THIẾT LẬP VCENTER APPLIANCE SYSLOG FORWARDING QUA VCENTER REST API ---"
+    local GATEWAY_IP="${IP_KBN}"
+    local VC_USER="${VCENTER_USER:-${GOVC_USERNAME:-administrator@vsphere.local}}"
+    local VC_PASS="${VCENTER_PASS:-${GOVC_PASSWORD:-}}"
+
+    if [[ -z "${VC_PASS}" ]]; then
+        echo "CẢNH BÁO: Không có mật khẩu quản trị vCenter trong bộ nhớ. Bỏ qua cấu hình vCenter Appliance Syslog."
         return 0
     fi
 
-    echo ""
-    echo "--- [3/4] THIẾT LẬP VCENTER APPLIANCE SYSLOG FORWARDING QUA VAMI REST API ---"
-    local GATEWAY_IP="${IP_KBN}"
-
-    # Lấy Session token từ VAMI
+    # 1. Lấy Session token từ vCenter REST API (HTTPS port 443)
     local SESSION_RESP
-    SESSION_RESP=$(curl -s -k -X POST -u "${VAMI_USER}:${VAMI_PASS}" "https://${VAMI_IP}:${VAMI_PORT}/api/session" 2>/dev/null || echo "")
+    SESSION_RESP=$(curl -s -k -X POST -u "${VC_USER}:${VC_PASS}" "https://${SITE_VCSA_IP}/api/session" 2>/dev/null || echo "")
     local SESSION_TOKEN=$(echo "${SESSION_RESP}" | tr -d '"')
 
     if [[ -n "${SESSION_TOKEN}" && "${SESSION_TOKEN}" != *"error"* && "${SESSION_TOKEN}" != *"Unauthorized"* ]]; then
-        echo "=> Đã xác thực thành công với VAMI. Đang thiết lập Syslog Forwarding..."
-        local API_STATUS
-        API_STATUS=$(curl -s -k -o /dev/null -w "%{http_code}" -X PUT \
-            -H "vmware-api-session-id: ${SESSION_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"spec": [{"hostname": "'"${GATEWAY_IP}"'", "port": 9525, "protocol": "UDP"}]}' \
-            "https://${VAMI_IP}:${VAMI_PORT}/api/appliance/logging/forwarding" || echo "500")
+        # 2. Đọc và sao lưu hiện trạng Syslog forwarding của vCenter Appliance
+        local CUR_FWD
+        CUR_FWD=$(curl -s -k -H "vmware-api-session-id: ${SESSION_TOKEN}" "https://${SITE_VCSA_IP}/api/appliance/logging/forwarding" 2>/dev/null || echo "[]")
+        
+        local LATEST_LINK="${STATE_DIR}/esxi_syslog_backup_latest.json"
+        if [[ -f "${LATEST_LINK}" ]]; then
+            python3 - "${LATEST_LINK}" "${CUR_FWD}" << 'PYEOF'
+import sys, json
+backup_file, cur_fwd_str = sys.argv[1], sys.argv[2]
+try:
+    with open(backup_file, "r") as f:
+        data = json.load(f)
+    try:
+        data["vcsa_forwarding"] = json.loads(cur_fwd_str)
+    except Exception:
+        data["vcsa_forwarding"] = []
+    with open(backup_file, "w") as f:
+        json.dump(data, f, indent=2)
+except Exception:
+    pass
+PYEOF
+        fi
 
-        if [[ "${API_STATUS}" =~ ^(200|204)$ ]]; then
-            echo "=> Đã cấu hình vCenter Appliance chuyển tiếp Syslog về ${GATEWAY_IP}:9525 thành công."
+        # 3. Kiểm tra Idempotent: nếu đã chứa target gateway thì bỏ qua
+        if echo "${CUR_FWD}" | grep -q "${GATEWAY_IP}"; then
+            echo "=> vCenter Appliance đã có cấu hình chuyển tiếp về ${GATEWAY_IP}:9525. Bỏ qua (Idempotent)."
         else
-            echo "CẢNH BÁO: Gọi API VAMI trả về HTTP ${API_STATUS}. Có thể cấu hình thủ công tại VAMI (https://${VAMI_IP}:${VAMI_PORT} > Syslog)."
+            echo "=> Thiết lập vCenter Appliance Syslog Forwarding -> udp://${GATEWAY_IP}:9525..."
+            local API_STATUS
+            API_STATUS=$(curl -s -k -o /dev/null -w "%{http_code}" -X PUT \
+                -H "vmware-api-session-id: ${SESSION_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d '{"cfg_list": [{"hostname": "'"${GATEWAY_IP}"'", "port": 9525, "protocol": "UDP"}]}' \
+                "https://${SITE_VCSA_IP}/api/appliance/logging/forwarding" || echo "500")
+
+            if [[ "${API_STATUS}" =~ ^(200|204)$ ]]; then
+                echo "=> Đã cấu hình vCenter Appliance chuyển tiếp Syslog về ${GATEWAY_IP}:9525 thành công."
+            else
+                echo "CẢNH BÁO: Cấu hình vCenter Syslog trả về HTTP ${API_STATUS}."
+            fi
         fi
     else
-        echo "CẢNH BÁO: Không thể xác thực vào VAMI qua cổng ${VAMI_PORT} (Mật khẩu không đúng hoặc VAMI bị chặn). Bỏ qua vCenter Syslog."
+        echo "CẢNH BÁO: Không thể xác thực vào vCenter REST API port 443. Bỏ qua vCenter Syslog."
     fi
 }
 
@@ -272,6 +292,42 @@ for host, cfg in hosts.items():
         print(f"=> Lỗi khôi phục firewall: {e}")
 PYEOF
 
+    # Khôi phục vCenter Appliance Syslog nếu có trong bản backup
+    local VC_USER="${VCENTER_USER:-${GOVC_USERNAME:-administrator@vsphere.local}}"
+    local VC_PASS="${VCENTER_PASS:-${GOVC_PASSWORD:-}}"
+    if [[ -n "${VC_PASS}" ]]; then
+        python3 - "${LATEST_BACKUP}" "${SITE_VCSA_IP}" "${VC_USER}" "${VC_PASS}" << 'PYEOF'
+import sys, json, urllib.request, ssl, base64
+
+backup_path, vc_ip, vc_user, vc_pass = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+try:
+    with open(backup_path, "r") as f:
+        data = json.load(f)
+    orig_vcsa_fwd = data.get("vcsa_forwarding")
+    if orig_vcsa_fwd is not None:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
+        sess_url = f"https://{vc_ip}/api/session"
+        auth_hdr = "Basic " + base64.b64encode(f"{vc_user}:{vc_pass}".encode()).decode()
+        req = urllib.request.Request(sess_url, headers={"Authorization": auth_hdr}, method="POST")
+        with urllib.request.urlopen(req, context=ctx) as resp:
+            token = json.loads(resp.read().decode())
+
+        fwd_url = f"https://{vc_ip}/api/appliance/logging/forwarding"
+        payload = {"cfg_list": orig_vcsa_fwd}
+        put_req = urllib.request.Request(fwd_url, data=json.dumps(payload).encode(), headers={
+            "vmware-api-session-id": token,
+            "Content-Type": "application/json"
+        }, method="PUT")
+        with urllib.request.urlopen(put_req, context=ctx) as put_resp:
+            print(f"=> Khôi phục cấu hình Syslog vCenter Appliance thành công (HTTP {put_resp.status}).")
+except Exception as e:
+    print(f"=> Lỗi khôi phục Syslog vCenter Appliance: {e}")
+PYEOF
+    fi
+
     echo ""
     echo "--- GỠ BỎ CHÍNH SÁCH GIÁM SÁT VSPHERE TRÊN KIBANA FLEET ---"
     cd "${SCRIPT_DIR}/../ansible_test"
@@ -282,9 +338,10 @@ PYEOF
 
     echo ""
     echo "=============================================================================="
-    echo "HOÀN TÁC TOÀN BỘ CẤU HÌNH VSPHERE OBSERVABILITY THÀNH CÔNG."
+    echo "HOÀN TẤT TOÀN BỘ CẤU HÌNH VSPHERE OBSERVABILITY THÀNH CÔNG."
     echo "=============================================================================="
 }
+
 
 # ==============================================================================
 # MAIN
