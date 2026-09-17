@@ -52,6 +52,8 @@ variable "folder" {
   description = "The inventory folder path to place the virtual machines in."
   type        = string
   default     = null
+}
+
 variable "default_domain_name" {
   description = "Default DNS search domain name."
   type        = string
