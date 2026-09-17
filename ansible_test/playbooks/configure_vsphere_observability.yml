@@ -1,0 +1,13 @@
+---
+# ==============================================================================
+# Playbook: configure_vsphere_observability.yml
+# Independent integration playbook for VMware vSphere Observability
+# ==============================================================================
+
+- name: Configure VMware vSphere Observability on Fleet Server
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  roles:
+    - vsphere_observability

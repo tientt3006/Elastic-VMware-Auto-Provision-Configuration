@@ -20,7 +20,8 @@ chmod +x "${SCRIPT_DIR}/packer_test/build_packer_secure.sh" \
          "${SCRIPT_DIR}/ansible_test/run_observability_setup.sh" \
          "${SCRIPT_DIR}/automation_seed/download_iso.sh" \
          "${SCRIPT_DIR}/automation_seed/upload_iso_to_vcenter.sh" \
-         "${SCRIPT_DIR}/automation_seed/setup_automation_env.sh"
+         "${SCRIPT_DIR}/automation_seed/setup_automation_env.sh" \
+         "${SCRIPT_DIR}/automation_seed/manage_vsphere_observability.sh"
 
 # ==============================================================================
 # 0. Mở tmux session nếu chưa ở trong tmux
@@ -514,6 +515,14 @@ run_ansible() {
     ./run_observability_setup.sh
 }
 
+run_vsphere_observability() {
+    "${SCRIPT_DIR}/automation_seed/manage_vsphere_observability.sh" apply
+}
+
+run_vsphere_rollback() {
+    "${SCRIPT_DIR}/automation_seed/manage_vsphere_observability.sh" rollback
+}
+
 # ==============================================================================
 # MAIN EXECUTION
 # ==============================================================================
@@ -531,8 +540,10 @@ while true; do
     echo "2) Chỉ tạo Golden Template (Packer)"
     echo "3) Chỉ cấp phát hạ tầng (Terraform Provisioning)"
     echo "4) Chỉ cấu hình ứng dụng (Ansible Configuration)"
+    echo "5) Tích hợp giám sát hạ tầng VMware vSphere (vCenter & ESXi Observability)"
+    echo "6) Hoàn tác giám sát hạ tầng VMware vSphere (Rollback vSphere Configuration)"
     echo "0) Thoát"
-    read -p "Vui lòng chọn (0-4) [1]: " MAIN_CHOICE
+    read -p "Vui lòng chọn (0-6) [1]: " MAIN_CHOICE
     MAIN_CHOICE=${MAIN_CHOICE:-1}
 
     case "${MAIN_CHOICE}" in
@@ -554,6 +565,12 @@ while true; do
         4)
             run_ansible
             echo "HOÀN TẤT QUÁ TRÌNH CẤU HÌNH ỨNG DỤNG."
+            ;;
+        5)
+            run_vsphere_observability
+            ;;
+        6)
+            run_vsphere_rollback
             ;;
         0)
             echo "Thoát chương trình."

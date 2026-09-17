@@ -1,0 +1,40 @@
+---
+# ==============================================================================
+# Playbook: rollback_vsphere_observability.yml
+# Removes vSphere Integration Policy from Kibana Fleet Server
+# ==============================================================================
+
+- name: Rollback VMware vSphere Observability from Fleet Server
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Set dynamic Kibana API URL from inventory
+      ansible.builtin.set_fact:
+        kibana_api_url: "http://{{ hostvars[groups['kibana_gateway'][0]]['ansible_host'] }}:5601"
+
+    - name: Query existing Fleet Package Policies
+      ansible.builtin.uri:
+        url: "{{ kibana_api_url }}/api/fleet/package_policies"
+        method: GET
+        user: "elastic"
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: 200
+      register: existing_package_policies
+
+    - name: Delete vsphere-monitoring policy if present
+      ansible.builtin.uri:
+        url: "{{ kibana_api_url }}/api/fleet/package_policies/{{ item.id }}"
+        method: DELETE
+        user: "elastic"
+        password: "{{ elastic_password }}"
+        force_basic_auth: true
+        headers:
+          kbn-xsrf: "true"
+        status_code: [200, 404]
+      loop: "{{ existing_package_policies.json['items'] | default([]) }}"
+      when: item.name == 'vsphere-monitoring'

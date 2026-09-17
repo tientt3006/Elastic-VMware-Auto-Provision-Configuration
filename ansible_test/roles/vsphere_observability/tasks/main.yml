@@ -1,0 +1,160 @@
+---
+# ==============================================================================
+# Role: vsphere_observability
+# Configures VMware vSphere Integration (Metrics & Syslog) on Kibana Fleet
+# ==============================================================================
+
+- name: Set dynamic Kibana API URL from inventory
+  ansible.builtin.set_fact:
+    kibana_api_url: "http://{{ hostvars[groups['kibana_gateway'][0]]['ansible_host'] }}:5601"
+  delegate_to: localhost
+
+- name: Check Kibana API availability
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/status"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    status_code: 200
+  register: kibana_health
+  retries: 15
+  delay: 4
+  until: kibana_health.status == 200
+  delegate_to: localhost
+
+- name: Install vSphere Integration Package (Latest)
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/epm/packages/vsphere"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: "{}"
+    status_code: [200, 400]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Get vSphere package version
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/epm/packages/vsphere"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+  register: vsphere_package_info
+  delegate_to: localhost
+
+- name: Query existing Fleet Package Policies
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies"
+    method: GET
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+  register: existing_package_policies
+  delegate_to: localhost
+
+- name: Remove outdated vsphere-monitoring policy if existing
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies/{{ item.id }}"
+    method: DELETE
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+    status_code: [200, 404]
+  loop: "{{ existing_package_policies.json['items'] | default([]) }}"
+  when: item.name == 'vsphere-monitoring'
+  delegate_to: localhost
+
+- name: Create vSphere Integration Policy (Metrics Polling & Syslog UDP 9525)
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/package_policies"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: |
+      {
+        "name": "vsphere-monitoring",
+        "description": "VMware vSphere Metrics & Syslog Collection",
+        "namespace": "default",
+        "policy_id": "fleet-server-policy",
+        "package": {
+          "name": "vsphere",
+          "title": "VMware vSphere",
+          "version": "{{ vsphere_package_info.json.item.version | default('1.25.0') }}"
+        },
+        "inputs": [
+          {
+            "type": "vsphere/metrics",
+            "enabled": true,
+            "streams": [
+              {
+                "id": "vsphere.cluster",
+                "enabled": true,
+                "data_stream": { "dataset": "vsphere.cluster", "type": "metrics" },
+                "vars": { "period": { "value": "60s", "type": "text" } }
+              },
+              {
+                "id": "vsphere.host",
+                "enabled": true,
+                "data_stream": { "dataset": "vsphere.host", "type": "metrics" },
+                "vars": { "period": { "value": "60s", "type": "text" } }
+              },
+              {
+                "id": "vsphere.datastore",
+                "enabled": true,
+                "data_stream": { "dataset": "vsphere.datastore", "type": "metrics" },
+                "vars": { "period": { "value": "60s", "type": "text" } }
+              },
+              {
+                "id": "vsphere.virtualmachine",
+                "enabled": true,
+                "data_stream": { "dataset": "vsphere.virtualmachine", "type": "metrics" },
+                "vars": { "period": { "value": "120s", "type": "text" } }
+              }
+            ],
+            "vars": {
+              "hosts": { "value": "https://{{ vcenter_server }}/sdk", "type": "text" },
+              "username": { "value": "{{ vcenter_readonly_user }}@vsphere.local", "type": "text" },
+              "password": { "value": "{{ vcenter_readonly_password }}", "type": "text" },
+              "insecure": { "value": true, "type": "bool" }
+            }
+          },
+          {
+            "type": "udp",
+            "enabled": true,
+            "streams": [
+              {
+                "id": "udp-vsphere.log",
+                "enabled": true,
+                "data_stream": { "dataset": "vsphere.log", "type": "logs" },
+                "vars": {
+                  "syslog_port": { "value": 9525, "type": "number" },
+                  "syslog_host": { "value": "0.0.0.0", "type": "text" },
+                  "tags": { "value": ["vsphere", "syslog"], "type": "text" }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    status_code: [200, 201, 400, 409]
+  delegate_to: localhost
