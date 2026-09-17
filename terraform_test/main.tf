@@ -95,6 +95,7 @@ module "compute" {
   default_domain_name             = var.default_domain_name
   default_dns_servers             = var.default_dns_servers
   ssh_public_key                  = var.ssh_public_key
+  ssh_username                    = var.ssh_username
 
   vms = {
     for k, vm in var.vms : k => merge(vm, {

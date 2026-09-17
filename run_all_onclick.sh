@@ -180,6 +180,7 @@ configure_templates() {
         SSH_PASS_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}")
         sed -i -E "s|(password:\s*\").*(\")|\1${SSH_PASS_HASH}\2|" "${USER_DATA_FILE}"
         sed -i -E "s/(username:\s*).*/\1${SSH_USER}/" "${USER_DATA_FILE}"
+        sed -i "s|<SSH_USER>|${SSH_USER}|g" "${USER_DATA_FILE}"
     fi
 
     python3 - "${TF_FILE}" "${IP_E01}" "${IP_E02}" "${IP_E03}" "${IP_KBN}" "${GW}" "${NETMASK}" << 'PYEOF'
@@ -462,8 +463,8 @@ while true; do
     case "${MAIN_CHOICE}" in
         1)
             run_packer
-            run_terraform || true
-            run_ansible || true
+            run_terraform
+            run_ansible
             echo "HOÀN TẤT QUÁ TRÌNH TRIỂN KHAI TOÀN BỘ."
             break
             ;;
@@ -472,11 +473,11 @@ while true; do
             echo "HOÀN TẤT QUÁ TRÌNH TẠO TEMPLATE."
             ;;
         3)
-            run_terraform || true
+            run_terraform
             echo "HOÀN TẤT QUÁ TRÌNH TẠO HẠ TẦNG."
             ;;
         4)
-            run_ansible || true
+            run_ansible
             echo "HOÀN TẤT QUÁ TRÌNH CẤU HÌNH ỨNG DỤNG."
             ;;
         0)

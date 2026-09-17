@@ -28,6 +28,6 @@ autoinstall:
   user-data:
     disable_root: true
   late-commands:
-    - echo "<SSH_USER> ALL=(ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/99-svc-admin
-    - chmod 0440 /target/etc/sudoers.d/99-svc-admin
+    - echo "<SSH_USER> ALL=(ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/99-provisioner
+    - chmod 0440 /target/etc/sudoers.d/99-provisioner
     - curtin in-target --target=/target -- systemctl enable ssh
