@@ -52,6 +52,7 @@ variable "vsphere_template_name" {
 variable "content_library_name" {
   description = "Name of the target Content Library to receive the golden template."
   type        = string
+  default     = ""
 }
 
 variable "content_library_item_name" {
