@@ -1,8 +1,8 @@
 # ==============================================================================
 # vCenter Server Connection Configuration (Example)
 # ==============================================================================
-vsphere_server              = "vcsa.corp.internal"
-vsphere_user                = "administrator@vsphere.local"
+vsphere_server              = "<VCENTER_IP>"
+vsphere_user                = "<VCENTER_USER>"
 vsphere_insecure_connection = true
 
 # ==============================================================================
@@ -28,7 +28,7 @@ vm_target_folder = "App_Workloads"
 # ==============================================================================
 # ESXi Host & Standard Switch Configuration
 # ==============================================================================
-esxi_hosts          = ["10.0.6.10", "10.0.6.11"]
+esxi_hosts          = ["<ESXI_HOST_01>", "<ESXI_HOST_02>"]
 virtual_switch_name = "vSwitch0"
 
 port_groups = {
@@ -36,7 +36,7 @@ port_groups = {
 }
 
 default_domain_name = "corp.internal"
-default_dns_servers = ["10.0.6.30", "8.8.8.8"]
+default_dns_servers = ["<DNS_SERVER>", "8.8.8.8"]
 
 # ==============================================================================
 # DRS Anti-Affinity Configuration
@@ -57,9 +57,9 @@ vms = {
     memory_mb    = 6144
     disk_size_gb = 50
     network_name = "VM Network 3"
-    ip_address   = "10.0.6.101"
+    ip_address   = "<IP_NODE_01>"
     netmask      = 24
-    gateway      = "10.0.6.1"
+    gateway      = "<GATEWAY>"
     role         = "master_data_ingest"
     extra_config = {
       "guestinfo.node.role" = "master_data_ingest"
@@ -74,9 +74,9 @@ vms = {
     memory_mb    = 6144
     disk_size_gb = 50
     network_name = "VM Network 3"
-    ip_address   = "10.0.6.102"
+    ip_address   = "<IP_NODE_02>"
     netmask      = 24
-    gateway      = "10.0.6.1"
+    gateway      = "<GATEWAY>"
     role         = "master_data_ingest"
     extra_config = {
       "guestinfo.node.role" = "master_data_ingest"
@@ -90,9 +90,9 @@ vms = {
     memory_mb    = 6144
     disk_size_gb = 50
     network_name = "VM Network 3"
-    ip_address   = "10.0.6.103"
+    ip_address   = "<IP_NODE_03>"
     netmask      = 24
-    gateway      = "10.0.6.1"
+    gateway      = "<GATEWAY>"
     role         = "master_data_ingest"
     extra_config = {
       "guestinfo.node.role" = "master_data_ingest"
@@ -107,9 +107,9 @@ vms = {
     memory_mb    = 4096
     disk_size_gb = 40
     network_name = "VM Network 3"
-    ip_address   = "10.0.6.104"
+    ip_address   = "<IP_KIBANA>"
     netmask      = 24
-    gateway      = "10.0.6.1"
+    gateway      = "<GATEWAY>"
     role         = "kibana_fleet_gateway"
     extra_config = {
       "guestinfo.node.role" = "kibana_fleet_gateway"

@@ -52,7 +52,7 @@ if [[ -n "${SSH_PASS:-}" ]]; then
     echo "Mat khau SSH da duoc nap tu bien moi truong."
 else
     while [[ -z "${SSH_PASS:-}" ]]; do
-        read -s -p "Nhap mat khau SSH khoi tao may ao (svc_admin): " SSH_PASS
+        read -s -p "Nhap mat khau SSH khoi tao may ao: " SSH_PASS
         echo ""
         [[ -z "${SSH_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
     done

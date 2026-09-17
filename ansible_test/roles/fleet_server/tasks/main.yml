@@ -37,7 +37,7 @@
 
 - name: Delete old Fleet Server service token (for idempotency)
   ansible.builtin.uri:
-    url: "{{ hostvars['localhost']['es_api_url'] | default('http://10.255.242.211:9200') }}/_security/service/elastic/fleet-server/credential/token/fleet-server-token"
+    url: "{{ hostvars['localhost']['es_api_url'] | default('http://<IP_NODE_01>:9200') }}/_security/service/elastic/fleet-server/credential/token/fleet-server-token"
     method: DELETE
     user: "elastic"
     password: "{{ hostvars['localhost']['elastic_password'] | default('Elas2026') }}"
@@ -49,7 +49,7 @@
 
 - name: Generate fresh Service Token for Fleet Server
   ansible.builtin.uri:
-    url: "{{ hostvars['localhost']['es_api_url'] | default('http://10.255.242.211:9200') }}/_security/service/elastic/fleet-server/credential/token/fleet-server-token"
+    url: "{{ hostvars['localhost']['es_api_url'] | default('http://<IP_NODE_01>:9200') }}/_security/service/elastic/fleet-server/credential/token/fleet-server-token"
     method: POST
     user: "elastic"
     password: "{{ hostvars['localhost']['elastic_password'] | default('Elas2026') }}"
@@ -67,9 +67,9 @@
       - install
       - --non-interactive
       - --force
-      - --url={{ fleet_server_url | default('https://10.255.242.214:8220') }}
+      - --url={{ fleet_server_url | default('https://<IP_KIBANA>:8220') }}
       - --fleet-server-service-token={{ fleet_server_token_resp.json.token.value }}
-      - --fleet-server-es={{ fleet_server_elasticsearch_url | default('http://10.255.242.211:9200') }}
+      - --fleet-server-es={{ fleet_server_elasticsearch_url | default('http://<IP_NODE_01>:9200') }}
       - --fleet-server-policy=fleet-server-policy
       - --fleet-server-port=8220
       - --fleet-server-host=0.0.0.0

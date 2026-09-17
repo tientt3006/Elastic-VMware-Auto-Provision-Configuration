@@ -69,6 +69,12 @@ if [[ ! -f "${ANS_VARS_FILE}" ]]; then
     echo "Đã tạo: ansible_test/inventories/lab/group_vars/all/main.yml"
 fi
 
+USER_DATA_FILE="${SCRIPT_DIR}/packer_test/http/user-data"
+if [[ ! -f "${USER_DATA_FILE}" && -f "${USER_DATA_FILE}.example" ]]; then
+    cp "${USER_DATA_FILE}.example" "${USER_DATA_FILE}"
+    echo "Đã tạo: packer_test/http/user-data"
+fi
+
 # ==============================================================================
 # 2. Thu thập thông tin từ tệp vars.conf
 # ==============================================================================
@@ -86,26 +92,26 @@ if [[ ! -f "${VARS_CONF}" ]]; then
 # ==============================================================================
 
 # --- vCenter Server ---
-SITE_VCSA_IP=""
-VCENTER_USER="administrator@vsphere.local"
+SITE_VCSA_IP="<VCENTER_IP>"
+VCENTER_USER="<VCENTER_USER>"
 
 # --- Hạ tầng vSphere ---
 VCENTER_DC="Datacenter"
 VCENTER_CLUSTER="Cluster1"
-ISO_DATASTORE=""
+ISO_DATASTORE="<DATASTORE_NAME>"
 PKR_NETWORK="VM Network"
 VM_FOLDER="App_Workloads"
 TPL_NAME="tpl-ubuntu-2404-golden"
 
 # --- Tài khoản OS ---
-SSH_USER="svc_admin"
+SSH_USER="<SSH_USER>"
 
 # --- IP tĩnh 4 VM ---
-IP_E01="10.0.6.101"
-IP_E02="10.0.6.102"
-IP_E03="10.0.6.103"
-IP_KBN="10.0.6.104"
-GW="10.0.6.1"
+IP_E01="<IP_NODE_01>"
+IP_E02="<IP_NODE_02>"
+IP_E03="<IP_NODE_03>"
+IP_KBN="<IP_KIBANA>"
+GW="<GATEWAY>"
 NETMASK="24"
 EOF
     echo "CHÚ Ý: Lần chạy đầu tiên, hệ thống đã tạo tệp cấu hình '${VARS_CONF}'."
@@ -124,7 +130,7 @@ if [[ -z "${VCENTER_PASS:-}" ]]; then
     echo ""
 fi
 if [[ -z "${SSH_PASS:-}" ]]; then
-    read -s -p "Mật khẩu SSH (svc_admin): " SSH_PASS
+    read -s -p "Mật khẩu SSH (SSH_USER): " SSH_PASS
     echo ""
 fi
 if [[ -z "${SUDO_PASS:-}" ]]; then
@@ -186,7 +192,7 @@ sed -i -E "s/(vsphere_template_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_
 sed -i -E "s/(content_library_item_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_FILE}"
 
 sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${PKR_FILE}"
-sed -i -E "s/(ansible_user:\s*).*/\1${SSH_USER}/" "${ANS_FILE}"
+sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${TF_FILE}"
 
 # --- Cập nhật mật khẩu động vào Cloud-init user-data ---
 USER_DATA_FILE="${SCRIPT_DIR}/packer_test/http/user-data"
@@ -224,11 +230,7 @@ with open(tf_file, 'w') as f:
     f.write(content)
 PYEOF
 
-# Điền IP vào Ansible hosts.yml
-sed -i -E "/srv-elastic-01/{n;s/(ansible_host:\s*).*/\1${IP_E01}/}" "${ANS_FILE}"
-sed -i -E "/srv-elastic-02/{n;s/(ansible_host:\s*).*/\1${IP_E02}/}" "${ANS_FILE}"
-sed -i -E "/srv-elastic-03/{n;s/(ansible_host:\s*).*/\1${IP_E03}/}" "${ANS_FILE}"
-sed -i -E "/srv-kibana-gw/{n;s/(ansible_host:\s*).*/\1${IP_KBN}/}" "${ANS_FILE}"
+# Bỏ qua bước sửa trực tiếp file hosts.yml vì Terraform sẽ tự động sinh file này thông qua template hosts.yml.tpl
 
 # Điền IP vào Ansible group_vars (Fleet Server & Elasticsearch URL)
 sed -i -E "s|(fleet_server_url:\s*\").*(\")|\1https://${IP_KBN}:8220\2|" "${ANS_VARS_FILE}"

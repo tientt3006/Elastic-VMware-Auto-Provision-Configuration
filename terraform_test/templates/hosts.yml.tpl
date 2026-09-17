@@ -4,7 +4,7 @@
 # ==============================================================================
 all:
   vars:
-    ansible_user: svc_admin
+    ansible_user: ${ssh_username}
 
   children:
     elastic_cluster:

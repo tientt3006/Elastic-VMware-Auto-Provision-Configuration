@@ -27,7 +27,7 @@ Quá trình cài đặt tự động diễn ra theo hai giai đoạn (two-stage 
 |  [ Giai đoạn 2: Cấu hình dịch vụ nền tảng vCenter và Single Sign-On (SSO) ]                  |
 |  - Thiết lập múi giờ và đồng bộ hóa thời gian qua máy chủ NTP.                               |
 |  - Khởi tạo cụm định danh VMware Single Sign-On (SSO Domain, ví dụ: vsphere.local).          |
-|  - Cấu hình tài khoản quản trị tối cao: administrator@vsphere.local.                          |
+|  - Cấu hình tài khoản quản trị tối cao: <VCENTER_USER>.                          |
 |  - Sinh cặp khóa và chứng chỉ số nội bộ (VMware Certificate Authority - VMCA).              |
 |  - Khởi động toàn bộ các dịch vụ hệ thống: vCenter Server, Envoy Reverse Proxy, vSphere API. |
 +-----------------------------------------------------------------------------------------------+
@@ -41,16 +41,16 @@ Trước khi thực thi cài đặt, phải xác nhận các điều kiện hạ
 
 ### 2.1. Phân giải tên miền xuôi và ngược (Forward & Reverse DNS)
 VMware VCSA bắt buộc phải có bản ghi phân giải tên miền hợp lệ trước khi cài đặt. Nếu DNS không phân giải được cả hai chiều, giai đoạn 2 sẽ thất bại hoàn toàn.
-- **Bản ghi xuôi (A Record)**: `vcsa.lab.internal` -> `10.255.242.20`.
-- **Bản ghi ngược (PTR Record)**: `10.255.242.20` -> `vcsa.lab.internal`.
+- **Bản ghi xuôi (A Record)**: `<VCSA_FQDN>` -> `<VCSA_IP>`.
+- **Bản ghi ngược (PTR Record)**: `<VCSA_IP>` -> `<VCSA_FQDN>`.
 
 Kiểm tra từ terminal máy Automation:
 ```bash
 # Kiểm tra phân giải xuôi
-dig +short vcsa.lab.internal @10.255.242.1
+dig +short <VCSA_FQDN> @<GATEWAY_DNS_IP>
 
 # Kiểm tra phân giải ngược
-dig +short -x 10.255.242.20 @10.255.242.1
+dig +short -x <VCSA_IP> @<GATEWAY_DNS_IP>
 ```
 Kết quả trả về phải hiển thị chính xác địa chỉ IP và FQDN tương ứng.
 
@@ -72,7 +72,7 @@ Lựa chọn quy mô máy ảo phù hợp với tài nguyên phần cứng thự
 | **medium** | 8 | 28 GB | ~50 GB | 400 Hosts / 4,000 VMs |
 
 ### 2.4. Tiêu chuẩn độ phức tạp của mật khẩu VMware
-Mật khẩu cho tài khoản `root` của hệ điều hành VCSA và tài khoản `administrator@vsphere.local` bắt buộc phải thỏa mãn:
+Mật khẩu cho tài khoản `root` của hệ điều hành VCSA và tài khoản `<VCENTER_USER>` bắt buộc phải thỏa mãn:
 - Độ dài tối thiểu: 8 ký tự (khuyến nghị từ 12 ký tự trở lên).
 - Chứa ít nhất một chữ cái viết hoa (`A-Z`).
 - Chứa ít nhất một chữ cái viết thường (`a-z`).
@@ -91,7 +91,7 @@ Mẫu cấu hình chuẩn nằm tại [templates/embedded_vcs_on_esxi.json.tpl](
   "__version": "2.13.0",
   "new_vcsa": {
     "esxi": {
-      "hostname": "10.255.242.10",             // IP hoặc FQDN của ESXi Host vật lý đích
+      "hostname": "<ESXI_HOST_IP>",             // IP hoặc FQDN của ESXi Host vật lý đích
       "username": "root",                     // Tài khoản quản trị cấp cao nhất của ESXi
       "password": "${ESXI_PASSWORD}",         // Mật khẩu ESXi (được tiêm động qua RAM)
       "deployment_network": "VM Network",     // Tên Portgroup mạng máy ảo kết nối
@@ -114,11 +114,11 @@ Mẫu cấu hình chuẩn nằm tại [templates/embedded_vcs_on_esxi.json.tpl](
     "network": {
       "ip_family": "ipv4",                    // Giao thức mạng IPv4
       "mode": "static",                       // Bắt buộc là static đối với môi trường doanh nghiệp
-      "ip": "10.255.242.20",                  // Địa chỉ IP tĩnh của VCSA
-      "dns_servers": ["10.255.242.1"],        // Máy chủ DNS giải quyết được FQDN của VCSA
+      "ip": "<VCSA_IP>",                  // Địa chỉ IP tĩnh của VCSA
+      "dns_servers": ["<GATEWAY_DNS_IP>"],        // Máy chủ DNS giải quyết được FQDN của VCSA
       "prefix": "24",                         // Subnet mask dạng tiền tố (24 tương đương 255.255.255.0)
-      "gateway": "10.255.242.1",              // Cổng định tuyến mặc định (Default Gateway)
-      "system_name": "vcsa.lab.internal"      // FQDN của VCSA (phải khớp hoàn toàn với DNS)
+      "gateway": "<GATEWAY_DNS_IP>",              // Cổng định tuyến mặc định (Default Gateway)
+      "system_name": "<VCSA_FQDN>"      // FQDN của VCSA (phải khớp hoàn toàn với DNS)
     }
   },
   "ceip": {
@@ -159,7 +159,7 @@ Kịch bản thực hiện tuần tự:
 3. Yêu cầu nhập mật khẩu bảo mật qua terminal ẩn:
    - Mật khẩu root của ESXi Host.
    - Mật khẩu root của máy ảo VCSA.
-   - Mật khẩu quản trị SSO (`administrator@vsphere.local`).
+   - Mật khẩu quản trị SSO (`<VCENTER_USER>`).
 4. Tự động sinh tệp đặc tả JSON vào bộ nhớ tạm RAM disk (`/dev/shm/vcsa_deployment_spec_<PID>.json`) với phân quyền giới hạn `0600`.
 5. Kích hoạt giai đoạn kiểm tra điều kiện tiên quyết (Precheck):
    ```bash
@@ -184,9 +184,9 @@ Result:
     The deployment of vCenter Server Appliance was successful.
 Details:
     Appliance Name: srv-vcsa-primary
-    Appliance IP: 10.255.242.20
+    Appliance IP: <VCSA_IP>
     Log directory: /var/log/vmware/upgrade/
-    vSphere Client URL: https://vcsa.lab.internal/ui
+    vSphere Client URL: https://<VCSA_FQDN>/ui
 ==============================================================================
 ```
 
@@ -195,14 +195,14 @@ Từ máy Automation, thực thi các lệnh sau để kiểm tra trạng thái 
 
 1. **Kiểm tra cổng dịch vụ mạng (Port 443 HTTPS)**:
    ```bash
-   nc -zv 10.255.242.20 443
+   nc -zv <VCSA_IP> 443
    ```
-   Kết quả mong đợi: `Connection to 10.255.242.20 443 port [tcp/https] succeeded!`.
+   Kết quả mong đợi: `Connection to <VCSA_IP> 443 port [tcp/https] succeeded!`.
 
 2. **Kiểm tra trạng thái hệ thống vCenter qua công cụ `govc`**:
    ```bash
-   export GOVC_URL="https://10.255.242.20"
-   export GOVC_USERNAME="administrator@vsphere.local"
+   export GOVC_URL="https://<VCSA_IP>"
+   export GOVC_USERNAME="<VCENTER_USER>"
    read -s -p "Nhap mat khau SSO: " GOVC_PASSWORD; export GOVC_PASSWORD
    export GOVC_INSECURE="true"
 
@@ -224,22 +224,22 @@ Từ máy Automation, thực thi các lệnh sau để kiểm tra trạng thái 
 3. **Truy cập giao diện đồ họa vSphere Client**:
    Mở trình duyệt web và truy cập địa chỉ:
    ```text
-   https://vcsa.lab.internal/ui
+   https://<VCSA_FQDN>/ui
    ```
-   Đăng nhập bằng tài khoản: `administrator@vsphere.local` và mật khẩu đã thiết lập.
+   Đăng nhập bằng tài khoản: `<VCENTER_USER>` và mật khẩu đã thiết lập.
 
 ---
 
 ## 6. Xử lý sự cố thường gặp (Troubleshooting)
 
 ### 6.1. Lỗi không khớp bản ghi phân giải DNS (`FQDN does not resolve`)
-- **Triệu chứng**: Giai đoạn Precheck hoặc Giai đoạn 2 báo lỗi: `The FQDN vcsa.lab.internal does not match the IP address 10.255.242.20 or cannot be resolved`.
+- **Triệu chứng**: Giai đoạn Precheck hoặc Giai đoạn 2 báo lỗi: `The FQDN <VCSA_FQDN> does not match the IP address <VCSA_IP> or cannot be resolved`.
 - **Nguyên nhân gốc rễ**: DNS Server chưa khai báo bản ghi A hoặc PTR, hoặc máy ảo VCSA không kết nối được tới DNS Server qua cổng UDP 53.
 - **Biện pháp khắc phục**:
   1. Kiểm tra cấu hình DNS trên máy chủ quản lý DNS nội bộ, đảm bảo đã tạo cả hai bản ghi:
      ```text
-     A Record  : vcsa.lab.internal -> 10.255.242.20
-     PTR Record: 10.255.242.20     -> vcsa.lab.internal
+     A Record  : <VCSA_FQDN> -> <VCSA_IP>
+     PTR Record: <VCSA_IP>     -> <VCSA_FQDN>
      ```
   2. Nếu môi trường lab không có DNS server chuyên dụng, có thể cấu hình tạm dịch vụ `dnsmasq` hoặc cấu hình bản ghi phân giải cục bộ trên router/gateway.
 

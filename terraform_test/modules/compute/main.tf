@@ -75,12 +75,12 @@ resource "vsphere_virtual_machine" "vm" {
         manage_etc_hosts: true
 
         runcmd:
-          - mkdir -p /home/svc_admin/.ssh
-          - echo "${var.ssh_public_key}" >> /home/svc_admin/.ssh/authorized_keys
-          - sort -u /home/svc_admin/.ssh/authorized_keys -o /home/svc_admin/.ssh/authorized_keys
-          - chown -R svc_admin:svc_admin /home/svc_admin/.ssh
-          - chmod 700 /home/svc_admin/.ssh
-          - chmod 600 /home/svc_admin/.ssh/authorized_keys
+          - mkdir -p /home/${var.ssh_username}/.ssh
+          - echo "${var.ssh_public_key}" >> /home/${var.ssh_username}/.ssh/authorized_keys
+          - sort -u /home/${var.ssh_username}/.ssh/authorized_keys -o /home/${var.ssh_username}/.ssh/authorized_keys
+          - chown -R ${var.ssh_username}:${var.ssh_username} /home/${var.ssh_username}/.ssh
+          - chmod 700 /home/${var.ssh_username}/.ssh
+          - chmod 600 /home/${var.ssh_username}/.ssh/authorized_keys
       EOF
       )
       "guestinfo.userdata.encoding"  = "base64"

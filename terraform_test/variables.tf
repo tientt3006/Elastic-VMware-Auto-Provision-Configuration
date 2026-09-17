@@ -109,13 +109,19 @@ variable "default_domain_name" {
 variable "default_dns_servers" {
   description = "Default DNS resolver IP addresses for guest customization."
   type        = list(string)
-  default     = ["10.255.242.106", "8.8.8.8"]
+  default     = ["1.1.1.1", "8.8.8.8"]
+}
+
+variable "ssh_username" {
+  description = "The OS username used by Ansible for SSH connections."
+  type        = string
+  default     = "<SSH_USERNAME>"
 }
 
 variable "ssh_public_key" {
-  description = "Public SSH key to inject into svc_admin authorized_keys for Ansible automation."
+  description = "Public SSH key to inject into authorized_keys for Ansible automation."
   type        = string
-  default     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICnV+Tc1fbglKmFn6zj+3FPBmngnLJlndAmNsk4rCstR tienbeo3006@gmail.com"
+  default     = "<YOUR_SSH_PUBLIC_KEY>"
 }
 
 # ==============================================================================
@@ -134,7 +140,7 @@ variable "vms" {
     ip_address   = string
     netmask      = number
     gateway      = string
-    dns_servers  = optional(list(string), ["10.255.242.106", "8.8.8.8"])
+    dns_servers  = optional(list(string), ["8.8.8.8"])
     domain_name  = optional(string, "lab.local")
     role         = optional(string, "standard")
     extra_config = optional(map(string), {})

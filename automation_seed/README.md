@@ -48,7 +48,7 @@ Tep ISO se duoc luu mac dinh tai thu muc `./iso_cache/`.
   ```bash
   ./upload_iso_to_vcenter.sh \
     -f ./iso_cache/ubuntu-24.04.1-live-server-amd64.iso \
-    -H 10.255.242.10 \
+    -H <ESXI_HOST_IP> \
     -u root \
     -d datastore1 \
     -p iso
@@ -59,6 +59,6 @@ Tep ISO se duoc luu mac dinh tai thu muc `./iso_cache/`.
   ./upload_iso_to_vcenter.sh \
     -f ./iso_cache/ubuntu-24.04.1-live-server-amd64.iso \
     -H vcsa.lab.internal \
-    -u administrator@vsphere.local \
+    -u <VCENTER_USER> \
     -l "Content-Library-Lab"
   ```

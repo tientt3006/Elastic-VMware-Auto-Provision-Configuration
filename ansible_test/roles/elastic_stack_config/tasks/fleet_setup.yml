@@ -135,7 +135,7 @@
     body: |
       {
         "fleet_server_hosts": [
-          "{{ fleet_server_url | default('https://10.255.242.214:8220') }}"
+          "{{ fleet_server_url | default('https://<IP_KIBANA>:8220') }}"
         ]
       }
     status_code: [200]

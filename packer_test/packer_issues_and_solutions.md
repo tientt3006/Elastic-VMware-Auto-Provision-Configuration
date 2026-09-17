@@ -7,7 +7,7 @@ Tài liệu này ghi lại toàn bộ các thách thức kỹ thuật, phân tí
 ### 1.1. Bối cảnh hạ tầng và công cụ
 
 - **Môi trường máy trạm**: Windows 11 chạy bản phân phối Ubuntu trên hệ thống phụ Windows Subsystem for Linux (WSL 2).
-- **Hạ tầng ảo hóa**: Thiết bị máy chủ ảo VMware vCenter Server Appliance (`10.255.242.106`), Datacenter `Datacenter`, Cụm máy chủ `Cluster1`, Vùng lưu trữ `DS_100_3`.
+- **Hạ tầng ảo hóa**: Thiết bị máy chủ ảo VMware vCenter Server Appliance (`<VCENTER_IP>`), Datacenter `Datacenter`, Cụm máy chủ `Cluster1`, Vùng lưu trữ `DS_100_3`.
 - **Hệ điều hành máy khách mục tiêu**: Ubuntu Server 24.04.4 LTS (64-bit, chuẩn khởi động UEFI firmware).
 - **Quy trình tự động hóa**: HashiCorp Packer (builder `vsphere-iso`), công cụ cài đặt Subiquity autoinstall, Cloud-Init, Netplan và Open-VM-Tools.
 
@@ -67,7 +67,7 @@ Plugin `vsphere-iso` tiêu chuẩn của Packer không tích hợp sẵn cơ ch�
 Máy ảo trên ESXi khởi động file ISO thành công nhưng không thể tải file `user-data` qua mạng. Màn hình console dừng tại giao diện lựa chọn ngôn ngữ cài đặt Subiquity.
 
 #### Phân tích nguyên nhân
-Trong môi trường WSL 2, hệ điều hành Linux con sở hữu card mạng ảo riêng. Khi Packer khởi chạy máy chủ HTTP phục vụ file cấu hình, Packer tự động chọn địa chỉ IP đầu tiên phát hiện được, thường là `10.255.255.254` (giao diện loopback nội bộ của WSL). Máy ảo ESXi nằm trên phân vùng mạng vật lý (`10.255.242.0/24`) hoàn toàn không có tuyến định tuyến tới dải mạng ảo này của WSL. Khi truy vấn HTTP thất bại, Subiquity hủy tiến trình tự động và quay về chế độ tương tác thủ công.
+Trong môi trường WSL 2, hệ điều hành Linux con sở hữu card mạng ảo riêng. Khi Packer khởi chạy máy chủ HTTP phục vụ file cấu hình, Packer tự động chọn địa chỉ IP đầu tiên phát hiện được, thường là `10.255.255.254` (giao diện loopback nội bộ của WSL). Máy ảo ESXi nằm trên phân vùng mạng vật lý (`<NETWORK_SUBNET>`) hoàn toàn không có tuyến định tuyến tới dải mạng ảo này của WSL. Khi truy vấn HTTP thất bại, Subiquity hủy tiến trình tự động và quay về chế độ tương tác thủ công.
 
 #### Giải pháp khắc phục
 Chỉ định rõ ràng địa chỉ IP vật lý của máy trạm có thể định tuyến được từ mạng ESXi trong tệp cấu hình:

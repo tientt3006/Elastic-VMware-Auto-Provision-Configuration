@@ -134,7 +134,8 @@ resource "local_file" "ansible_inventory" {
   filename        = "${path.module}/../ansible_test/inventories/lab/hosts.yml"
   file_permission = "0644"
   content         = templatefile("${path.module}/templates/hosts.yml.tpl", {
-    vms = var.vms
+    vms          = var.vms
+    ssh_username = var.ssh_username
   })
 
   depends_on = [module.compute]

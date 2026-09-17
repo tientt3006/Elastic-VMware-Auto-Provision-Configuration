@@ -36,3 +36,11 @@ Thumbs.db
 .idea/
 *.swp
 *~
+
+# Auto-generated runtime config files (Secrets / Site-specific)
+vars.conf
+*.pkrvars.hcl
+!*.pkrvars.hcl.example
+ansible_test/inventories/lab/hosts.yml
+ansible_test/inventories/lab/group_vars/all/main.yml
+packer_test/http/user-data

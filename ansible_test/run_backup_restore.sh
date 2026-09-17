@@ -27,7 +27,7 @@ echo "He thong dieu phoi Sao luu va Phuc hoi tham hoa Elastic Stack (In-Memory)"
 echo "=============================================================================="
 
 # 1. Nhap mat khau an tu terminal
-read -s -p "Nhap mat khau SSH (svc_admin): " SSH_PASS
+read -s -p "Nhap mat khau SSH: " SSH_PASS
 echo ""
 if [[ -z "${SSH_PASS}" ]]; then
     echo "Loi: Mat khau SSH khong duoc de trong." >&2
@@ -57,7 +57,7 @@ cd "${SCRIPT_DIR}"
 export ANSIBLE_CONFIG="${SCRIPT_DIR}/ansible.cfg"
 
 # Trich xuat IP node dau tien tu inventory de goi API truc tiep khi can
-ES_HOST=$(grep -E 'srv-elastic-01' -A 1 inventories/lab/hosts.yml | grep 'ansible_host' | awk '{print $2}' || echo "10.255.242.211")
+ES_HOST=$(grep -E 'srv-elastic-01' -A 1 inventories/lab/hosts.yml | grep 'ansible_host' | awk '{print $2}' || echo "<IP_NODE_01>")
 ES_API="http://${ES_HOST}:9200"
 
 echo "------------------------------------------------------------------------------"

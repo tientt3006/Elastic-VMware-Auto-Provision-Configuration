@@ -30,6 +30,6 @@ sudo ./deploy_vcsa_unattended.sh
 ### Buoc 3: Nhap mat khau an theo yeu cau tren man hinh
 - Mat khau root cua ESXi Host dich.
 - Mat khau root cua he dieu hanh VCSA.
-- Mat khau quan tri Single Sign-On (`administrator@vsphere.local`).
+- Mat khau quan tri Single Sign-On (`<VCENTER_USER>`).
 
 Kich ban se tu dong chay precheck, yeu cau xac nhan `yes`, tien hanh cai dat va tu dong xoa sach mat khau khoi RAM khi hoan tat.

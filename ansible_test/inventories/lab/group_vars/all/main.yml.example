@@ -11,8 +11,8 @@ kibana_encryption_key: "CHANGE_ME_TO_A_LONG_RANDOM_VALUE_32_CHARS"
 
 # Fleet Server is the native Elastic Agent on kibana_gateway.
 fleet_server_host: "0.0.0.0"
-fleet_server_url: "http://10.255.242.214:8220"
-fleet_server_elasticsearch_url: "http://10.255.242.211:9200"
+fleet_server_url: "https://<IP_KIBANA>:8220"
+fleet_server_elasticsearch_url: "http://<IP_NODE_01>:9200"
 fleet_server_port: 8220
 fleet_server_enrollment_token: "CHANGE_ME"
 

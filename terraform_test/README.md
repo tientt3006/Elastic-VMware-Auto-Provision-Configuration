@@ -7,7 +7,7 @@ Dự án Terraform này chịu trách nhiệm tự động hóa việc khởi t�
 ### Các năng lực cốt lõi
 1. **Quản lý cấu trúc thư mục (Inventory Folders)**: Khởi tạo hàng loạt các thư mục phân cấp trong vSphere inventory (`App_Workloads`, `Infra_Services`).
 2. **Đồng bộ Content Library**: Đồng bộ mẫu máy ảo vào thư viện Content Library `Content Lib DS_100_3_1` dưới dạng OVF template mà không làm thay đổi hay xóa máy ảo gốc tại thư mục `VM Template`.
-3. **Định hình mạng cluster (Cluster Networking)**: Tự động khởi tạo đồng bộ các standard port group `VM Network 3` và `VM Network 4` trên switch chuẩn `vSwitch0` trên toàn bộ các máy chủ ESXi (`10.255.242.100`, `10.255.242.101`).
+3. **Định hình mạng cluster (Cluster Networking)**: Tự động khởi tạo đồng bộ các standard port group `VM Network 3` và `VM Network 4` trên switch chuẩn `vSwitch0` trên toàn bộ các máy chủ ESXi (`<ESXI_HOST_01>`, `<ESXI_HOST_02>`).
 4. **Khởi tạo và tùy biến cụm máy ảo (Customized Compute Provisioning)**: Nhân bản 4 máy ảo chuyên dụng cho cụm Elastic Stack HA và Kibana Gateway, tự động cấu hình địa chỉ IP tĩnh, tên máy chủ, card mạng và tiêm siêu dữ liệu `guestinfo`.
 5. **Quy tắc phân tán tải DRS (DRS Anti-Affinity Rule)**: Thiết lập quy tắc chống gom cụm (Anti-Affinity) trên VMware DRS để phân tách các máy ảo Elasticsearch trên các máy chủ vật lý khác nhau.
 
@@ -42,14 +42,14 @@ terraform_test/
 
 | Loại tài nguyên | Tên đối tượng vSphere | Định danh / MOID |
 | :--- | :--- | :--- |
-| **vCenter Server** | `10.255.242.106` | vCenter Server Appliance |
+| **vCenter Server** | `<VCENTER_IP>` | vCenter Server Appliance |
 | **Datacenter** | `Datacenter` | `datacenter-3` |
 | **Compute Cluster** | `Cluster1` | `domain-c2113` |
 | **Datastore** | `DS_100_3` | `datastore-2006` |
 | **Content Library** | `Content Lib DS_100_3_1` | `a0bc3584-8b7c-40cc-b2fd-bae7a6b9bf6c` |
 | **Golden Template nguồn** | `tpl-ubuntu-2404-golden` | `421cf3ab-92d7-1036-2a5e-2f3e8e410d0a` |
-| **Máy chủ ESXi 01** | `10.255.242.100` | `host-2001` |
-| **Máy chủ ESXi 02** | `10.255.242.101` | `host-10009` |
+| **Máy chủ ESXi 01** | `<ESXI_HOST_01>` | `host-2001` |
+| **Máy chủ ESXi 02** | `<ESXI_HOST_02>` | `host-10009` |
 | **Switch ảo chuẩn** | `vSwitch0` | Standard vSwitch |
 
 ### Hồ sơ cấu hình các máy ảo mục tiêu (Workload Profiles)
@@ -64,8 +64,8 @@ terraform_test/
 | **Dung lượng RAM** | `6144` MB (6 GB) | `6144` MB (6 GB) | `6144` MB (6 GB) | `4096` MB (4 GB) |
 | **Dung lượng ổ đĩa gốc**| `50` GB | `50` GB | `50` GB | `40` GB |
 | **Port Group mạng** | `VM Network 3` | `VM Network 3` | `VM Network 3` | `VM Network 3` |
-| **Địa chỉ IPv4 tĩnh** | `10.255.242.211/24` | `10.255.242.212/24` | `10.255.242.213/24` | `10.255.242.214/24` |
-| **Cổng mặc định (Gateway)** | `10.255.242.1` | `10.255.242.1` | `10.255.242.1` | `10.255.242.1` |
+| **Địa chỉ IPv4 tĩnh** | `<IP_NODE_01>/24` | `<IP_NODE_02>/24` | `<IP_NODE_03>/24` | `<IP_KIBANA>/24` |
+| **Cổng mặc định (Gateway)** | `<GATEWAY_IP>` | `<GATEWAY_IP>` | `<GATEWAY_IP>` | `<GATEWAY_IP>` |
 | **Vai trò cụm (`role`)** | `master_data_ingest` | `master_data_ingest` | `master_data_ingest` | `kibana_fleet_gateway` |
 
 ---
@@ -86,7 +86,7 @@ cd /mnt/d/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/terrafor
 ./run_provision_secure.sh
 ```
 
-Tiến trình yêu cầu nhập ẩn mật khẩu tài khoản vCenter (`administrator@vsphere.local`). Mật khẩu được nạp vào biến môi trường `TF_VAR_vsphere_password` trong bộ nhớ RAM và tự động hủy sau khi lệnh hoàn tất.
+Tiến trình yêu cầu nhập ẩn mật khẩu tài khoản vCenter (`<VCENTER_USER>`). Mật khẩu được nạp vào biến môi trường `TF_VAR_vsphere_password` trong bộ nhớ RAM và tự động hủy sau khi lệnh hoàn tất.
 
 ### Bước 3: Đánh giá kế hoạch (Plan Review) và xác nhận
 
@@ -101,9 +101,9 @@ Sau khi hoàn tất, Terraform xuất ra danh sách địa chỉ IP phục vụ 
 ```text
 Outputs:
 ansible_inventory_hosts = [
-  "10.255.242.211",
-  "10.255.242.212",
-  "10.255.242.213",
-  "10.255.242.214"
+  "<IP_NODE_01>",
+  "<IP_NODE_02>",
+  "<IP_NODE_03>",
+  "<IP_KIBANA>"
 ]
 ```

@@ -19,8 +19,8 @@ autoinstall:
       name: direct
   identity:
     hostname: ubuntu-template
-    username: svc_admin
-    password: "$6$Gdw506CZbqi/IOzb$Rn7Zn15OWCDwpeNBa/Tpuw0nZhmcLWWDt8D0qNtbCxUdE9fGi9Maawqsq71DutX5CJnMgdsV2TGTp67WDHlzD."
+    username: <SSH_USER>
+    password: "CHANGE_ME_PASSWORD_HASH"
   ssh:
     install-server: true
     allow-pw: true
@@ -28,6 +28,6 @@ autoinstall:
   user-data:
     disable_root: true
   late-commands:
-    - echo "svc_admin ALL=(ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/99-svc-admin
+    - echo "<SSH_USER> ALL=(ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/99-svc-admin
     - chmod 0440 /target/etc/sudoers.d/99-svc-admin
     - curtin in-target --target=/target -- systemctl enable ssh

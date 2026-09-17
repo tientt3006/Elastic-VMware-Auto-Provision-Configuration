@@ -5,13 +5,13 @@
 variable "vcenter_server" {
   type        = string
   description = "Fully qualified domain name or IP address of the vCenter Server instance."
-  default     = "10.255.242.106"
+  default     = "<VCENTER_IP>"
 }
 
 variable "vcenter_user" {
   type        = string
   description = "Administrative or service account username for vCenter authentication."
-  default     = "administrator@vsphere.local"
+  default     = "<VCENTER_USER>"
 }
 
 variable "vcenter_password" {
@@ -103,7 +103,7 @@ variable "vm_disk_thin" {
 variable "ssh_username" {
   type        = string
   description = "Default administrative username created via cloud-init autoinstall."
-  default     = "svc_admin"
+  default     = "<SSH_USER>"
 }
 
 variable "ssh_password" {

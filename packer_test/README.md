@@ -88,8 +88,8 @@ File cấu hình [packer.pkrvars.hcl](file:///d:/neit_ng/obsidian_vault_neit/IUN
 
 | Tham số | Giá trị gán | Ý nghĩa kỹ thuật |
 | :--- | :--- | :--- |
-| `vcenter_server` | `10.255.242.106` | Địa chỉ IP / FQDN của máy chủ vCenter Server |
-| `vcenter_user` | `administrator@vsphere.local` | Tài khoản quản trị vCenter có đủ quyền cấp phát VM |
+| `vcenter_server` | `<VCENTER_IP>` | Địa chỉ IP / FQDN của máy chủ vCenter Server |
+| `vcenter_user` | `<VCENTER_USER>` | Tài khoản quản trị vCenter có đủ quyền cấp phát VM |
 | `vcenter_datacenter` | `Datacenter` | Tên đối tượng Datacenter trên vCenter |
 | `vcenter_cluster` | `Cluster1` | Tên cụm tính toán mục tiêu |
 | `vcenter_datastore` | `DS_100_3` | Tên vùng lưu trữ VMFS chứa Content Library |
@@ -155,12 +155,12 @@ boot_command = [
    ==============================================================================
    He thong dieu phoi dong goi Template Packer an toan In-Memory
    ==============================================================================
-   May chu vCenter: 10.255.242.106
-   Tai khoan:       administrator@vsphere.local
+   May chu vCenter: <VCENTER_IP>
+   Tai khoan:       <VCENTER_USER>
    Ten template VM: tpl-ubuntu-2404-golden
    ------------------------------------------------------------------------------
    Nhap mat khau quan tri vCenter: 
-   Nhap mat khau SSH khoi tao may ao (svc_admin): 
+   Nhap mat khau SSH khoi tao may ao (<SSH_USER>): 
    ```
 
 4. **Tiền kiểm tra tự động (Pre-flight Checks)**:
@@ -173,7 +173,7 @@ boot_command = [
    - Cấp phát máy ảo tạm thời trên ESXi với thông số: 4 CPU cores, 8GB RAM, 50GB ổ đĩa PVSCSI, card mạng VMXNET3.
    - Gắn file ISO cài đặt Ubuntu 24.04 và đĩa CD-ROM cấu hình `cidata`.
    - Gửi lệnh GRUB khởi động Subiquity autoinstall.
-   - Hệ điều hành tự động phân vùng đĩa, cài đặt gói cơ sở, thiết lập tài khoản `svc_admin` và khởi động lại.
+   - Hệ điều hành tự động phân vùng đĩa, cài đặt gói cơ sở, thiết lập tài khoản `<SSH_USER>` và khởi động lại.
    - Packer kết nối SSH vào máy ảo qua cổng 22.
    - Thực thi lần lượt 4 kịch bản cấu hình trong thư mục `scripts/`:
      1. `01_install_open_vm_tools.sh`: Cài đặt `open-vm-tools`, `chrony`, thiết lập dịch vụ hệ thống.

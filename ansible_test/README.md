@@ -7,14 +7,14 @@ Dự án này cung cấp bộ mã nguồn Ansible thực thi từ môi trường
 Hệ thống phân tán trên 4 máy ảo chuyên dụng:
 
 1. **Cụm lưu trữ và xử lý dữ liệu Elasticsearch HA (3 nodes)**:
-   - Các nút: `srv-elastic-01` (`10.255.242.211`), `srv-elastic-02` (`10.255.242.212`), `srv-elastic-03` (`10.255.242.213`).
+   - Các nút: `srv-elastic-01` (`<IP_NODE_01>`), `srv-elastic-02` (`<IP_NODE_02>`), `srv-elastic-03` (`<IP_NODE_03>`).
    - Cài đặt trực tiếp từ kho lưu trữ APT chính thức của Elastic (Native Package).
    - Cả 3 nút đều nắm giữ đa vai trò: `master`, `data`, và `ingest`.
    - Giao tiếp liên nút (Transport Port `9300`) được mã hóa mTLS thông qua chứng chỉ `elastic-certificates.p12`.
    - Giao diện REST API (Port `9200`) tiếp nhận yêu cầu từ Kibana và các Elastic Agent.
 
 2. **Máy chủ quản trị Kibana & Fleet Gateway (1 node)**:
-   - Nút: `srv-kibana-gw` (`10.255.242.214`).
+   - Nút: `srv-kibana-gw` (`<IP_KIBANA>`).
    - Vận hành giao diện Kibana Web UI (Port `5601`) với cơ chế phân tải đều xuống 3 nút Elasticsearch.
    - Vận hành Fleet Server (Port HTTPS `8220`) điều phối và quản lý tập trung toàn bộ các Elastic Agent.
    - Mở cổng UDP `9004` tiếp nhận trực tiếp luồng nhật ký FortiGate Syslog.

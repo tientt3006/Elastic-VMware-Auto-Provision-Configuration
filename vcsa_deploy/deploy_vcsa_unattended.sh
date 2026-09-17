@@ -110,7 +110,7 @@ if [[ -z "${VCSA_ROOT_PASSWORD}" ]]; then
     exit 1
 fi
 
-read -s -p "Nhap mat khau quan tri Single Sign-On (administrator@${SSO_DOMAIN_NAME}): " SSO_ADMIN_PASSWORD
+read -s -p "Nhap mat khau quan tri Single Sign-On (<VCENTER_USER>): " SSO_ADMIN_PASSWORD
 echo ""
 if [[ -z "${SSO_ADMIN_PASSWORD}" ]]; then
     echo "Loi: Mat khau SSO khong duoc de trong." >&2
@@ -172,5 +172,5 @@ echo "==========================================================================
 echo "TRIEN KHAI VCENTER SERVER APPLIANCE THANH CONG!"
 echo "Truy cap giao dien quan tri vSphere Client tai:"
 echo "  URL          : https://${VCSA_FQDN}/ui hoac https://${VCSA_STATIC_IP}/ui"
-echo "  Tai khoan SSO: administrator@${SSO_DOMAIN_NAME}"
+echo "  Tai khoan SSO: <VCENTER_USER>"
 echo "=============================================================================="

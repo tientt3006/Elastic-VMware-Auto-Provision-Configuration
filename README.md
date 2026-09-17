@@ -16,7 +16,7 @@ Toàn bộ tài liệu kiến trúc, hướng dẫn vận hành và sổ tay k�
 | [03_team_collaboration_and_git_workflow.md](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/03_team_collaboration_and_git_workflow.md) | Quy chuẩn phối hợp Git: Phân nhánh, khóa trạng thái State Lock, bảo mật bí mật và PR Review. |
 | [04_elastic_stack_observability_blueprint.md](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/04_elastic_stack_observability_blueprint.md) | Bản thiết kế kiến trúc Elastic Stack HA, Fleet Server, FortiGate Syslog (UDP 9004) và ILM 15 ngày. |
 | [05_backup_and_rollback_runbook.md](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/05_backup_and_rollback_runbook.md) | Sổ tay quy trình sao lưu tự động (VM Snapshot, cấu hình) và phục hồi khi xảy ra sự cố khẩn cấp. |
-| [06_client_handover_and_day2_operations.md](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/06_client_handover_and_day2_operations.md) | Hướng dẫn vận hành Day-2: Điều chỉnh tài nguyên máy ảo, bảo trì định kỳ và danh mục nghiệm thu. |
+| [06_client_handover_and_day2_operations.md](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/06_client_handover_and_day2_operations.md) | Hướng dẫn vận hành và bàn giao: Điều chỉnh tài nguyên máy ảo, bảo trì định kỳ và danh mục nghiệm thu. |
 | [07_advanced_automation_packer_maas_roadmap.md](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/07_advanced_automation_packer_maas_roadmap.md) | Lộ trình tự động hóa nâng cao: Đóng gói Golden Image với Packer và cài đặt Bare-metal qua MAAS. |
 | [08_quy_tac_drs_anti_affinity_va_van_hanh_cluster.md](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/08_quy_tac_drs_anti_affinity_va_van_hanh_cluster.md) | Quy tắc phân tán tải DRS Anti-Affinity và hướng dẫn vận hành cụm trong điều kiện tài nguyên giới hạn. |
 | [09_chuan_hoa_quy_trinh_trien_khai_onpremise_si_thuc_te.md](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/09_chuan_hoa_quy_trinh_trien_khai_onpremise_si_thuc_te.md) | Chuẩn hóa quy trình triển khai On-Premise thực tế của SI và cấu trúc kho mã nguồn dùng chung đa dự án. |
@@ -48,7 +48,7 @@ auto_provision_configuration/
 └── ansible_test/                               # Bộ mã nguồn Ansible cấu hình dịch vụ
     ├── ansible.cfg, inventories/lab/           # Cấu hình môi trường và định nghĩa danh sách host
     ├── run_ansible_secure.sh                   # Kịch bản cài đặt cụm Elasticsearch HA và Kibana Gateway
-    ├── run_observability_setup.sh              # Kịch bản tự động hóa 100% hệ thống quan sát Day-2
+    ├── run_observability_setup.sh              # Kịch bản tự động hóa 100% hệ thống quan sát tập trung Observability
     ├── run_backup_restore.sh                   # Kịch bản quản lý sao lưu và phục hồi thảm họa
     ├── playbooks/                              # Các playbook triển khai, cấu hình policy và teardown
     └── roles/                                  # Các role: elastic_cluster, kibana_fleet_gateway, elastic_stack_config, fleet_server, elastic_agent, elastic_backup_restore
@@ -82,7 +82,7 @@ Tiến trình thực hiện:
 - Cấu hình mạng tĩnh, hostname và tiêm siêu dữ liệu `guestinfo`.
 - Thiết lập quy tắc DRS Anti-Affinity phân tách tải các máy ảo dữ liệu.
 
-### Giai đoạn 3: Cài đặt cụm Elastic Stack HA (Ansible Day-1)
+### Giai đoạn 3: Cài đặt cụm Elastic Stack HA (Ansible)
 
 ```bash
 cd /mnt/d/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/ansible_test
@@ -90,7 +90,7 @@ cd /mnt/d/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/ansible_
 ```
 Tiến trình tự động cài đặt Elasticsearch Native trên 3 node, thiết lập mã hóa liên node mTLS, cấu hình mật khẩu quản trị và khởi chạy Kibana Gateway.
 
-### Giai đoạn 4: Kích hoạt hệ thống quan sát tập trung (Ansible Day-2)
+### Giai đoạn 4: Kích hoạt hệ thống quan sát tập trung (Ansible)
 
 ```bash
 ./run_observability_setup.sh

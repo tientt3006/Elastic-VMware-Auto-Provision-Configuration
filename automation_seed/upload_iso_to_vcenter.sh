@@ -31,13 +31,13 @@ Tuy chon:
 
 Vi du:
   # 1. Day ISO len Datastore tren ESXi Host bang govc:
-  $0 -f ./iso_cache/ubuntu-24.04.1-live-server-amd64.iso -H 10.255.242.10 -u root -d datastore1
+  $0 -f ./iso_cache/ubuntu-24.04.1-live-server-amd64.iso -H <ESXI_HOST_IP> -u root -d datastore1
 
   # 2. Import ISO vao Content Library tren vCenter:
-  $0 -f ./iso_cache/ubuntu-24.04.1-live-server-amd64.iso -H vcsa.lab.internal -u administrator@vsphere.local -l "DevOps-Content-Lib"
+  $0 -f ./iso_cache/ubuntu-24.04.1-live-server-amd64.iso -H vcsa.lab.internal -u <VCENTER_USER> -l "DevOps-Content-Lib"
 
   # 3. Day ISO truc tiep qua HTTPS /folder (khi khong co govc):
-  $0 -f ./iso_cache/ubuntu-24.04.1-live-server-amd64.iso -H 10.255.242.10 -u root -d datastore1 -m curl
+  $0 -f ./iso_cache/ubuntu-24.04.1-live-server-amd64.iso -H <ESXI_HOST_IP> -u root -d datastore1 -m curl
 EOF
     exit 0
 }
