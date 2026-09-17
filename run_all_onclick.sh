@@ -56,12 +56,37 @@ init_config_files() {
     [[ ! -f "${USER_DATA_FILE}" && -f "${USER_DATA_FILE}.example" ]] && cp "${USER_DATA_FILE}.example" "${USER_DATA_FILE}" && echo "Đã tạo: user-data"
 }
 
+prompt_if_placeholder() {
+    local var_name="$1"
+    local prompt_msg="$2"
+    local current_val="${!var_name:-}"
+
+    # Cờ đánh dấu nếu biến đang rỗng hoặc là placeholder (chứa cặp ngoặc <...>)
+    if [[ -z "${current_val}" || "${current_val}" == *"<"*">"* ]]; then
+        local new_val=""
+        while [[ -z "${new_val}" || "${new_val}" == *"<"*">"* ]]; do
+            read -p "${prompt_msg} [hiện tại: ${current_val}]: " new_val
+            # Nếu người dùng bấm Enter mà current_val vẫn là placeholder, bắt nhập lại
+            if [[ -z "${new_val}" ]]; then
+                if [[ "${current_val}" == *"<"*">"* || -z "${current_val}" ]]; then
+                    echo "=> Giá trị không được để trống hoặc chứa <PLACEHOLDER>!"
+                    new_val=""
+                else
+                    new_val="${current_val}"
+                fi
+            fi
+        done
+        # Cập nhật giá trị mới vào biến và lưu vào vars.conf
+        eval "${var_name}=\"${new_val}\""
+        sed -i -E "s|^${var_name}=.*|${var_name}=\"${new_val}\"|" "${VARS_CONF}"
+    fi
+}
+
 gather_vars() {
     if [[ ! -f "${VARS_CONF}" ]]; then
         cat << 'EOF' > "${VARS_CONF}"
 # ==============================================================================
 # TỆP CẤU HÌNH BIẾN CHUNG (Tự động điền vào Packer, Terraform, Ansible)
-# Điền các giá trị thực tế của site vào đây, sau đó lưu lại.
 # ==============================================================================
 
 # --- vCenter Server ---
@@ -88,18 +113,30 @@ GW="<GATEWAY>"
 NETMASK="24"
 EOF
         echo "CHÚ Ý: Lần chạy đầu tiên, hệ thống đã tạo tệp cấu hình '${VARS_CONF}'."
-        echo "Vui lòng mở một terminal khác (hoặc dùng nano/vim), điền đầy đủ thông tin (IP, Datastore, Network...) vào file này."
-        read -p "Sau khi lưu file xong, nhấn Enter tại đây để tiếp tục..."
     fi
 
     source "${VARS_CONF}"
+
+    echo ""
+    echo "------------------------------------------------------------------------------"
+    echo "CẤU HÌNH SETUP WIZARD (Kiểm tra và điền các thông số còn thiếu)"
+    echo "------------------------------------------------------------------------------"
+    prompt_if_placeholder "SITE_VCSA_IP" "Nhập IP của vCenter Server"
+    prompt_if_placeholder "VCENTER_USER" "Nhập tài khoản đăng nhập vCenter (vd: administrator@vsphere.local)"
+    prompt_if_placeholder "ISO_DATASTORE" "Nhập tên Datastore lưu ISO"
+    prompt_if_placeholder "SSH_USER" "Nhập tài khoản SSH cho máy ảo (vd: ubuntu, sysops)"
+    prompt_if_placeholder "IP_E01" "Nhập IP tĩnh cho Elasticsearch Node 1 (srv-elastic-01)"
+    prompt_if_placeholder "IP_E02" "Nhập IP tĩnh cho Elasticsearch Node 2 (srv-elastic-02)"
+    prompt_if_placeholder "IP_E03" "Nhập IP tĩnh cho Elasticsearch Node 3 (srv-elastic-03)"
+    prompt_if_placeholder "IP_KBN" "Nhập IP tĩnh cho Kibana/Fleet Server (srv-kibana-gw)"
+    prompt_if_placeholder "GW" "Nhập Default Gateway (vd: 10.0.6.1)"
 
     echo "------------------------------------------------------------------------------"
     echo "THU THẬP MẬT KHẨU BẢO MẬT (Chỉ hỏi 1 lần và lưu trong RAM)"
     echo "------------------------------------------------------------------------------"
     [[ -z "${VCENTER_PASS:-}" ]] && read -s -p "Mật khẩu vCenter: " VCENTER_PASS && echo ""
-    [[ -z "${SSH_PASS:-}" ]] && read -s -p "Mật khẩu SSH (SSH_USER): " SSH_PASS && echo ""
-    [[ -z "${SUDO_PASS:-}" ]] && read -s -p "Mật khẩu Sudo: " SUDO_PASS && echo ""
+    [[ -z "${SSH_PASS:-}" ]] && read -s -p "Mật khẩu SSH (${SSH_USER}): " SSH_PASS && echo ""
+    [[ -z "${SUDO_PASS:-}" ]] && read -s -p "Mật khẩu Sudo (nếu cần đổi quyền gốc): " SUDO_PASS && echo ""
     [[ -z "${ELASTIC_PASS:-}" ]] && read -s -p "Mật khẩu Elastic (elastic): " ELASTIC_PASS && echo ""
     [[ -z "${KIBANA_PASS:-}" ]] && read -s -p "Mật khẩu Kibana (kibana_system): " KIBANA_PASS && echo ""
 
