@@ -112,6 +112,7 @@ IP_E03="<IP_NODE_03>"
 IP_KBN="<IP_KIBANA>"
 GW="<GATEWAY>"
 NETMASK="24"
+DNS_SERVER="<DNS_SERVER>"
 EOF
         echo "CHÚ Ý: Lần chạy đầu tiên, hệ thống đã tạo tệp cấu hình '${VARS_CONF}'."
     fi
@@ -131,6 +132,7 @@ EOF
     prompt_if_placeholder "IP_E03" "Nhập IP tĩnh cho Elasticsearch Node 3 (srv-elastic-03)"
     prompt_if_placeholder "IP_KBN" "Nhập IP tĩnh cho Kibana/Fleet Server (srv-kibana-gw)"
     prompt_if_placeholder "GW" "Nhập Default Gateway (vd: 10.0.6.1)"
+    prompt_if_placeholder "DNS_SERVER" "Nhập IP của DNS Server nội bộ (vd: 10.0.6.1, hoặc 8.8.8.8)"
 
     echo "------------------------------------------------------------------------------"
     echo "THU THẬP MẬT KHẨU BẢO MẬT (Chỉ hỏi 1 lần và lưu trong RAM)"
@@ -176,6 +178,7 @@ configure_templates() {
     sed -i -E "s/(content_library_item_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_FILE}"
     sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${PKR_FILE}"
     sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${TF_FILE}"
+    sed -i -E "s/(default_dns_servers\s*=\s*\[\")[^\"]+(\")/\1${DNS_SERVER}\2/" "${TF_FILE}"
 
     if [[ -f "${USER_DATA_FILE}" ]]; then
         SSH_PASS_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}")
@@ -229,7 +232,7 @@ run_iso_menu() {
     
     # Kiểm tra ISO đã dùng lần trước
     if [[ -n "${LAST_USED_ISO:-}" ]]; then
-        echo "Phát hiện bạn đã từng dùng ISO tại: ${LAST_USED_ISO}"
+        echo "Phát hiện bạn đã từng sử dụng file ISO trên Datastore [${ISO_DATASTORE}]: ${LAST_USED_ISO}"
         read -p "Bạn có muốn tiếp tục sử dụng ISO này không? (Y/n): " USE_OLD
         if [[ "${USE_OLD}" != "n" && "${USE_OLD}" != "N" ]]; then
             update_iso_in_packer "${LAST_USED_ISO}"
@@ -391,6 +394,21 @@ run_terraform() {
         fi
     else
         echo "Template hợp lệ, đã tìm thấy trên vCenter."
+    fi
+
+    echo ""
+    echo "=============================================================================="
+    echo "PRE-FLIGHT CHECK: KIỂM TRA FILE CẤU HÌNH (TERRAFORM)"
+    echo "=============================================================================="
+    if grep -q -E '<[A-Z0-9_]+>' "${TF_FILE}"; then
+        echo "CẢNH BÁO: File ${TF_FILE} vẫn còn chứa biến chưa được gán giá trị (ví dụ: <ESXI_HOST_01>)."
+        echo "Vì bạn muốn cấu hình thủ công cho các tham số mở rộng (như IP host vật lý), vui lòng:"
+        echo "  1. Mở file: terraform_test/terraform.tfvars"
+        echo "  2. Tìm và thay thế các chuỗi <...> bằng giá trị thực tế của bạn."
+        echo "  3. Lưu file lại."
+        read -p "Sau khi sửa xong file, nhấn Enter tại đây để tiếp tục chạy Terraform..."
+    else
+        echo "File cấu hình Terraform hợp lệ, không còn biến <PLACEHOLDER>."
     fi
 
     echo ""
