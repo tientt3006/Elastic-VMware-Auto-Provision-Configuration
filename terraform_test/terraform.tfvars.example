@@ -58,6 +58,14 @@ vms = {
     disk_size_gb = 50
     network_name = "VM Network 3"
     ip_address   = "<IP_NODE_01>"
+    
+    # [TÙY CHỌN - GHI ĐÈ] Kế thừa và Ghi đè (Inheritance and Override)
+    # Bỏ comment các dòng dưới đây nếu bạn muốn máy ảo này chạy trên Host/Datastore cục bộ,
+    # hoặc nằm trong một Folder riêng biệt thay vì dùng cấu hình chung ở trên cùng.
+    # host_name      = "<ESXI_HOST_01>"
+    # datastore_name = "<DS_LOCAL_1>"
+    # folder_name    = "<CUSTOM_FOLDER_NAME>"
+    
     netmask      = 24
     gateway      = "<GATEWAY>"
     role         = "master_data_ingest"

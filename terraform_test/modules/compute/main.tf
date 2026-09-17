@@ -12,9 +12,12 @@ resource "vsphere_virtual_machine" "vm" {
   for_each = var.vms
 
   name             = each.value.name
-  folder           = var.folder
   resource_pool_id = var.resource_pool_id
-  datastore_id     = var.datastore_id
+
+  # Inheritance and Override Pattern for Storage, Host, and Folder
+  datastore_id   = try(var.datastore_mapping[each.value.datastore_name], var.datastore_id)
+  host_system_id = try(var.host_mapping[each.value.host_name], null)
+  folder         = try(var.folder_mapping[each.value.folder_name], var.folder)
 
   num_cpus = each.value.cpu_count
   memory   = each.value.memory_mb

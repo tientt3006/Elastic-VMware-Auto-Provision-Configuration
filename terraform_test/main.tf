@@ -27,6 +27,19 @@ data "vsphere_virtual_machine" "source_template" {
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
 
+# Dynamic Data Sources for Per-VM Overrides
+data "vsphere_datastore" "vm_datastores" {
+  for_each      = toset([for k, vm in var.vms : vm.datastore_name if vm.datastore_name != null])
+  name          = each.value
+  datacenter_id = data.vsphere_datacenter.datacenter.id
+}
+
+data "vsphere_host" "vm_hosts" {
+  for_each      = toset([for k, vm in var.vms : vm.host_name if vm.host_name != null])
+  name          = each.value
+  datacenter_id = data.vsphere_datacenter.datacenter.id
+}
+
 # ==============================================================================
 # Module: Folder Provisioning (Bulk Creation)
 # ==============================================================================
@@ -91,11 +104,18 @@ module "compute" {
   template_scsi_type              = data.vsphere_virtual_machine.source_template.scsi_type
   template_network_interface_type = data.vsphere_virtual_machine.source_template.network_interface_types[0]
   template_disk_thin_provisioned  = data.vsphere_virtual_machine.source_template.disks[0].thin_provisioned
+  
+  # Default Global Fallbacks
   folder                          = try(module.folder.folder_paths[var.vm_target_folder], null)
   default_domain_name             = var.default_domain_name
   default_dns_servers             = var.default_dns_servers
   ssh_public_key                  = var.ssh_public_key
   ssh_username                    = var.ssh_username
+
+  # Override Mappings
+  datastore_mapping               = { for k, v in data.vsphere_datastore.vm_datastores : k => v.id }
+  host_mapping                    = { for k, v in data.vsphere_host.vm_hosts : k => v.id }
+  folder_mapping                  = module.folder.folder_paths
 
   vms = {
     for k, vm in var.vms : k => merge(vm, {

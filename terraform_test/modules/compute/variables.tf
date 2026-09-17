@@ -52,12 +52,28 @@ variable "folder" {
   description = "The inventory folder path to place the virtual machines in."
   type        = string
   default     = null
-}
-
 variable "default_domain_name" {
   description = "Default DNS search domain name."
   type        = string
   default     = "lab.local"
+}
+
+variable "datastore_mapping" {
+  description = "Map of datastore names to their IDs for per-VM overrides."
+  type        = map(string)
+  default     = {}
+}
+
+variable "host_mapping" {
+  description = "Map of host names to their IDs for per-VM overrides."
+  type        = map(string)
+  default     = {}
+}
+
+variable "folder_mapping" {
+  description = "Map of folder names to their IDs for per-VM overrides."
+  type        = map(string)
+  default     = {}
 }
 
 variable "default_dns_servers" {
@@ -91,6 +107,9 @@ variable "vms" {
     netmask      = number
     gateway      = string
     dns_servers  = optional(list(string), ["8.8.8.8"])
+    datastore_name = optional(string, null)
+    host_name      = optional(string, null)
+    folder_name    = optional(string, null)
     domain_name  = optional(string, "lab.local")
     role         = optional(string, "standard")
     extra_config = optional(map(string), {})
