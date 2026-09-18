@@ -169,6 +169,33 @@
                   "period": { "value": "20s", "type": "text" },
                   "tags": { "value": ["vsphere-virtualmachine"], "type": "text" }
                 }
+              },
+              {
+                "id": "vsphere.network",
+                "enabled": true,
+                "data_stream": { "dataset": "vsphere.network", "type": "metrics" },
+                "vars": {
+                  "period": { "value": "20s", "type": "text" },
+                  "tags": { "value": ["vsphere-network"], "type": "text" }
+                }
+              },
+              {
+                "id": "vsphere.resourcepool",
+                "enabled": true,
+                "data_stream": { "dataset": "vsphere.resourcepool", "type": "metrics" },
+                "vars": {
+                  "period": { "value": "20s", "type": "text" },
+                  "tags": { "value": ["vsphere-resourcepool"], "type": "text" }
+                }
+              },
+              {
+                "id": "vsphere.datastorecluster",
+                "enabled": true,
+                "data_stream": { "dataset": "vsphere.datastorecluster", "type": "metrics" },
+                "vars": {
+                  "period": { "value": "20s", "type": "text" },
+                  "tags": { "value": ["vsphere-datastorecluster"], "type": "text" }
+                }
               }
             ],
             "vars": {
