@@ -53,22 +53,6 @@
   delegate_to: localhost
   ignore_errors: true
 
-- name: Install vSphere Integration Package (Latest)
-  ansible.builtin.uri:
-    url: "{{ kibana_api_url }}/api/fleet/epm/packages/vsphere"
-    method: POST
-    user: "elastic"
-    password: "{{ elastic_password }}"
-    force_basic_auth: true
-    headers:
-      kbn-xsrf: "true"
-      content-type: "application/json"
-    body_format: json
-    body: '{"force": true}'
-    status_code: [200, 201, 400]
-  delegate_to: localhost
-  ignore_errors: true
-
 - name: Get vSphere package version
   ansible.builtin.uri:
     url: "{{ kibana_api_url }}/api/fleet/epm/packages/vsphere"
@@ -80,6 +64,22 @@
       kbn-xsrf: "true"
   register: vsphere_package_info
   delegate_to: localhost
+
+- name: Install vSphere Integration Package (Latest with Assets and Pipelines)
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/epm/packages/vsphere/{{ vsphere_package_info.json.item.version | default('1.25.0') }}"
+    method: POST
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: '{"force": true}'
+    status_code: [200, 201, 400, 409]
+  delegate_to: localhost
+  ignore_errors: true
 
 - name: Query existing Fleet Package Policies
   ansible.builtin.uri:
@@ -139,7 +139,7 @@
                 "enabled": true,
                 "data_stream": { "dataset": "vsphere.cluster", "type": "metrics" },
                 "vars": {
-                  "period": { "value": "60s", "type": "text" },
+                  "period": { "value": "20s", "type": "text" },
                   "tags": { "value": ["vsphere-cluster"], "type": "text" }
                 }
               },
@@ -148,7 +148,7 @@
                 "enabled": true,
                 "data_stream": { "dataset": "vsphere.host", "type": "metrics" },
                 "vars": {
-                  "period": { "value": "60s", "type": "text" },
+                  "period": { "value": "20s", "type": "text" },
                   "tags": { "value": ["vsphere-host"], "type": "text" }
                 }
               },
@@ -157,7 +157,7 @@
                 "enabled": true,
                 "data_stream": { "dataset": "vsphere.datastore", "type": "metrics" },
                 "vars": {
-                  "period": { "value": "60s", "type": "text" },
+                  "period": { "value": "20s", "type": "text" },
                   "tags": { "value": ["vsphere-datastore"], "type": "text" }
                 }
               },
@@ -166,7 +166,7 @@
                 "enabled": true,
                 "data_stream": { "dataset": "vsphere.virtualmachine", "type": "metrics" },
                 "vars": {
-                  "period": { "value": "120s", "type": "text" },
+                  "period": { "value": "20s", "type": "text" },
                   "tags": { "value": ["vsphere-virtualmachine"], "type": "text" }
                 }
               }
