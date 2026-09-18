@@ -457,7 +457,7 @@ run_terraform() {
     echo "=============================================================================="
     echo "PRE-FLIGHT CHECK: KIỂM TRA FILE CẤU HÌNH (TERRAFORM)"
     echo "=============================================================================="
-    if grep -q -E '<[A-Z0-9_]+>' "${TF_FILE}"; then
+    if grep -v '^\s*#' "${TF_FILE}" | grep -q -E '<[A-Z0-9_]+>'; then
         echo "CẢNH BÁO: File ${TF_FILE} vẫn còn chứa biến chưa được gán giá trị (ví dụ: <ESXI_HOST_01>)."
         echo "Vì bạn muốn cấu hình thủ công cho các tham số mở rộng (như IP host vật lý), vui lòng:"
         echo "  1. Mở file: terraform_test/terraform.tfvars"
