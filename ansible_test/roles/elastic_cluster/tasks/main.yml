@@ -223,3 +223,27 @@
     job: "/usr/local/bin/elastic-disk-pruner.sh >/dev/null 2>&1"
     cron_file: "elastic-disk-pruner"
 
+- name: Apply cluster disk watermark settings on primary node (Day-1 protection)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9200/_cluster/settings"
+    method: PUT
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      persistent:
+        cluster.routing.allocation.disk.watermark.low: "{{ disk_watermark_low | default('60%') }}"
+        cluster.routing.allocation.disk.watermark.high: "{{ disk_watermark_high | default('70%') }}"
+        cluster.routing.allocation.disk.watermark.flood_stage: "{{ disk_watermark_flood_stage | default('75%') }}"
+        indices.lifecycle.poll_interval: "{{ ilm_poll_interval | default('5m') }}"
+    status_code: [200]
+  when: inventory_hostname == groups['elastic_cluster'][0]
+  register: apply_cluster_watermarks
+  until: apply_cluster_watermarks.status == 200
+  retries: 10
+  delay: 5
+
+

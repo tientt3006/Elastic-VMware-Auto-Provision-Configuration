@@ -25,12 +25,26 @@ prompt_credentials() {
     echo "THIẾT LẬP THAM SỐ GIÁM SÁT VMWARE VSPHERE"
     echo "=============================================================================="
 
+    if [[ -z "${SITE_VCSA_IP:-}" || "${SITE_VCSA_IP}" == *"<"*">"* ]]; then
+        read -p "Địa chỉ IP vCenter Server: " SITE_VCSA_IP
+        export SITE_VCSA_IP
+    fi
+
+    if [[ -z "${IP_KBN:-}" || "${IP_KBN}" == *"<"*">"* ]]; then
+        read -p "Địa chỉ IP Gateway / Kibana (srv-kibana-gw): " IP_KBN
+        export IP_KBN
+    fi
+
     if [[ -z "${VCENTER_PASS:-}" ]]; then
         read -s -p "Mật khẩu vCenter Administrator (${VCENTER_USER:-administrator@vsphere.local}): " VCENTER_PASS
         echo ""
         export VCENTER_PASS
-        export GOVC_PASSWORD="${VCENTER_PASS}"
     fi
+
+    export GOVC_URL="https://${SITE_VCSA_IP}"
+    export GOVC_USERNAME="${VCENTER_USER:-administrator@vsphere.local}"
+    export GOVC_PASSWORD="${VCENTER_PASS}"
+    export GOVC_INSECURE="1"
 
     # 1. Tài khoản Service Account Read-Only
     read -p "Tài khoản Service Account Read-Only [mặc định: svc_elastic_ro]: " INPUT_USER
@@ -51,6 +65,13 @@ prompt_credentials() {
             break
         fi
     done
+
+    # 2. Mật khẩu siêu quản trị elasticsearch (elastic)
+    if [[ -z "${ELASTIC_PASS:-}" ]]; then
+        read -s -p "Mật khẩu siêu quản trị Elasticsearch (elastic): " ELASTIC_PASS
+        echo ""
+        export ELASTIC_PASS
+    fi
 
     export SVC_USER SVC_PASS
 }
@@ -259,6 +280,28 @@ rollback() {
     if [[ ! -f "${LATEST_BACKUP}" ]]; then
         echo "LỖI: Không tìm thấy tệp sao lưu ${LATEST_BACKUP} để hoàn tác!" >&2
         exit 1
+    fi
+
+    if [[ -z "${SITE_VCSA_IP:-}" || "${SITE_VCSA_IP}" == *"<"*">"* ]]; then
+        read -p "Địa chỉ IP vCenter Server: " SITE_VCSA_IP
+        export SITE_VCSA_IP
+    fi
+
+    if [[ -z "${VCENTER_PASS:-}" ]]; then
+        read -s -p "Mật khẩu vCenter Administrator (${VCENTER_USER:-administrator@vsphere.local}): " VCENTER_PASS
+        echo ""
+        export VCENTER_PASS
+    fi
+
+    export GOVC_URL="https://${SITE_VCSA_IP}"
+    export GOVC_USERNAME="${VCENTER_USER:-administrator@vsphere.local}"
+    export GOVC_PASSWORD="${VCENTER_PASS}"
+    export GOVC_INSECURE="1"
+
+    if [[ -z "${ELASTIC_PASS:-}" ]]; then
+        read -s -p "Mật khẩu siêu quản trị Elasticsearch (elastic): " ELASTIC_PASS
+        echo ""
+        export ELASTIC_PASS
     fi
 
     echo "Đang nạp dữ liệu hoàn tác từ: ${LATEST_BACKUP}..."
