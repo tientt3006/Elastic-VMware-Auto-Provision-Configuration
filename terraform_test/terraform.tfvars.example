@@ -16,26 +16,26 @@ vsphere_template_name = "tpl-ubuntu-2404-golden"
 # ==============================================================================
 # Content Library Configuration
 # ==============================================================================
-content_library_name      = "Content Lib DS_100_3_1"
-content_library_item_name = "tpl-ubuntu-2404-golden"
+#content_library_name      = "Content Lib DS_100_3_1"
+#content_library_item_name = "tpl-ubuntu-2404-golden"
 
 # ==============================================================================
 # Inventory Folder Configuration (Bulk Creation)
 # ==============================================================================
-vm_folders       = ["App_Workloads", "Infra_Services"]
-vm_target_folder = "App_Workloads"
+vm_folders       = []
+vm_target_folder = ""
 
 # ==============================================================================
 # ESXi Host & Standard Switch Configuration
 # ==============================================================================
-esxi_hosts          = ["<ESXI_HOST_01>", "<ESXI_HOST_02>"]
+esxi_hosts          = []
 virtual_switch_name = "vSwitch0"
 
 port_groups = {
-  "VM Network 3" = { vlan_id = 0 }
+  #"VM Network 3" = { vlan_id = 0 }
 }
 
-default_domain_name = "corp.internal"
+default_domain_name = "int"
 default_dns_servers = [<DNS_SERVERS_LIST>]
 
 # ==============================================================================
@@ -67,10 +67,12 @@ vms = {
     
     # [TÙY CHỌN - GHI ĐÈ] Kế thừa và Ghi đè (Inheritance and Override)
     # Bỏ comment các dòng dưới đây nếu bạn muốn máy ảo này chạy trên Host/Datastore cục bộ,
-    # hoặc nằm trong một Folder riêng biệt thay vì dùng cấu hình chung ở trên cùng.
+    # nằm trong một Folder riêng biệt, hoặc dùng DNS Server / Domain riêng biệt.
     # host_name      = "<ESXI_HOST_01>"
     # datastore_name = "<DS_LOCAL_1>"
     # folder_name    = "<CUSTOM_FOLDER_NAME>"
+    # dns_servers    = ["1.1.1.1", "8.8.8.8"]
+    # domain_name    = "custom.local"
     
     netmask      = 24
     gateway      = "<GATEWAY>"
@@ -94,6 +96,7 @@ vms = {
     role         = "master_data_ingest"
     extra_config = {
       "guestinfo.node.role" = "master_data_ingest"
+      "guestinfo.force_poweron" = "true"
     }
   },
   "elastic_03" = {
@@ -127,6 +130,7 @@ vms = {
     role         = "kibana_fleet_gateway"
     extra_config = {
       "guestinfo.node.role" = "kibana_fleet_gateway"
+      "guestinfo.force_poweron" = "true"
     }
   }
 }

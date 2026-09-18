@@ -108,12 +108,13 @@ variable "vms" {
     ip_address   = string
     netmask      = number
     gateway      = string
-    dns_servers  = optional(list(string), ["8.8.8.8"])
+    dns_servers  = optional(list(string), null)
     datastore_name = optional(string, null)
     host_name      = optional(string, null)
     folder_name    = optional(string, null)
-    domain_name  = optional(string, "lab.local")
+    domain_name  = optional(string, null)
     role         = optional(string, "standard")
     extra_config = optional(map(string), {})
   }))
+
 }

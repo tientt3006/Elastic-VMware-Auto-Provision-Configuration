@@ -144,11 +144,12 @@ variable "vms" {
     datastore_name = optional(string, null)
     host_name      = optional(string, null)
     folder_name    = optional(string, null)
-    dns_servers    = optional(list(string), ["8.8.8.8"])
-    domain_name  = optional(string, "lab.local")
-    role         = optional(string, "standard")
-    extra_config = optional(map(string), {})
+    dns_servers    = optional(list(string), null)
+    domain_name    = optional(string, null)
+    role           = optional(string, "standard")
+    extra_config   = optional(map(string), {})
   }))
+
 }
 
 variable "drs_rule_mandatory" {

@@ -65,12 +65,15 @@ check_and_create_sso_user() {
     
     # Kiểm tra tồn tại trong SSO
     if govc sso.user.ls 2>/dev/null | grep -qw "${SVC_USER}"; then
-        echo "=> Tài khoản SSO '${SVC_USER}' đã tồn tại. Bỏ qua bước tạo mới (Idempotent)."
+        echo "=> Tài khoản SSO '${SVC_USER}' đã tồn tại. Đang đồng bộ cập nhật mật khẩu..."
+        govc sso.user.update -p "${SVC_PASS}" "${SVC_USER}"
+        echo "=> Đã cập nhật mật khẩu SSO thành công."
     else
         echo "=> Đang tạo mới tài khoản SSO '${SVC_USER}'..."
         govc sso.user.create -p "${SVC_PASS}" "${SVC_USER}"
         echo "=> Đã tạo tài khoản SSO thành công."
     fi
+
 
     # Gán quyền ReadOnly tại root vCenter
     echo "=> Đảm bảo quyền ReadOnly tại cấp gốc (/) cho '${SVC_USER}@vsphere.local'..."
