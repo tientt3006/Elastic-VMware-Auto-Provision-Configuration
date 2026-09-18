@@ -211,8 +211,18 @@ configure_templates() {
     sed -i -E "s/(vsphere_template_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_FILE}"
     sed -i -E "s/(content_library_item_name\s*=\s*\")[^\"]+(\")/\1${TPL_NAME}\2/" "${TF_FILE}"
     sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${PKR_FILE}"
-    sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${TF_FILE}"
-    sed -i -E "s|(ssh_public_key\s*=\s*\")[^\"]+(\")|\1${SSH_PUB_KEY}\2|" "${TF_FILE}"
+
+    if grep -q "ssh_username" "${TF_FILE}"; then
+        sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${SSH_USER}\2/" "${TF_FILE}"
+    else
+        echo "ssh_username   = \"${SSH_USER}\"" >> "${TF_FILE}"
+    fi
+
+    if grep -q "ssh_public_key" "${TF_FILE}"; then
+        sed -i -E "s|(ssh_public_key\s*=\s*\")[^\"]+(\")|\1${SSH_PUB_KEY}\2|" "${TF_FILE}"
+    else
+        echo "ssh_public_key = \"${SSH_PUB_KEY}\"" >> "${TF_FILE}"
+    fi
 
     if [[ -f "${SCRIPT_DIR}/ansible_test/ansible.cfg" ]]; then
         sed -i -E "s/(remote_user\s*=\s*).*/\1${SSH_USER}/" "${SCRIPT_DIR}/ansible_test/ansible.cfg"
