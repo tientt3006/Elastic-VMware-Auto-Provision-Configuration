@@ -206,3 +206,20 @@
   until: reset_kibana_pass.rc == 0
   retries: 30
   delay: 10
+
+- name: Deploy automated emergency disk pruner script
+  ansible.builtin.template:
+    src: elastic-disk-pruner.sh.j2
+    dest: /usr/local/bin/elastic-disk-pruner.sh
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Configure cron schedule for emergency disk pruner (Runs every 15 minutes)
+  ansible.builtin.cron:
+    name: "elastic-emergency-disk-pruner"
+    minute: "*/15"
+    user: "root"
+    job: "/usr/local/bin/elastic-disk-pruner.sh >/dev/null 2>&1"
+    cron_file: "elastic-disk-pruner"
+

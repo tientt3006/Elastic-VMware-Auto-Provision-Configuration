@@ -23,3 +23,16 @@ elastic_agent_download_dir: /var/tmp/elastic-agent
 
 # Set false only for a controlled lab with self-signed HTTP certificates.
 elastic_tls_verify: false
+
+# ==============================================================================
+# ILM & Cluster Disk Safeguard Settings (Auto-delete & Watermarks)
+# ==============================================================================
+ilm_retention_days: "7d"
+ilm_rollover_max_age: "1d"
+ilm_rollover_max_size: "10gb"
+disk_watermark_low: "60%"
+disk_watermark_high: "70%"
+disk_watermark_flood_stage: "75%"
+disk_prune_threshold_percent: 70
+disk_prune_target_percent: 60
+

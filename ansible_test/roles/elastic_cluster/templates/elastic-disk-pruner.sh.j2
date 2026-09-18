@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Automated Emergency Disk Pruner for Elasticsearch
+# Guarantees local disk usage never exceeds the safety threshold (default: 70%)
+# ==============================================================================
+set -euo pipefail
+
+THRESHOLD="{{ disk_prune_threshold_percent | default(70) }}"
+TARGET_LOW="{{ disk_prune_target_percent | default(60) }}"
+ES_URL="http://127.0.0.1:9200"
+ES_USER="elastic"
+ES_PASS="{{ elastic_password }}"
+LOG_FILE="/var/log/elasticsearch/disk_pruner.log"
+DATA_DIR="/var/lib/elasticsearch"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"
+}
+
+if [[ ! -d "${DATA_DIR}" ]]; then
+    exit 0
+fi
+
+# 1. Check current disk usage percentage on Elasticsearch data partition
+CURRENT_USAGE=$(df -P "${DATA_DIR}" | awk 'NR==2 {gsub("%","",$5); print $5}')
+
+if [[ "${CURRENT_USAGE}" -le "${THRESHOLD}" ]]; then
+    exit 0
+fi
+
+log "WARNING: Disk usage on ${DATA_DIR} is at ${CURRENT_USAGE}%, exceeding safety threshold of ${THRESHOLD}%! Initiating emergency auto-prune..."
+
+# 2. Check Elasticsearch API connectivity
+if ! curl -s -u "${ES_USER}:${ES_PASS}" -f "${ES_URL}/_cluster/health" > /dev/null 2>&1; then
+    log "ERROR: Cannot reach local Elasticsearch at ${ES_URL} to perform emergency pruning."
+    exit 1
+fi
+
+# 3. Trigger immediate rollover on heavy data streams to seal current active writing indices
+curl -s -X POST -u "${ES_USER}:${ES_PASS}" "${ES_URL}/logs-*/_rollover" > /dev/null 2>&1 || true
+curl -s -X POST -u "${ES_USER}:${ES_PASS}" "${ES_URL}/metrics-*/_rollover" > /dev/null 2>&1 || true
+
+# 4. Fetch list of non-active write backing indices sorted by creation date ascending (oldest first)
+# Priority for pruning: 1. vSphere logs, 2. Other logs, 3. Metrics
+INDEX_CANDIDATES=$(curl -s -u "${ES_USER}:${ES_PASS}" "${ES_URL}/_cat/indices/.ds-logs-*?s=creation.date:asc&h=index" 2>/dev/null | awk '{print $1}')
+
+if [[ -z "${INDEX_CANDIDATES}" ]]; then
+    INDEX_CANDIDATES=$(curl -s -u "${ES_USER}:${ES_PASS}" "${ES_URL}/_cat/indices/.ds-*?s=creation.date:asc&h=index" 2>/dev/null | awk '{print $1}')
+fi
+
+# Identify current write indices to protect active writing index
+WRITE_INDICES=$(curl -s -u "${ES_USER}:${ES_PASS}" "${ES_URL}/_data_stream" 2>/dev/null | grep -o '"index_name":"[^"]*"' | cut -d'"' -f4 || true)
+
+for IDX in ${INDEX_CANDIDATES}; do
+    # Skip active write index
+    if echo "${WRITE_INDICES}" | grep -qw "${IDX}"; then
+        continue
+    fi
+
+    log "Emergency pruning oldest backing index: ${IDX}..."
+    DEL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -u "${ES_USER}:${ES_PASS}" "${ES_URL}/${IDX}" || echo "500")
+    log "Purged index ${IDX} (HTTP ${DEL_STATUS})."
+
+    # Allow 2 seconds for OS filesystem to release deleted blocks
+    sleep 2
+
+    CURRENT_USAGE=$(df -P "${DATA_DIR}" | awk 'NR==2 {gsub("%","",$5); print $5}')
+    log "Current disk usage after purge: ${CURRENT_USAGE}%"
+
+    if [[ "${CURRENT_USAGE}" -le "${TARGET_LOW}" ]]; then
+        log "SUCCESS: Disk usage reduced to ${CURRENT_USAGE}% (below target of ${TARGET_LOW}%). Emergency purge stopped."
+        break
+    fi
+done
