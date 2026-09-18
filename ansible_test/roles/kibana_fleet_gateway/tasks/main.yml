@@ -31,7 +31,7 @@
     state: present
     update_cache: true
 
-- name: Allow Kibana (5601) and Fleet Server (8220) ports through firewall
+- name: Allow Kibana, Fleet Server and Syslog ports through firewall
   community.general.ufw:
     rule: allow
     port: "{{ item.port }}"
@@ -40,6 +40,7 @@
     - { port: "5601", proto: "tcp" }
     - { port: "8220", proto: "tcp" }
     - { port: "9004", proto: "udp" }
+    - { port: "9525", proto: "udp" }
 
 - name: Deploy kibana.yml configuration
   ansible.builtin.template:

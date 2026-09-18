@@ -25,6 +25,34 @@
   until: kibana_health.status == 200
   delegate_to: localhost
 
+- name: Set dynamic Elasticsearch Hosts from inventory
+  ansible.builtin.set_fact:
+    elasticsearch_cluster_hosts: "{{ groups['elastic_cluster'] | default([]) | map('extract', hostvars, 'ansible_host') | map('regex_replace', '^(.*)$', 'http://\\1:9200') | list }}"
+  delegate_to: localhost
+
+- name: Ensure Fleet Default Output points to Elasticsearch cluster
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/outputs/fleet-default-output"
+    method: PUT
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      content-type: "application/json"
+    body_format: json
+    body: |
+      {
+        "name": "default",
+        "type": "elasticsearch",
+        "is_default": true,
+        "is_default_monitoring": true,
+        "hosts": {{ (elasticsearch_cluster_hosts | length > 0) | ternary(elasticsearch_cluster_hosts, [fleet_server_elasticsearch_url | default('http://10.255.242.91:9200')]) | to_json }}
+      }
+    status_code: [200]
+  delegate_to: localhost
+  ignore_errors: true
+
 - name: Install vSphere Integration Package (Latest)
   ansible.builtin.uri:
     url: "{{ kibana_api_url }}/api/fleet/epm/packages/vsphere"

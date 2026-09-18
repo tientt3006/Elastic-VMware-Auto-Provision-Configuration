@@ -4,6 +4,18 @@
 # Independent integration playbook for VMware vSphere Observability
 # ==============================================================================
 
+- name: Ensure UDP port 9525 is open on Kibana Gateway for vSphere Syslog
+  hosts: kibana_gateway
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Allow UDP 9525 through UFW firewall
+      community.general.ufw:
+        rule: allow
+        port: "9525"
+        proto: "udp"
+      ignore_errors: true
+
 - name: Configure VMware vSphere Observability on Fleet Server
   hosts: localhost
   connection: local
