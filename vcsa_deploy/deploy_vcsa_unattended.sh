@@ -152,8 +152,10 @@ echo "  - FQDN He Thong      : ${VCSA_FQDN}"
 echo "  - SSO Domain         : ${SSO_DOMAIN_NAME}"
 echo "=============================================================================="
 
-read -p "Xac nhan bat dau trien khai VCSA ngay bay gio? (yes/no): " CONFIRM
-if [[ "${CONFIRM}" != "yes" ]]; then
+read -p "Xac nhan bat dau trien khai VCSA ngay bay gio? (Y/n): " CONFIRM
+CONFIRM="${CONFIRM%$'\r'}"
+CONFIRM=${CONFIRM:-Y}
+if [[ ! "${CONFIRM}" =~ ^[yY]([eE][sS])?$ ]]; then
     echo "Huy tien trinh theo yeu cau cua nguoi dung."
     exit 0
 fi

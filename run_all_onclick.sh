@@ -526,10 +526,29 @@ run_ansible() {
 }
 
 run_vsphere_observability() {
+    echo ""
+    echo "=============================================================================="
+    echo "PRE-FLIGHT CHECK: TÍCH HỢP GIÁM SÁT VMWARE VSPHERE (GIAI ĐOẠN 5)"
+    echo "=============================================================================="
+    read -p "Bạn có muốn tiếp tục chạy Giai đoạn 5 (Tích hợp giám sát vCenter & ESXi) không? (Y/n): " CONFIRM_VSPHERE
+    CONFIRM_VSPHERE=${CONFIRM_VSPHERE:-Y}
+    if [[ ! "${CONFIRM_VSPHERE}" =~ ^[yY]$ ]]; then
+        echo "Đã bỏ qua tích hợp giám sát VMware vSphere."
+        return 1
+    fi
+
+    echo ""
+    echo "=============================================================================="
+    echo "TIẾN TRÌNH: TÍCH HỢP GIÁM SÁT HẠ TẦNG VMWARE VSPHERE"
+    echo "=============================================================================="
     "${SCRIPT_DIR}/automation_seed/manage_vsphere_observability.sh" apply
 }
 
 run_vsphere_rollback() {
+    echo ""
+    echo "=============================================================================="
+    echo "TIẾN TRÌNH: HOÀN TÁC GIÁM SÁT HẠ TẦNG VMWARE VSPHERE (ROLLBACK)"
+    echo "=============================================================================="
     "${SCRIPT_DIR}/automation_seed/manage_vsphere_observability.sh" rollback
 }
 
@@ -558,29 +577,47 @@ while true; do
 
     case "${MAIN_CHOICE}" in
         1)
-            run_packer
-            run_terraform
-            run_ansible
+            if ! run_packer; then
+                echo "Đã hủy luồng chạy toàn bộ. Quay lại menu chính."
+                continue
+            fi
+            if ! run_terraform; then
+                echo "Đã hủy luồng chạy toàn bộ. Quay lại menu chính."
+                continue
+            fi
+            if ! run_ansible; then
+                echo "Đã hủy luồng chạy toàn bộ. Quay lại menu chính."
+                continue
+            fi
+            run_vsphere_observability || true
+            echo ""
             echo "HOÀN TẤT QUÁ TRÌNH TRIỂN KHAI TOÀN BỘ."
             break
             ;;
         2)
-            run_packer
-            echo "HOÀN TẤT QUÁ TRÌNH TẠO TEMPLATE."
+            if run_packer; then
+                echo "HOÀN TẤT QUÁ TRÌNH TẠO TEMPLATE."
+            fi
             ;;
         3)
-            run_terraform
-            echo "HOÀN TẤT QUÁ TRÌNH TẠO HẠ TẦNG."
+            if run_terraform; then
+                echo "HOÀN TẤT QUÁ TRÌNH TẠO HẠ TẦNG."
+            fi
             ;;
         4)
-            run_ansible
-            echo "HOÀN TẤT QUÁ TRÌNH CẤU HÌNH ỨNG DỤNG."
+            if run_ansible; then
+                echo "HOÀN TẤT QUÁ TRÌNH CẤU HÌNH ỨNG DỤNG."
+            fi
             ;;
         5)
-            run_vsphere_observability
+            if run_vsphere_observability; then
+                echo "HOÀN TẤT QUÁ TRÌNH TÍCH HỢP GIÁM SÁT VSPHERE."
+            fi
             ;;
         6)
-            run_vsphere_rollback
+            if run_vsphere_rollback; then
+                echo "HOÀN TẤT QUÁ TRÌNH HOÀN TÁC GIÁM SÁT VSPHERE."
+            fi
             ;;
         0)
             echo "Thoát chương trình."

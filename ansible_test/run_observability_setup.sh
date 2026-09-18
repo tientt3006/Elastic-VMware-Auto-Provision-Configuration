@@ -57,9 +57,10 @@ fi
 
 # 2. Yêu cầu xác nhận trước khi chạy
 echo "------------------------------------------------------------------------------"
-read -p "Xác nhận bắt đầu cấu hình Observability (Fleet/ILM)? (yes/no): " CONFIRM
+read -p "Xác nhận bắt đầu cấu hình Observability (Fleet/ILM)? (Y/n): " CONFIRM
 CONFIRM="${CONFIRM%$'\r'}"
-if [[ "${CONFIRM}" != "yes" ]]; then
+CONFIRM=${CONFIRM:-Y}
+if [[ ! "${CONFIRM}" =~ ^[yY]([eE][sS])?$ ]]; then
     echo "Hủy tiến trình theo yêu cầu của người dùng."
     exit 1
 fi

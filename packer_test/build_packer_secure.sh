@@ -85,8 +85,9 @@ if command -v govc &>/dev/null; then
         echo "Mac dinh Packer se gap loi 'The name already exists' va khong the build tiep."
         echo "(Ghi chu: Neu ban khong thay no hien thi la Template, co the no la mot may ao (VM) bi kiet do lan build truoc bi loi)."
         echo "------------------------------------------------------------------------------"
-        read -p "Ban co muon xoa VM/Template cu de build lai khong? (yes/no): " OVERWRITE
-        if [[ "${OVERWRITE}" == "yes" ]]; then
+        read -p "Ban co muon xoa VM/Template cu de build lai khong? (y/N): " OVERWRITE
+        OVERWRITE="${OVERWRITE%$'\r'}"
+        if [[ "${OVERWRITE}" =~ ^[yY]([eE][sS])?$ ]]; then
             echo "Dang xoa '${VM_PATH}' tren vCenter..."
             if govc vm.destroy "${VM_PATH}"; then
                 echo "Da xoa thanh cong."
@@ -109,8 +110,10 @@ echo "Cau hinh hop le."
 
 # 6. Yeu cau xac nhan truoc khi build
 echo "------------------------------------------------------------------------------"
-read -p "Xac nhan bat dau build template bang Packer? (yes/no): " CONFIRM
-if [[ "${CONFIRM}" != "yes" ]]; then
+read -p "Xac nhan bat dau build template bang Packer? (Y/n): " CONFIRM
+CONFIRM="${CONFIRM%$'\r'}"
+CONFIRM=${CONFIRM:-Y}
+if [[ ! "${CONFIRM}" =~ ^[yY]([eE][sS])?$ ]]; then
     echo "Huy tien trinh theo yeu cau cua nguoi dung."
     exit 0
 fi
