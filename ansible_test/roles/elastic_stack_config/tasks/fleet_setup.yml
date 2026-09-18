@@ -135,35 +135,19 @@
     body: |
       {
         "fleet_server_hosts": [
-          "{{ fleet_server_url | default('https://<IP_KIBANA>:8220') }}"
+          "{{ fleet_server_url }}"
         ]
       }
     status_code: [200]
   delegate_to: localhost
   ignore_errors: true
 
-- name: Configure Fleet Default Output (Elasticsearch Cluster)
-  ansible.builtin.uri:
-    url: "{{ kibana_api_url }}/api/fleet/outputs/fleet-default-output"
-    method: PUT
-    user: "elastic"
-    password: "{{ elastic_password }}"
-    force_basic_auth: true
-    headers:
-      kbn-xsrf: "true"
-      content-type: "application/json"
-    body_format: json
-    body: |
-      {
-        "name": "default",
-        "type": "elasticsearch",
-        "is_default": true,
-        "is_default_monitoring": true,
-        "hosts": {{ (groups['elastic_cluster'] | default([]) | map('extract', hostvars, 'ansible_host') | map('regex_replace', '^(.*)$', 'http://\\1:9200') | list) if (groups['elastic_cluster'] is defined and groups['elastic_cluster'] | length > 0) else [fleet_server_elasticsearch_url | default('http://10.255.242.91:9200')] | to_json }}
-      }
-    status_code: [200]
-  delegate_to: localhost
-  ignore_errors: true
+- name: Set fleet_output_hosts variable for setup
+  ansible.builtin.set_fact:
+    fleet_output_hosts: "{{ (groups['elastic_cluster'] | default([]) | map('extract', hostvars, 'ansible_host') | map('regex_replace', '^(.*)$', 'http://\\1:9200') | list) if (groups['elastic_cluster'] is defined and groups['elastic_cluster'] | length > 0) else [fleet_server_elasticsearch_url] }}"
+
+- name: Apply Fleet Default Output settings
+  ansible.builtin.include_tasks: fleet_default_output.yml
 
 - name: Get Fleet Server Enrollment Tokens
   ansible.builtin.uri:

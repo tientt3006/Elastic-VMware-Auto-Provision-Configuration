@@ -1,37 +1,41 @@
 ---
-- name: Set API URLs
-  ansible.builtin.set_fact:
-    es_api_url: "http://{{ hostvars[groups['elastic_cluster'][0]]['ansible_host'] }}:9200"
-    kibana_api_url: "http://{{ hostvars[groups['kibana_gateway'][0]]['ansible_host'] }}:5601"
+# ==============================================================================
+# Shared tasks: Enforce Cluster Disk Allocation Watermarks and Default ILM
+# ==============================================================================
 
-- name: Wait for Elasticsearch API to be ready
+- name: Configure Cluster Disk Allocation Watermarks (Capped at 70%)
   ansible.builtin.uri:
-    url: "{{ es_api_url }}/_cluster/health"
-    method: GET
-    user: "elastic"
-    password: "{{ elastic_password }}"
-    force_basic_auth: true
-    status_code: 200
-  register: es_status
-  until: es_status.status == 200
-  retries: 30
-  delay: 10
-  delegate_to: localhost
-
-- name: Set target ES API URL for safeguards
-  ansible.builtin.set_fact:
-    target_es_api_url: "{{ es_api_url }}"
-
-- name: Apply cluster safeguards (Watermarks and Default ILM)
-  ansible.builtin.include_tasks: cluster_safeguards.yml
-
-- name: Create FortiGate ILM Policy
-  ansible.builtin.uri:
-    url: "{{ es_api_url }}/_ilm/policy/fortigate"
+    url: "{{ target_es_api_url }}/_cluster/settings"
     method: PUT
     user: "elastic"
     password: "{{ elastic_password }}"
     force_basic_auth: true
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body: |
+      {
+        "persistent": {
+          "cluster.routing.allocation.disk.watermark.low": "{{ disk_watermark_low | default('60%') }}",
+          "cluster.routing.allocation.disk.watermark.high": "{{ disk_watermark_high | default('70%') }}",
+          "cluster.routing.allocation.disk.watermark.flood_stage": "{{ disk_watermark_flood_stage | default('75%') }}",
+          "cluster.info.update.interval": "30s",
+          "indices.lifecycle.poll_interval": "5m"
+        }
+      }
+    status_code: [200]
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Configure Default Logs ILM Policy (Auto-Delete after retention period)
+  ansible.builtin.uri:
+    url: "{{ target_es_api_url }}/_ilm/policy/logs"
+    method: PUT
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      content-type: "application/json"
     body_format: json
     body: |
       {
@@ -54,16 +58,19 @@
           }
         }
       }
-    status_code: [200, 201]
+    status_code: [200]
   delegate_to: localhost
+  ignore_errors: true
 
-- name: Create Dedicated vSphere ILM Policy
+- name: Configure Default Metrics ILM Policy (Auto-Delete after retention period)
   ansible.builtin.uri:
-    url: "{{ es_api_url }}/_ilm/policy/vsphere-ilm-policy"
+    url: "{{ target_es_api_url }}/_ilm/policy/metrics"
     method: PUT
     user: "elastic"
     password: "{{ elastic_password }}"
     force_basic_auth: true
+    headers:
+      content-type: "application/json"
     body_format: json
     body: |
       {
@@ -86,6 +93,6 @@
           }
         }
       }
-    status_code: [200, 201]
+    status_code: [200]
   delegate_to: localhost
-
+  ignore_errors: true

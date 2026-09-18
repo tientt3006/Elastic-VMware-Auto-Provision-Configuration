@@ -61,7 +61,7 @@ fi
 # 3. Nap bien moi truong vao RAM
 export PKR_VAR_vcenter_password="${VCENTER_PASS}"
 export PKR_VAR_ssh_password="${SSH_PASS}"
-export GOVC_URL="${VCENTER_SERVER}"
+export GOVC_URL="https://${VCENTER_SERVER}"
 export GOVC_USERNAME="${VCENTER_USER}"
 export GOVC_PASSWORD="${VCENTER_PASS}"
 export GOVC_INSECURE="1"

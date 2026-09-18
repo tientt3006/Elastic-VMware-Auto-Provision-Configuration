@@ -1,7 +1,0 @@
----
-elastic_compose_dir: /opt/elastic-stack
-elastic_data_dir: /var/lib/elastic-stack/elasticsearch
-elastic_version: "8.19.0"
-elastic_password: "CHANGE_ME"
-kibana_system_password: "CHANGE_ME"
-kibana_encryption_key: "CHANGE_ME_TO_A_LONG_RANDOM_VALUE_32_CHARS"

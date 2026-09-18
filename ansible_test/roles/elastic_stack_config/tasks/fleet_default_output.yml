@@ -1,0 +1,27 @@
+---
+# ==============================================================================
+# Shared tasks: Configure Fleet Default Output
+# ==============================================================================
+
+- name: Configure Fleet Default Output (Elasticsearch Cluster)
+  ansible.builtin.uri:
+    url: "{{ kibana_api_url }}/api/fleet/outputs/fleet-default-output"
+    method: PUT
+    user: "elastic"
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    headers:
+      kbn-xsrf: "true"
+      Content-Type: "application/json"
+    body_format: json
+    body: |
+      {
+        "name": "default",
+        "type": "elasticsearch",
+        "is_default": true,
+        "is_default_monitoring": true,
+        "hosts": {{ fleet_output_hosts | to_json }}
+      }
+    status_code: [200]
+  delegate_to: localhost
+  ignore_errors: true

@@ -42,7 +42,7 @@
       - install
       - --non-interactive
       - --force
-      - --url={{ fleet_server_url | default('https://<IP_KIBANA>:8220') }}
+      - --url={{ fleet_server_url }}
       - --enrollment-token={{ hostvars['localhost']['agent_enrollment_token'] }}
       - --insecure
   no_log: true

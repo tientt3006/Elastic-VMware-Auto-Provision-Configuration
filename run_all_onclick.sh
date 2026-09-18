@@ -79,7 +79,7 @@ prompt_if_placeholder() {
             fi
         done
         # Cập nhật giá trị mới vào biến và lưu vào vars.conf
-        eval "${var_name}=\"${new_val}\""
+        printf -v "${var_name}" "%s" "${new_val}"
         sed -i -E "s|^${var_name}=.*|${var_name}=\"${new_val}\"|" "${VARS_CONF}"
     fi
 }
@@ -93,11 +93,11 @@ prompt_password() {
     if [[ -n "${current_val}" ]]; then
         read -s -p "${prompt_msg} [Đã lưu trong phiên, Enter để giữ nguyên]: " new_val
         echo ""
-        [[ -n "${new_val}" ]] && eval "${var_name}=\"${new_val}\""
+        [[ -n "${new_val}" ]] && printf -v "${var_name}" "%s" "${new_val}"
     else
         read -s -p "${prompt_msg}: " new_val
         echo ""
-        eval "${var_name}=\"${new_val}\""
+        printf -v "${var_name}" "%s" "${new_val}"
     fi
 }
 
@@ -244,8 +244,8 @@ configure_templates() {
             FORMATTED_DNS="${FORMATTED_DNS}, \"${ip}\""
         fi
     done
-    sed -i "s|<DNS_SERVERS_LIST>|${FORMATTED_DNS}|g" "${TF_FILE}"
-
+    # Thay thế list DNS trong TF_FILE (bắt cả placeholder lẫn mảng đã có giá trị)
+    sed -i -E "s/(default_dns_servers\s*=\s*).*/\1\[${FORMATTED_DNS}\]/" "${TF_FILE}"
     if [[ -f "${USER_DATA_FILE}" ]]; then
         SSH_PASS_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}" 2>/dev/null || openssl passwd -6 "${SSH_PASS}")
         sed -i -E "s|(password:\s*\").*(\")|\1${SSH_PASS_HASH}\2|" "${USER_DATA_FILE}"
@@ -291,6 +291,26 @@ iso_paths = [\
 ]' "${PKR_FILE}"
 }
 
+save_last_used_iso() {
+    local iso_remote_name="$1"
+    if ! grep -q "^LAST_USED_ISO=" "${VARS_CONF}"; then
+        echo "LAST_USED_ISO=\"${iso_remote_name}\"" >> "${VARS_CONF}"
+    else
+        sed -i "s|^LAST_USED_ISO=.*|LAST_USED_ISO=\"${iso_remote_name}\"|" "${VARS_CONF}"
+    fi
+}
+
+upload_iso_to_datastore() {
+    local local_path="$1"
+    local remote_name="$2"
+    if govc datastore.ls -ds="${ISO_DATASTORE}" "${remote_name}" &> /dev/null; then
+        echo "ISO đã tồn tại trên Datastore, bỏ qua việc upload."
+    else
+        govc datastore.mkdir -ds="${ISO_DATASTORE}" iso || true
+        govc datastore.upload -ds="${ISO_DATASTORE}" "${local_path}" "${remote_name}"
+    fi
+}
+
 run_iso_menu() {
     echo ""
     echo "=============================================================================="
@@ -332,20 +352,11 @@ run_iso_menu() {
                 fi
                 echo "-> Upload lên Datastore [${ISO_DATASTORE}]..."
                 local ISO_REMOTE_NAME="iso/ubuntu-24.04.5-live-server-amd64.iso"
-                if govc datastore.ls -ds="${ISO_DATASTORE}" "${ISO_REMOTE_NAME}" &> /dev/null; then
-                    echo "ISO đã tồn tại trên Datastore, bỏ qua việc upload."
-                else
-                    govc datastore.mkdir -ds="${ISO_DATASTORE}" iso || true
-                    govc datastore.upload -ds="${ISO_DATASTORE}" "${ISO_LOCAL_FILE}" "${ISO_REMOTE_NAME}"
-                fi
-                update_iso_in_packer "${ISO_REMOTE_NAME}"
+                upload_iso_to_datastore "${ISO_LOCAL_FILE}" "${ISO_REMOTE_NAME}"
                 
-                # Lưu vào vars.conf
-                if ! grep -q "^LAST_USED_ISO=" "${VARS_CONF}"; then
-                    echo "LAST_USED_ISO=\"${ISO_REMOTE_NAME}\"" >> "${VARS_CONF}"
-                else
-                    sed -i "s|^LAST_USED_ISO=.*|LAST_USED_ISO=\"${ISO_REMOTE_NAME}\"|" "${VARS_CONF}"
-                fi
+                update_iso_in_packer "${ISO_REMOTE_NAME}"
+                save_last_used_iso "${ISO_REMOTE_NAME}"
+                
                 break
                 ;;
             2)
@@ -374,18 +385,11 @@ run_iso_menu() {
                 local BASE_NAME=$(basename "${CHOSEN_LOCAL_ISO}")
                 local ISO_REMOTE_NAME="iso/${BASE_NAME}"
                 echo "-> Upload ${CHOSEN_LOCAL_ISO} lên Datastore [${ISO_DATASTORE}]..."
-                if govc datastore.ls -ds="${ISO_DATASTORE}" "${ISO_REMOTE_NAME}" &> /dev/null; then
-                    echo "ISO ${BASE_NAME} đã tồn tại trên Datastore, bỏ qua việc upload."
-                else
-                    govc datastore.mkdir -ds="${ISO_DATASTORE}" iso || true
-                    govc datastore.upload -ds="${ISO_DATASTORE}" "${CHOSEN_LOCAL_ISO}" "${ISO_REMOTE_NAME}"
-                fi
+                upload_iso_to_datastore "${CHOSEN_LOCAL_ISO}" "${ISO_REMOTE_NAME}"
+                
                 update_iso_in_packer "${ISO_REMOTE_NAME}"
-                if ! grep -q "^LAST_USED_ISO=" "${VARS_CONF}"; then
-                    echo "LAST_USED_ISO=\"${ISO_REMOTE_NAME}\"" >> "${VARS_CONF}"
-                else
-                    sed -i "s|^LAST_USED_ISO=.*|LAST_USED_ISO=\"${ISO_REMOTE_NAME}\"|" "${VARS_CONF}"
-                fi
+                save_last_used_iso "${ISO_REMOTE_NAME}"
+                
                 break
                 ;;
             3)
@@ -412,11 +416,7 @@ run_iso_menu() {
                 local CHOSEN_REMOTE_ISO="${REMOTE_ISOS[$((SEL_INDEX-1))]}"
                 echo "Đã chọn: ${CHOSEN_REMOTE_ISO}"
                 update_iso_in_packer "${CHOSEN_REMOTE_ISO}"
-                if ! grep -q "^LAST_USED_ISO=" "${VARS_CONF}"; then
-                    echo "LAST_USED_ISO=\"${CHOSEN_REMOTE_ISO}\"" >> "${VARS_CONF}"
-                else
-                    sed -i "s|^LAST_USED_ISO=.*|LAST_USED_ISO=\"${CHOSEN_REMOTE_ISO}\"|" "${VARS_CONF}"
-                fi
+                save_last_used_iso "${CHOSEN_REMOTE_ISO}"
                 break
                 ;;
             *)

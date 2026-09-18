@@ -30,127 +30,27 @@
     elasticsearch_cluster_hosts: "{{ groups['elastic_cluster'] | default([]) | map('extract', hostvars, 'ansible_host') | map('regex_replace', '^(.*)$', 'http://\\1:9200') | list }}"
   delegate_to: localhost
 
-- name: Ensure Fleet Default Output points to Elasticsearch cluster
-  ansible.builtin.uri:
-    url: "{{ kibana_api_url }}/api/fleet/outputs/fleet-default-output"
-    method: PUT
-    user: "elastic"
-    password: "{{ elastic_password }}"
-    force_basic_auth: true
-    headers:
-      kbn-xsrf: "true"
-      content-type: "application/json"
-    body_format: json
-    body: |
-      {
-        "name": "default",
-        "type": "elasticsearch",
-        "is_default": true,
-        "is_default_monitoring": true,
-        "hosts": {{ (elasticsearch_cluster_hosts | length > 0) | ternary(elasticsearch_cluster_hosts, [fleet_server_elasticsearch_url | default('http://10.255.242.91:9200')]) | to_json }}
-      }
-    status_code: [200]
+- name: Set fleet_output_hosts variable for vsphere
+  ansible.builtin.set_fact:
+    fleet_output_hosts: "{{ (elasticsearch_cluster_hosts | length > 0) | ternary(elasticsearch_cluster_hosts, [fleet_server_elasticsearch_url]) }}"
   delegate_to: localhost
-  ignore_errors: true
+
+- name: Apply Fleet Default Output settings
+  ansible.builtin.include_tasks: ../../elastic_stack_config/tasks/fleet_default_output.yml
 
 - name: Set primary Elasticsearch API URL
   ansible.builtin.set_fact:
-    primary_es_url: "{{ (elasticsearch_cluster_hosts | length > 0) | ternary(elasticsearch_cluster_hosts[0], fleet_server_elasticsearch_url | default('http://10.255.242.91:9200')) }}"
+    primary_es_url: "{{ (elasticsearch_cluster_hosts | length > 0) | ternary(elasticsearch_cluster_hosts[0], fleet_server_elasticsearch_url) }}"
   delegate_to: localhost
 
-- name: Enforce Cluster Disk Allocation Watermarks (Capped at 70%)
-  ansible.builtin.uri:
-    url: "{{ primary_es_url }}/_cluster/settings"
-    method: PUT
-    user: "elastic"
-    password: "{{ elastic_password }}"
-    force_basic_auth: true
-    headers:
-      content-type: "application/json"
-    body_format: json
-    body: |
-      {
-        "persistent": {
-          "cluster.routing.allocation.disk.watermark.low": "{{ disk_watermark_low | default('60%') }}",
-          "cluster.routing.allocation.disk.watermark.high": "{{ disk_watermark_high | default('70%') }}",
-          "cluster.routing.allocation.disk.watermark.flood_stage": "{{ disk_watermark_flood_stage | default('75%') }}",
-          "cluster.info.update.interval": "30s",
-          "indices.lifecycle.poll_interval": "5m"
-        }
-      }
-    status_code: [200]
-  delegate_to: localhost
-  ignore_errors: true
+- name: Set target ES API URL for safeguards
+  ansible.builtin.set_fact:
+    target_es_api_url: "{{ primary_es_url }}"
 
-- name: Enforce Default Logs ILM Policy (Auto-Delete after retention period)
-  ansible.builtin.uri:
-    url: "{{ primary_es_url }}/_ilm/policy/logs"
-    method: PUT
-    user: "elastic"
-    password: "{{ elastic_password }}"
-    force_basic_auth: true
-    headers:
-      content-type: "application/json"
-    body_format: json
-    body: |
-      {
-        "policy": {
-          "phases": {
-            "hot": {
-              "actions": {
-                "rollover": {
-                  "max_primary_shard_size": "{{ ilm_rollover_max_size | default('10gb') }}",
-                  "max_age": "{{ ilm_rollover_max_age | default('1d') }}"
-                }
-              }
-            },
-            "delete": {
-              "min_age": "{{ ilm_retention_days | default('7d') }}",
-              "actions": {
-                "delete": {}
-              }
-            }
-          }
-        }
-      }
-    status_code: [200]
-  delegate_to: localhost
-  ignore_errors: true
+- name: Apply cluster safeguards (Watermarks and Default ILM)
+  ansible.builtin.include_tasks: ../../elastic_stack_config/tasks/cluster_safeguards.yml
 
-- name: Enforce Default Metrics ILM Policy (Auto-Delete after retention period)
-  ansible.builtin.uri:
-    url: "{{ primary_es_url }}/_ilm/policy/metrics"
-    method: PUT
-    user: "elastic"
-    password: "{{ elastic_password }}"
-    force_basic_auth: true
-    headers:
-      content-type: "application/json"
-    body_format: json
-    body: |
-      {
-        "policy": {
-          "phases": {
-            "hot": {
-              "actions": {
-                "rollover": {
-                  "max_primary_shard_size": "{{ ilm_rollover_max_size | default('10gb') }}",
-                  "max_age": "{{ ilm_rollover_max_age | default('1d') }}"
-                }
-              }
-            },
-            "delete": {
-              "min_age": "{{ ilm_retention_days | default('7d') }}",
-              "actions": {
-                "delete": {}
-              }
-            }
-          }
-        }
-      }
-    status_code: [200]
-  delegate_to: localhost
-  ignore_errors: true
+
 
 - name: Get vSphere package version
   ansible.builtin.uri:
