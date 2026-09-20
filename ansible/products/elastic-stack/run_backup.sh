@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Secure In-Memory Backup & Disaster Recovery Wrapper for Elastic Stack
-# - Run directly from inside ansible_test directory: ./run_backup_restore.sh
+# - Run directly from inside ansible/products/elastic-stack directory: ./run_backup.sh
 # - Dedicated execution tool: completely isolated from day-1 & day-2 deployments
 # - Prompts for credentials via masked terminal input (In-Memory only)
 # - Supports automated repository setup, SLM configuration, on-demand snapshots,
@@ -54,7 +54,7 @@ if [[ -f ~/.venvs/ansible-env/bin/activate ]]; then
 fi
 
 cd "${SCRIPT_DIR}"
-export ANSIBLE_CONFIG="${SCRIPT_DIR}/ansible.cfg"
+export ANSIBLE_CONFIG="${SCRIPT_DIR}/../../ansible.cfg"
 
 # Trich xuat IP node dau tien tu inventory de goi API truc tiep khi can
 ES_HOST=$(grep -E 'srv-elastic-01' -A 1 inventories/lab/hosts.yml | grep 'ansible_host' | awk '{print $2}' || echo "<IP_NODE_01>")

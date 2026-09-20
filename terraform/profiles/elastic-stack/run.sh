@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Secure In-Memory Terraform Provisioning Wrapper (Decentralized Component)
-# - Run directly from inside terraform_test directory: ./run_provision_secure.sh
+# - Run directly from inside terraform/profiles/elastic-stack directory: ./run.sh
 # - Reads target topology directly from ./terraform.tfvars (Zero .env dependency)
 # - Prompts for password interactively via masked input (read -s -p)
 # - Stores credentials strictly in memory (RAM environment variables)

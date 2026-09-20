@@ -22,7 +22,7 @@ iso_cache/
 
 # Ansible runtime artifacts and auto-generated shared env
 *.retry
-ansible/inventories/*/group_vars/all/shared_env.yml
+ansible/products/*/inventories/*/group_vars/all/shared_env.yml
 .vault_pass*
 
 # Packer build caches
@@ -39,8 +39,11 @@ Thumbs.db
 
 # Auto-generated runtime config files (Secrets / Site-specific)
 vars.conf
+products/*/*.conf
+!products/*/*.conf.example
+backup_pre_refactor_gd1/
 *.pkrvars.hcl
 !*.pkrvars.hcl.example
-ansible_test/inventories/lab/hosts.yml
-ansible_test/inventories/lab/group_vars/all/main.yml
-packer_test/http/user-data
+ansible/products/*/inventories/*/hosts.yml
+ansible/products/*/inventories/*/group_vars/all/main.yml
+packer/templates/*/http/user-data

@@ -257,8 +257,8 @@ PYEOF
 run_fleet_ansible_integration() {
     echo ""
     echo "--- [4/4] CẤU HÌNH KIBANA FLEET INTEGRATION QUA ANSIBLE ---"
-    cd "${SCRIPT_DIR}/../ansible_test"
-    export ANSIBLE_CONFIG="${SCRIPT_DIR}/../ansible_test/ansible.cfg"
+    cd "${SCRIPT_DIR}/../ansible/products/elastic-stack"
+    export ANSIBLE_CONFIG="${SCRIPT_DIR}/../ansible/ansible.cfg"
 
     ansible-playbook playbooks/configure_vsphere_observability.yml \
         -e "vcenter_server=${SITE_VCSA_IP} vcenter_readonly_user=${SVC_USER} vcenter_readonly_password=${SVC_PASS} elastic_password=${ELASTIC_PASS}"
@@ -376,8 +376,8 @@ PYEOF
 
     echo ""
     echo "--- GỠ BỎ CHÍNH SÁCH GIÁM SÁT VSPHERE TRÊN KIBANA FLEET ---"
-    cd "${SCRIPT_DIR}/../ansible_test"
-    export ANSIBLE_CONFIG="${SCRIPT_DIR}/../ansible_test/ansible.cfg"
+    cd "${SCRIPT_DIR}/../ansible/products/elastic-stack"
+    export ANSIBLE_CONFIG="${SCRIPT_DIR}/../ansible/ansible.cfg"
 
     ansible-playbook playbooks/rollback_vsphere_observability.yml \
         -e "elastic_password=${ELASTIC_PASS}" || true

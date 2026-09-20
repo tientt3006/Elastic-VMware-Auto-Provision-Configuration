@@ -46,7 +46,7 @@ data "vsphere_host" "vm_hosts" {
 # Module: Folder Provisioning (Bulk Creation)
 # ==============================================================================
 module "folder" {
-  source = "./modules/folder"
+  source = "../../modules/folder"
 
   datacenter_id = data.vsphere_datacenter.datacenter.id
   folder_names  = var.vm_folders
@@ -58,7 +58,7 @@ module "folder" {
 # Clones source golden template to target Content Library without deleting source
 # ==============================================================================
 # module "content_library" {
-#   source = "./modules/content_library"
+#   source = "../../modules/content_library"
 #
 #   content_library_name = var.content_library_name
 #   item_name            = var.content_library_item_name
@@ -72,7 +72,7 @@ module "folder" {
 # Creates standard port groups across all ESXi hosts on vSwitch0
 # ==============================================================================
 module "network" {
-  source = "./modules/network"
+  source = "../../modules/network"
 
   datacenter_id       = data.vsphere_datacenter.datacenter.id
   esxi_hosts          = var.esxi_hosts
@@ -95,7 +95,7 @@ data "vsphere_network" "networks" {
 # Module: Compute Provisioning (Customized Virtual Machines)
 # ==============================================================================
 module "compute" {
-  source = "./modules/compute"
+  source = "../../modules/compute"
 
   datacenter_id                   = data.vsphere_datacenter.datacenter.id
   resource_pool_id                = data.vsphere_compute_cluster.cluster.resource_pool_id
@@ -135,7 +135,7 @@ module "compute" {
 # Module: DRS Anti-Affinity Rule (Cluster Workload Separation)
 # ==============================================================================
 module "cluster_rules" {
-  source = "./modules/cluster_rules"
+  source = "../../modules/cluster_rules"
 
   compute_cluster_id  = data.vsphere_compute_cluster.cluster.id
   rule_name           = "elastic-cluster-anti-affinity"
@@ -151,10 +151,10 @@ module "cluster_rules" {
 
 # ==============================================================================
 # Dynamic Ansible Inventory Generation
-# Exports provisioned VM topology directly to ansible_test inventory
+# Exports provisioned VM topology directly to ansible inventory
 # ==============================================================================
 resource "local_file" "ansible_inventory" {
-  filename        = "${path.module}/../ansible_test/inventories/lab/hosts.yml"
+  filename        = "${path.module}/../../../ansible/products/elastic-stack/inventories/lab/hosts.yml"
   file_permission = "0644"
   content         = templatefile("${path.module}/templates/hosts.yml.tpl", {
     vms          = var.vms

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Secure In-Memory Packer Golden Image Build Wrapper (Decentralized Component)
-# - Run directly from inside packer_test directory: ./build_packer_secure.sh
+# - Run directly from inside packer directory: ./build.sh
 # - Extracts target vCenter topology directly from ./packer.pkrvars.hcl
 # - Prompts for vCenter & SSH passwords via masked terminal input (read -s -p)
 # - Exports credentials strictly in memory (PKR_VAR_* and GOVC_*)
@@ -14,17 +14,36 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PKRVARS="${SCRIPT_DIR}/packer.pkrvars.hcl"
 
+TEMPLATE_NAME="${1:-ubuntu-24.04}"
+if [[ "${TEMPLATE_NAME}" == "--template" ]]; then
+    TEMPLATE_NAME="${2:-ubuntu-24.04}"
+fi
 
+if [[ -d "${SCRIPT_DIR}/templates/${TEMPLATE_NAME}" ]]; then
+    TEMPLATE_DIR="${SCRIPT_DIR}/templates/${TEMPLATE_NAME}"
+elif [[ -f "${SCRIPT_DIR}/ubuntu-24.04.pkr.hcl" ]]; then
+    TEMPLATE_DIR="${SCRIPT_DIR}"
+else
+    TEMPLATE_DIR="${SCRIPT_DIR}/templates/ubuntu-24.04"
+fi
+
+PKRVARS="${TEMPLATE_DIR}/packer.pkrvars.hcl"
 
 echo "=============================================================================="
 echo "He thong dieu phoi dong goi Template Packer an toan In-Memory"
+echo "Template: ${TEMPLATE_NAME} (${TEMPLATE_DIR})"
 echo "=============================================================================="
 
 if [[ ! -f "${PKRVARS}" ]]; then
     echo "Loi: Khong tim thay file cau hinh tai: ${PKRVARS}" >&2
     exit 1
+fi
+
+# Tu dong khoi tao user-data tu example neu chua ton tai
+if [[ ! -f "${TEMPLATE_DIR}/http/user-data" && -f "${TEMPLATE_DIR}/http/user-data.example" ]]; then
+    echo "Phat hien chua co user-data. Dang tu dong tao tu template example..."
+    cp "${TEMPLATE_DIR}/http/user-data.example" "${TEMPLATE_DIR}/http/user-data"
 fi
 
 # 1. Trich xuat thong so vCenter tu file cau hinh
@@ -102,7 +121,7 @@ if command -v govc &>/dev/null; then
 fi
 
 # 5. Kiem tra cu phap Packer
-cd "${SCRIPT_DIR}"
+cd "${TEMPLATE_DIR}"
 echo "Cai dat plugin va kiem tra tinh hop le cua cau hinh Packer..."
 packer init .
 packer validate -var-file="${PKRVARS}" .

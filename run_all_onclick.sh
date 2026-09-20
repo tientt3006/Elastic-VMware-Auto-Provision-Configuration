@@ -6,22 +6,23 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="${SCRIPT_DIR}/deploy_$(date +%Y%m%d_%H%M%S).log"
-PKR_FILE="${SCRIPT_DIR}/packer_test/packer.pkrvars.hcl"
-TF_FILE="${SCRIPT_DIR}/terraform_test/terraform.tfvars"
-ANS_FILE="${SCRIPT_DIR}/ansible_test/inventories/lab/hosts.yml"
-ANS_VARS_FILE="${SCRIPT_DIR}/ansible_test/inventories/lab/group_vars/all/main.yml"
-USER_DATA_FILE="${SCRIPT_DIR}/packer_test/http/user-data"
+PKR_FILE="${SCRIPT_DIR}/packer/templates/ubuntu-24.04/packer.pkrvars.hcl"
+TF_FILE="${SCRIPT_DIR}/terraform/profiles/elastic-stack/terraform.tfvars"
+ANS_FILE="${SCRIPT_DIR}/ansible/products/elastic-stack/inventories/lab/hosts.yml"
+ANS_VARS_FILE="${SCRIPT_DIR}/ansible/products/elastic-stack/inventories/lab/group_vars/all/main.yml"
+USER_DATA_FILE="${SCRIPT_DIR}/packer/templates/ubuntu-24.04/http/user-data"
 VARS_CONF="${SCRIPT_DIR}/vars.conf"
 
 # Cấp quyền thực thi cho toàn bộ script con
-chmod +x "${SCRIPT_DIR}/packer_test/build_packer_secure.sh" \
-         "${SCRIPT_DIR}/terraform_test/run_provision_secure.sh" \
-         "${SCRIPT_DIR}/ansible_test/run_ansible_secure.sh" \
-         "${SCRIPT_DIR}/ansible_test/run_observability_setup.sh" \
-         "${SCRIPT_DIR}/automation_seed/download_iso.sh" \
-         "${SCRIPT_DIR}/automation_seed/upload_iso_to_vcenter.sh" \
-         "${SCRIPT_DIR}/automation_seed/setup_automation_env.sh" \
-         "${SCRIPT_DIR}/automation_seed/manage_vsphere_observability.sh"
+chmod +x "${SCRIPT_DIR}/packer/build.sh" \
+         "${SCRIPT_DIR}/terraform/profiles/elastic-stack/run.sh" \
+         "${SCRIPT_DIR}/ansible/products/elastic-stack/run_deploy.sh" \
+         "${SCRIPT_DIR}/ansible/products/elastic-stack/run_observability.sh" \
+         "${SCRIPT_DIR}/ansible/products/elastic-stack/run_backup.sh" \
+         "${SCRIPT_DIR}/seed/download_iso.sh" \
+         "${SCRIPT_DIR}/seed/upload_iso.sh" \
+         "${SCRIPT_DIR}/seed/setup_env.sh" \
+         "${SCRIPT_DIR}/seed/manage_vsphere_observability.sh" 2>/dev/null || true
 
 # ==============================================================================
 # 0. Mở tmux session nếu chưa ở trong tmux
@@ -224,8 +225,8 @@ configure_templates() {
         echo "ssh_public_key = \"${SSH_PUB_KEY}\"" >> "${TF_FILE}"
     fi
 
-    if [[ -f "${SCRIPT_DIR}/ansible_test/ansible.cfg" ]]; then
-        sed -i -E "s/(remote_user\s*=\s*).*/\1${SSH_USER}/" "${SCRIPT_DIR}/ansible_test/ansible.cfg"
+    if [[ -f "${SCRIPT_DIR}/ansible/ansible.cfg" ]]; then
+        sed -i -E "s/(remote_user\s*=\s*).*/\1${SSH_USER}/" "${SCRIPT_DIR}/ansible/ansible.cfg"
     fi
 
     if [[ -f "${ANS_FILE}" ]]; then
@@ -343,7 +344,7 @@ run_iso_menu() {
                 ;;
             1)
                 echo "-> Tải ISO từ Internet..."
-                cd "${SCRIPT_DIR}/automation_seed"
+                cd "${SCRIPT_DIR}/seed"
                 ./download_iso.sh --ubuntu
                 local ISO_LOCAL_FILE="./iso_cache/ubuntu-24.04.5-live-server-amd64.iso"
                 if [[ ! -f "${ISO_LOCAL_FILE}" ]]; then
@@ -432,8 +433,8 @@ run_packer() {
     echo "=============================================================================="
     echo "TIẾN TRÌNH: ĐÓNG GÓI GOLDEN TEMPLATE (PACKER)"
     echo "=============================================================================="
-    cd "${SCRIPT_DIR}/packer_test"
-    ./build_packer_secure.sh
+    cd "${SCRIPT_DIR}/packer"
+    ./build.sh
 
     # Đồng bộ tên template sang Terraform
     local TEMPLATE_NAME=$(grep -E '^\s*vm_name\s*=' "${PKR_FILE}" | head -n 1 | cut -d'"' -f2)
@@ -470,7 +471,7 @@ run_terraform() {
     if grep -v '^\s*#' "${TF_FILE}" | grep -q -E '<[A-Z0-9_]+>'; then
         echo "CẢNH BÁO: File ${TF_FILE} vẫn còn chứa biến chưa được gán giá trị (ví dụ: <ESXI_HOST_01>)."
         echo "Vì bạn muốn cấu hình thủ công cho các tham số mở rộng (như IP host vật lý), vui lòng:"
-        echo "  1. Mở file: terraform_test/terraform.tfvars"
+        echo "  1. Mở file: terraform/profiles/elastic-stack/terraform.tfvars"
         echo "  2. Tìm và thay thế các chuỗi <...> bằng giá trị thực tế của bạn."
         echo "  3. Lưu file lại."
         read -p "Sau khi sửa xong file, nhấn Enter tại đây để tiếp tục chạy Terraform..."
@@ -482,8 +483,8 @@ run_terraform() {
     echo "=============================================================================="
     echo "TIẾN TRÌNH: KHỞI TẠO HẠ TẦNG VSPHERE (TERRAFORM)"
     echo "=============================================================================="
-    cd "${SCRIPT_DIR}/terraform_test"
-    ./run_provision_secure.sh
+    cd "${SCRIPT_DIR}/terraform/profiles/elastic-stack"
+    ./run.sh
 }
 
 run_ansible() {
@@ -515,14 +516,14 @@ run_ansible() {
     echo "=============================================================================="
     echo "TIẾN TRÌNH: CẤU HÌNH ỨNG DỤNG (ANSIBLE ELASTIC STACK)"
     echo "=============================================================================="
-    cd "${SCRIPT_DIR}/ansible_test"
-    ./run_ansible_secure.sh
+    cd "${SCRIPT_DIR}/ansible/products/elastic-stack"
+    ./run_deploy.sh
 
     echo ""
     echo "=============================================================================="
     echo "TIẾN TRÌNH: KÍCH HOẠT QUAN SÁT TẬP TRUNG (OBSERVABILITY)"
     echo "=============================================================================="
-    ./run_observability_setup.sh
+    ./run_observability.sh
 }
 
 run_vsphere_observability() {
@@ -541,7 +542,7 @@ run_vsphere_observability() {
     echo "=============================================================================="
     echo "TIẾN TRÌNH: TÍCH HỢP GIÁM SÁT HẠ TẦNG VMWARE VSPHERE"
     echo "=============================================================================="
-    "${SCRIPT_DIR}/automation_seed/manage_vsphere_observability.sh" apply
+    "${SCRIPT_DIR}/seed/manage_vsphere_observability.sh" apply
 }
 
 run_vsphere_rollback() {
@@ -549,7 +550,7 @@ run_vsphere_rollback() {
     echo "=============================================================================="
     echo "TIẾN TRÌNH: HOÀN TÁC GIÁM SÁT HẠ TẦNG VMWARE VSPHERE (ROLLBACK)"
     echo "=============================================================================="
-    "${SCRIPT_DIR}/automation_seed/manage_vsphere_observability.sh" rollback
+    "${SCRIPT_DIR}/seed/manage_vsphere_observability.sh" rollback
 }
 
 # ==============================================================================

@@ -35,13 +35,13 @@ Tài liệu này đặc tả kế hoạch triển khai, checklist điều kiện
 ### 1.3. Luồng điều phối toàn trình
 ```text
 [Trạm WSL/Linux]
- ├── 0. automation_seed: Setup công cụ + Tải ISO lên Datastore
- ├── 1. packer_test: Tạo tpl-ubuntu-2404-golden (Autoinstall)
- ├── 2. terraform_test: Tạo Network, VM, DRS Rules -> Sinh inventory
- ├── 3. ansible_test: Cài Elasticsearch HA + Kibana Gateway
- ├── 4. ansible_test: Cấu hình ILM, Fleet Server, FortiGate Syslog, Enroll Agents
- ├── 5. vsphere_observability: Tích hợp giám sát VMware vCenter & ESXi
- └── 6. backup_restore: Cấu hình SLM Backup & Restore
+ ├── 0. seed: Setup công cụ + Tải ISO lên Datastore
+ ├── 1. packer: Tạo tpl-ubuntu-2404-golden (Autoinstall)
+ ├── 2. terraform/profiles/elastic-stack: Tạo Network, VM, DRS Rules -> Sinh inventory
+ ├── 3. ansible/products/elastic-stack: Cài Elasticsearch HA + Kibana Gateway
+ ├── 4. ansible/products/elastic-stack: Cấu hình ILM, Fleet Server, FortiGate Syslog, Enroll Agents
+ ├── 5. seed/manage_vsphere_observability.sh: Tích hợp giám sát VMware vCenter & ESXi
+ └── 6. ansible/products/elastic-stack/run_backup.sh: Cấu hình SLM Backup & Restore
 ```
 
 Menu điều phối tập trung tại `run_all_onclick.sh`:
@@ -108,7 +108,7 @@ Menu điều phối tập trung tại `run_all_onclick.sh`:
    - Triển khai Fleet Server trên Gateway và enroll Elastic Agent trên các node Elasticsearch.
 
 ### Giai đoạn 5: Tích hợp giám sát hạ tầng VMware vSphere
-1. **Thực thi**: Chọn tùy chọn `5` trong menu `run_all_onclick.sh` hoặc chạy `automation_seed/manage_vsphere_observability.sh apply`.
+1. **Thực thi**: Chọn tùy chọn `5` trong menu `run_all_onclick.sh` hoặc chạy `seed/manage_vsphere_observability.sh apply`.
 2. **Tiến trình**:
    - Cài đặt và kích hoạt Elastic package `vsphere` trên Kibana.
    - Cấu hình luồng Metrics (Datastore, Host, Cluster, VM) thông qua vCenter SDK.

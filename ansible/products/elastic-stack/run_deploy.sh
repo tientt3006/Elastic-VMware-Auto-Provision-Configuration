@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Secure In-Memory Ansible Deployment Wrapper (Decentralized Component)
-# - Run directly from inside ansible_test directory: ./run_ansible_secure.sh
+# - Run directly from inside ansible/products/elastic-stack directory: ./run_deploy.sh
 # - Prompts for SSH, Sudo, and Elastic Stack passwords via masked terminal input
 # - Injects credentials into Ansible strictly in memory via extra-vars
 # - Automatically clears in-memory credentials upon exit via shell trap
@@ -10,9 +10,26 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+
+
 echo "=============================================================================="
 echo "Hệ thống điều phối triển khai Ansible an toàn In-Memory"
 echo "=============================================================================="
+
+# 0. Tu dong khoi tao cau hinh neu clone sang may moi
+INVENTORY_VARS_DIR="${SCRIPT_DIR}/inventories/lab/group_vars/all"
+if [[ ! -f "${INVENTORY_VARS_DIR}/main.yml" && -f "${INVENTORY_VARS_DIR}/main.yml.example" ]]; then
+    echo "Phat hien moi truong moi. Dang tu dong khoi tao cau hinh tu template..."
+    cp "${INVENTORY_VARS_DIR}/main.yml.example" "${INVENTORY_VARS_DIR}/main.yml"
+    
+    # Tu dong tao khoa ma hoa ngau nhien cho Kibana (>32 ky tu)
+    RANDOM_KEY=$(openssl rand -hex 24)
+    sed -i "s/CHANGE_ME_TO_A_LONG_RANDOM_VALUE_32_CHARS/${RANDOM_KEY}/g" "${INVENTORY_VARS_DIR}/main.yml"
+    
+    echo "Da tao file ${INVENTORY_VARS_DIR}/main.yml (Tu dong sinh kibana_encryption_key: ${RANDOM_KEY})."
+    echo "LUU Y: Kiem tra va cap nhat cac thong so mang/token trong file neu can."
+    echo "------------------------------------------------------------------------------"
+fi
 
 # 1. Nhap mat khau an tu terminal (Ho tro luu vet trong RAM)
 if [[ -n "${SSH_PASS:-}" ]]; then
@@ -57,7 +74,7 @@ fi
 
 # 2. Yêu cầu xác nhận trước khi chạy
 echo "------------------------------------------------------------------------------"
-read -p "Xác nhận bắt đầu cấu hình Observability (Fleet/ILM)? (Y/n): " CONFIRM
+read -p "Xác nhận bắt đầu triển khai cụm Elastic Stack? (Y/n): " CONFIRM
 CONFIRM="${CONFIRM%$'\r'}"
 CONFIRM=${CONFIRM:-Y}
 if [[ ! "${CONFIRM}" =~ ^[yY]([eE][sS])?$ ]]; then
@@ -72,10 +89,10 @@ fi
 
 # 4. Thực thi Ansible Playbook
 cd "${SCRIPT_DIR}"
-export ANSIBLE_CONFIG="${SCRIPT_DIR}/ansible.cfg"
+export ANSIBLE_CONFIG="${SCRIPT_DIR}/../../ansible.cfg"
 
 echo "=============================================================================="
-echo "Khởi chạy Master Playbook (site_observability.yml) cấu hình Observability..."
+echo "Khởi chạy Ansible playbook deploy_cluster.yml..."
 echo "=============================================================================="
 
-ansible-playbook playbooks/site_observability.yml -e "ansible_password=${SSH_PASS} ansible_become_password=${SUDO_PASS} elastic_password=${ELASTIC_PASS} kibana_system_password=${KIBANA_PASS}"
+ansible-playbook playbooks/deploy_cluster.yml -e "ansible_password=${SSH_PASS} ansible_become_password=${SUDO_PASS} elastic_password=${ELASTIC_PASS} kibana_system_password=${KIBANA_PASS}"
