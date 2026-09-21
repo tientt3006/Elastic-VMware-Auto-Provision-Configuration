@@ -150,6 +150,48 @@ export PKR_VAR_vcenter_password="${VCENTER_PASS}"
 export PKR_VAR_ssh_password="${SSH_PASS}"
 export_govc_env "${VCENTER_SERVER}" "${VCENTER_USER}" "${VCENTER_PASS}"
 
+# Kiểm tra placeholder trong packer.pkrvars.hcl
+if grep -v '^\s*#' "${PKRVARS}" | grep -q -E '<[A-Z0-9_]+>'; then
+    log_warn "Tệp ${PKRVARS} vẫn còn chứa biến chưa được gán giá trị (ví dụ: <VCENTER_IP>)."
+    if ! confirm_action "Tiếp tục chạy Packer với cấu hình hiện tại?" "N"; then
+        log_info "Hủy tiến trình theo yêu cầu của người dùng."
+        exit 0
+    fi
+fi
+
+# Đồng bộ tài khoản và mật khẩu vào tệp user-data autoinstall nếu còn chứa placeholder
+USER_DATA_PATH="${TEMPLATE_DIR}/http/user-data"
+if [[ -f "${USER_DATA_PATH}" ]]; then
+    if grep -q "CHANGE_ME_PASSWORD_HASH" "${USER_DATA_PATH}" || grep -q "<SSH_USER>" "${USER_DATA_PATH}"; then
+        log_info "Đồng bộ tài khoản và mật khẩu mã hóa vào tệp user-data autoinstall..."
+        SSH_TARGET_USER=$(grep -E '^\s*ssh_username\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2 || true)
+        SSH_HASH=""
+        if command -v openssl &>/dev/null; then
+            SSH_HASH=$(openssl passwd -6 "${SSH_PASS}" 2>/dev/null || true)
+        fi
+        if [[ -z "${SSH_HASH}" ]]; then
+            SSH_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}" 2>/dev/null || true)
+        fi
+        if [[ -n "${SSH_HASH}" ]]; then
+            sed -i -E "s|(password:\s*\").*(\")|\1${SSH_HASH}\2|" "${USER_DATA_PATH}"
+        fi
+        if [[ -n "${SSH_TARGET_USER}" && "${SSH_TARGET_USER}" != *"<"*">"* ]]; then
+            sed -i -E "s/(username:\s*).*/\1${SSH_TARGET_USER}/" "${USER_DATA_PATH}"
+            sed -i "s|<SSH_USER>|${SSH_TARGET_USER}|g" "${USER_DATA_PATH}"
+        fi
+        PUB_KEY=""
+        if [[ -f "${HOME}/.ssh/id_ed25519.pub" ]]; then
+            PUB_KEY=$(cat "${HOME}/.ssh/id_ed25519.pub")
+        elif [[ -f "${HOME}/.ssh/id_rsa.pub" ]]; then
+            PUB_KEY=$(cat "${HOME}/.ssh/id_rsa.pub")
+        fi
+        if [[ -n "${PUB_KEY}" ]]; then
+            sed -i "s|<SSH_PUB_KEY>|${PUB_KEY}|g" "${USER_DATA_PATH}"
+        fi
+        log_success "Đã chuẩn bị thông tin xác thực an toàn trong user-data autoinstall."
+    fi
+fi
+
 # 5. Pre-flight Check và kiểm tra trùng lặp template trên vCenter
 if command -v govc &>/dev/null; then
     log_info "Đang xác thực kết nối vCenter qua govc API..."

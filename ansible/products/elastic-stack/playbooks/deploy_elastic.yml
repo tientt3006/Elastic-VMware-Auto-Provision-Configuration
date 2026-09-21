@@ -1,7 +1,0 @@
----
-- name: Install Docker and deploy Elasticsearch/Kibana
-  hosts: elastic_docker_host
-  become: true
-  roles:
-    - docker_engine
-    - elastic_stack_docker

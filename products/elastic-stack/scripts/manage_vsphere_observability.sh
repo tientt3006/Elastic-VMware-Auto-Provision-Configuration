@@ -263,7 +263,7 @@ run_fleet_ansible_integration() {
     cd "${REPO_ROOT}/ansible/products/elastic-stack"
     export ANSIBLE_CONFIG="${REPO_ROOT}/ansible/ansible.cfg"
 
-    ansible-playbook playbooks/configure_vsphere_observability.yml \
+    ansible-playbook -i inventories/lab/hosts.yml playbooks/configure_vsphere_observability.yml \
         -e "vcenter_server=${SITE_VCSA_IP} vcenter_readonly_user=${SVC_USER} vcenter_readonly_password=${SVC_PASS} elastic_password=${ELASTIC_PASS}"
 
     echo ""

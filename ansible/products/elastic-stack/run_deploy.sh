@@ -93,6 +93,8 @@ fi
 # 3. Kích hoạt Virtual Environment (nếu có)
 if [[ -f ~/.venvs/ansible-env/bin/activate ]]; then
     source ~/.venvs/ansible-env/bin/activate
+elif [[ -f /opt/venvs/ansible-env/bin/activate ]]; then
+    source /opt/venvs/ansible-env/bin/activate
 fi
 
 # 4. Thực thi Ansible Playbook
@@ -103,4 +105,4 @@ echo "==========================================================================
 echo "Khởi chạy Ansible playbook deploy_cluster.yml..."
 echo "=============================================================================="
 
-ansible-playbook playbooks/deploy_cluster.yml -e "ansible_password=${SSH_PASS} ansible_become_password=${SUDO_PASS} elastic_password=${ELASTIC_PASS} kibana_system_password=${KIBANA_PASS}"
+ansible-playbook -i inventories/lab/hosts.yml playbooks/deploy_cluster.yml -e "ansible_password=${SSH_PASS} ansible_become_password=${SUDO_PASS} elastic_password=${ELASTIC_PASS} kibana_system_password=${KIBANA_PASS}"

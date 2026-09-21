@@ -26,23 +26,38 @@
         - /etc/elastic-agent
         - /var/tmp/elastic-agent
 
-    - name: Check if Compose file exists
-      ansible.builtin.stat:
-        path: "{{ elastic_compose_dir | default('/opt/elastic-stack') }}/compose.yml"
-      register: compose_file
-
-    - name: Stop and remove Elastic Stack Docker containers
-      community.docker.docker_compose_v2:
-        project_src: "{{ elastic_compose_dir | default('/opt/elastic-stack') }}"
-        state: absent
-        remove_volumes: true
-      when: compose_file.stat.exists
+    - name: Stop and disable Kibana service if present
+      ansible.builtin.systemd:
+        name: kibana
+        state: stopped
+        enabled: false
       ignore_errors: true
 
-    - name: Remove Elastic Stack data and project directories
+    - name: Stop and disable Elasticsearch service if present
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: stopped
+        enabled: false
+      ignore_errors: true
+
+    - name: Remove native Elastic Stack packages and configuration
+      ansible.builtin.apt:
+        name:
+          - kibana
+          - elasticsearch
+        state: absent
+        purge: true
+      ignore_errors: true
+
+    - name: Remove Elastic Stack data and logs directories
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
       loop:
-        - "{{ elastic_compose_dir | default('/opt/elastic-stack') }}"
-        - "{{ elastic_data_dir | default('/var/lib/elastic-stack/elasticsearch') }}"
+        - /var/lib/elasticsearch
+        - /var/log/elasticsearch
+        - /etc/elasticsearch
+        - /etc/kibana
+        - /etc/systemd/system/elasticsearch.service.d
+        - /usr/local/bin/elastic-disk-pruner.sh
+        - /etc/cron.d/elastic-disk-pruner

@@ -51,6 +51,8 @@ fi
 # 2. Kich hoat Virtual Environment neu ton tai
 if [[ -f ~/.venvs/ansible-env/bin/activate ]]; then
     source ~/.venvs/ansible-env/bin/activate
+elif [[ -f /opt/venvs/ansible-env/bin/activate ]]; then
+    source /opt/venvs/ansible-env/bin/activate
 fi
 
 cd "${SCRIPT_DIR}"
@@ -77,7 +79,7 @@ case "${ACTION_CHOICE}" in
         echo "=============================================================================="
         echo "Khoi chay Playbook thiet lap Snapshot Repository & SLM Policy..."
         echo "=============================================================================="
-        ansible-playbook playbooks/setup_backup_repository.yml \
+        ansible-playbook -i inventories/lab/hosts.yml playbooks/setup_backup_repository.yml \
             -e "ansible_password=${SSH_PASS} ansible_become_password=${SUDO_PASS} elastic_password=${ELASTIC_PASS}"
         ;;
     2)
@@ -114,7 +116,7 @@ case "${ACTION_CHOICE}" in
         echo "=============================================================================="
         echo "Khoi chay Playbook restore_snapshot.yml..."
         echo "=============================================================================="
-        ansible-playbook playbooks/restore_snapshot.yml \
+        ansible-playbook -i inventories/lab/hosts.yml playbooks/restore_snapshot.yml \
             -e "snapshot_to_restore=${TARGET_SNAP} elastic_password=${ELASTIC_PASS}"
         ;;
     4)
