@@ -47,3 +47,6 @@ backup_pre_refactor_gd1/
 ansible/products/*/inventories/*/hosts.yml
 ansible/products/*/inventories/*/group_vars/all/main.yml
 packer/templates/*/http/user-data
+
+# Execution and deploy logs
+*.log
