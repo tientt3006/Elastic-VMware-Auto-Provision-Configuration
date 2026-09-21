@@ -128,7 +128,43 @@ if [[ ! -f "${PKRVARS}" ]]; then
     exit 1
 fi
 
-# 3. Trích xuất thông số vCenter từ tệp cấu hình
+# 3. Kiểm tra liên tục các thông số chưa điền (placeholder) trong packer.pkrvars.hcl
+while true; do
+    placeholders=()
+    mapfile -t placeholders < <(grep -v '^\s*#' "${PKRVARS}" | grep -o -E '<[A-Z0-9_]+>' | sort -u || true)
+    
+    if [[ ${#placeholders[@]} -gt 0 ]]; then
+        echo ""
+        log_warn "Tệp ${PKRVARS} vẫn còn các trường thông số mẫu chưa được điền:"
+        for p in "${placeholders[@]}"; do
+            echo "  - ${p}"
+        done
+        echo ""
+        echo "Vui lòng mở tệp sau để cập nhật thông số hạ tầng thực tế:"
+        echo "  ${PKRVARS}"
+        echo ""
+        echo "Hướng dẫn:"
+        echo "  - Mở tệp trên trong trình soạn thảo, hoàn thiện thông số và lưu lại."
+        echo "  - Quay lại terminal này và nhấn [Enter] để hệ thống kiểm tra lại."
+        echo "  - Nhập 'q' hoặc '0' và nhấn [Enter] nếu muốn hủy và quay lại menu."
+        echo ""
+        WAIT_INPUT=""
+        if ! read -r -p "Nhấn Enter để kiểm tra lại (hoặc 'q' để hủy): " WAIT_INPUT; then
+            echo ""
+            exit 0
+        fi
+        WAIT_INPUT="${WAIT_INPUT%$'\r'}"
+        if [[ "${WAIT_INPUT}" == "q" || "${WAIT_INPUT}" == "Q" || "${WAIT_INPUT}" == "0" ]]; then
+            log_info "Hủy tiến trình theo yêu cầu của người dùng."
+            exit 0
+        fi
+    else
+        log_success "Đã xác nhận cấu hình ${PKRVARS} hợp lệ (không còn biến placeholder)."
+        break
+    fi
+done
+
+# 4. Trích xuất thông số vCenter từ tệp cấu hình
 VCENTER_SERVER=$(grep -E '^\s*vcenter_server\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2 || true)
 VCENTER_USER=$(grep -E '^\s*vcenter_user\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2 || true)
 VM_NAME=$(grep -E '^\s*vm_name\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2 || true)
@@ -137,7 +173,7 @@ log_info "Máy chủ vCenter: ${VCENTER_SERVER}"
 log_info "Tài khoản:       ${VCENTER_USER}"
 log_info "Tên VM Template: ${VM_NAME}"
 
-# 4. Thu thập mật khẩu an toàn vào bộ nhớ RAM
+# 5. Thu thập mật khẩu an toàn vào bộ nhớ RAM
 if [[ -z "${VCENTER_PASS:-}" ]]; then
     prompt_password "VCENTER_PASS" "Nhập mật khẩu quản trị vCenter" || exit 1
 fi
@@ -149,15 +185,6 @@ fi
 export PKR_VAR_vcenter_password="${VCENTER_PASS}"
 export PKR_VAR_ssh_password="${SSH_PASS}"
 export_govc_env "${VCENTER_SERVER}" "${VCENTER_USER}" "${VCENTER_PASS}"
-
-# Kiểm tra placeholder trong packer.pkrvars.hcl
-if grep -v '^\s*#' "${PKRVARS}" | grep -q -E '<[A-Z0-9_]+>'; then
-    log_warn "Tệp ${PKRVARS} vẫn còn chứa biến chưa được gán giá trị (ví dụ: <VCENTER_IP>)."
-    if ! confirm_action "Tiếp tục chạy Packer với cấu hình hiện tại?" "N"; then
-        log_info "Hủy tiến trình theo yêu cầu của người dùng."
-        exit 0
-    fi
-fi
 
 # Đồng bộ tài khoản và mật khẩu vào tệp user-data autoinstall nếu còn chứa placeholder
 USER_DATA_PATH="${TEMPLATE_DIR}/http/user-data"

@@ -99,7 +99,7 @@ variable "default_dns_servers" {
 variable "ssh_username" {
   description = "The OS username used for SSH administration."
   type        = string
-  default     = "sysops"
+  default     = ""
 }
 
 variable "ssh_public_key" {

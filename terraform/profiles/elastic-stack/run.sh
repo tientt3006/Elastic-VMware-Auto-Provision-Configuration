@@ -32,14 +32,50 @@ if [[ ! -f "${TFVARS}" ]]; then
     exit 1
 fi
 
-# 1. Trích xuất thông số máy chủ trực tiếp từ terraform.tfvars
+# 1. Kiểm tra liên tục các thông số chưa điền (placeholder) trong terraform.tfvars
+while true; do
+    placeholders=()
+    mapfile -t placeholders < <(grep -v '^\s*#' "${TFVARS}" | grep -o -E '<[A-Z0-9_]+>' | sort -u || true)
+    
+    if [[ ${#placeholders[@]} -gt 0 ]]; then
+        echo ""
+        log_warn "Tệp ${TFVARS} vẫn còn các trường thông số mẫu chưa được điền:"
+        for p in "${placeholders[@]}"; do
+            echo "  - ${p}"
+        done
+        echo ""
+        echo "Vui lòng mở tệp sau để cập nhật thông số hạ tầng thực tế:"
+        echo "  ${TFVARS}"
+        echo ""
+        echo "Hướng dẫn:"
+        echo "  - Mở tệp trên trong trình soạn thảo, hoàn thiện thông số và lưu lại."
+        echo "  - Quay lại terminal này và nhấn [Enter] để hệ thống kiểm tra lại."
+        echo "  - Nhập 'q' hoặc '0' và nhấn [Enter] nếu muốn hủy và quay lại menu."
+        echo ""
+        WAIT_INPUT=""
+        if ! read -r -p "Nhấn Enter để kiểm tra lại (hoặc 'q' để hủy): " WAIT_INPUT; then
+            echo ""
+            exit 0
+        fi
+        WAIT_INPUT="${WAIT_INPUT%$'\r'}"
+        if [[ "${WAIT_INPUT}" == "q" || "${WAIT_INPUT}" == "Q" || "${WAIT_INPUT}" == "0" ]]; then
+            log_info "Hủy tiến trình theo yêu cầu của người dùng."
+            exit 0
+        fi
+    else
+        log_success "Đã xác nhận cấu hình ${TFVARS} hợp lệ (không còn biến placeholder)."
+        break
+    fi
+done
+
+# 2. Trích xuất thông số máy chủ trực tiếp từ terraform.tfvars
 VSPHERE_SERVER=$(grep -E '^\s*vsphere_server\s*=' "${TFVARS}" | head -n 1 | cut -d'"' -f2 || true)
 VSPHERE_USER=$(grep -E '^\s*vsphere_user\s*=' "${TFVARS}" | head -n 1 | cut -d'"' -f2 || true)
 
 log_info "Máy chủ vCenter: ${VSPHERE_SERVER}"
 log_info "Tài khoản:       ${VSPHERE_USER}"
 
-# 2. Nhập mật khẩu ẩn từ terminal (Hỗ trợ lưu trong RAM)
+# 3. Nhập mật khẩu ẩn từ terminal (Hỗ trợ lưu trong RAM)
 VSPHERE_PASSWORD="${VCENTER_PASS:-${VSPHERE_PASSWORD:-}}"
 
 if [[ -n "${VSPHERE_PASSWORD:-}" ]]; then

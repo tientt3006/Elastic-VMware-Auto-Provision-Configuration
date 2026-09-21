@@ -76,6 +76,7 @@ resource "vsphere_virtual_machine" "vm" {
         hostname: ${each.value.hostname}
         fqdn: ${each.value.hostname}.${coalesce(each.value.domain_name, var.default_domain_name)}
         manage_etc_hosts: true
+%{ if var.ssh_username != "" && !can(regex("<.*>", var.ssh_username)) && var.ssh_public_key != "" && !can(regex("<.*>", var.ssh_public_key)) ~}
 
         runcmd:
           - mkdir -p /home/${var.ssh_username}/.ssh
@@ -84,6 +85,7 @@ resource "vsphere_virtual_machine" "vm" {
           - chown -R ${var.ssh_username}:${var.ssh_username} /home/${var.ssh_username}/.ssh
           - chmod 700 /home/${var.ssh_username}/.ssh
           - chmod 600 /home/${var.ssh_username}/.ssh/authorized_keys
+%{ endif ~}
       EOF
       )
       "guestinfo.userdata.encoding"  = "base64"

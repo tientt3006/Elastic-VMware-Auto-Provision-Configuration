@@ -37,18 +37,50 @@ if [[ ! -f "${TFVARS}" ]]; then
     fi
 fi
 
-# 1. Trích xuất thông số vCenter từ terraform.tfvars
+# 1. Kiểm tra liên tục các thông số chưa điền (placeholder) trong terraform.tfvars
+while true; do
+    placeholders=()
+    mapfile -t placeholders < <(grep -v '^\s*#' "${TFVARS}" | grep -o -E '<[A-Z0-9_]+>' | sort -u || true)
+    
+    if [[ ${#placeholders[@]} -gt 0 ]]; then
+        echo ""
+        log_warn "Tệp ${TFVARS} vẫn còn các trường thông số mẫu chưa được điền:"
+        for p in "${placeholders[@]}"; do
+            echo "  - ${p}"
+        done
+        echo ""
+        echo "Vui lòng mở tệp sau để cập nhật thông số hạ tầng thực tế:"
+        echo "  ${TFVARS}"
+        echo ""
+        echo "Hướng dẫn:"
+        echo "  - Mở tệp trên trong trình soạn thảo, hoàn thiện thông số và lưu lại."
+        echo "  - Quay lại terminal này và nhấn [Enter] để hệ thống kiểm tra lại."
+        echo "  - Nhập 'q' hoặc '0' và nhấn [Enter] nếu muốn hủy và quay lại menu."
+        echo ""
+        WAIT_INPUT=""
+        if ! read -r -p "Nhấn Enter để kiểm tra lại (hoặc 'q' để hủy): " WAIT_INPUT; then
+            echo ""
+            exit 0
+        fi
+        WAIT_INPUT="${WAIT_INPUT%$'\r'}"
+        if [[ "${WAIT_INPUT}" == "q" || "${WAIT_INPUT}" == "Q" || "${WAIT_INPUT}" == "0" ]]; then
+            log_info "Hủy tiến trình theo yêu cầu của người dùng."
+            exit 0
+        fi
+    else
+        log_success "Đã xác nhận cấu hình ${TFVARS} hợp lệ (không còn biến placeholder)."
+        break
+    fi
+done
+
+# 2. Trích xuất thông số vCenter từ terraform.tfvars
 VSPHERE_SERVER=$(grep -E '^\s*vsphere_server\s*=' "${TFVARS}" | head -n 1 | cut -d'"' -f2 || true)
 VSPHERE_USER=$(grep -E '^\s*vsphere_user\s*=' "${TFVARS}" | head -n 1 | cut -d'"' -f2 || true)
-
-if [[ -z "${VSPHERE_SERVER}" || "${VSPHERE_SERVER}" == *"<"*">"* ]]; then
-    log_warn "Biến vsphere_server trong ${TFVARS} chưa được cấu hình hợp lệ."
-fi
 
 log_info "Máy chủ vCenter: ${VSPHERE_SERVER}"
 log_info "Tài khoản:       ${VSPHERE_USER}"
 
-# 2. Thu thập mật khẩu vCenter vào bộ nhớ RAM
+# 3. Thu thập mật khẩu vCenter vào bộ nhớ RAM
 VSPHERE_PASSWORD="${VCENTER_PASS:-${VSPHERE_PASSWORD:-}}"
 if [[ -z "${VSPHERE_PASSWORD}" ]]; then
     prompt_password "VSPHERE_PASSWORD" "Nhập mật khẩu vCenter" || exit 1
@@ -57,7 +89,7 @@ fi
 export TF_VAR_vsphere_password="${VSPHERE_PASSWORD}"
 export_govc_env "${VSPHERE_SERVER}" "${VSPHERE_USER}" "${VSPHERE_PASSWORD}"
 
-# 3. Pre-flight check kiểm tra kết nối vCenter
+# 4. Pre-flight check kiểm tra kết nối vCenter
 if command -v govc &>/dev/null; then
     log_info "Đang kiểm tra kết nối tới vCenter qua govc API..."
     if ! check_vsphere_connectivity; then
@@ -65,15 +97,6 @@ if command -v govc &>/dev/null; then
         exit 1
     fi
     log_success "Xác thực kết nối vCenter thành công."
-fi
-
-# 4. Kiểm tra placeholder trong terraform.tfvars
-if grep -v '^\s*#' "${TFVARS}" | grep -q -E '<[A-Z0-9_]+>'; then
-    log_warn "Tệp ${TFVARS} vẫn còn chứa biến chưa được gán giá trị (ví dụ: <VCENTER_IP_OR_FQDN>)."
-    if ! confirm_action "Tiếp tục chạy Terraform với cấu hình hiện tại?" "N"; then
-        log_info "Hủy tiến trình theo yêu cầu của người dùng."
-        exit 0
-    fi
 fi
 
 cd "${SCRIPT_DIR}"
