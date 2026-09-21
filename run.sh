@@ -138,9 +138,9 @@ while true; do
     echo "=============================================================================="
     echo "1) Công cụ nền tảng (Platform Tools: Packer, Terraform, ISO, Seed)"
     echo "2) Triển khai Elastic Stack (SIEM, Observability, Fleet HA)"
-    echo "3) Triển khai Zabbix Server             [Dự kiến phát triển]"
-    echo "4) Triển khai HAProxy / Load Balancer   [Dự kiến phát triển]"
-    echo "5) Triển khai dịch vụ hạ tầng mạng     [Dự kiến phát triển]"
+    echo "3) Triển khai Zabbix Server             [Khung mở rộng]"
+    echo "4) Triển khai HAProxy / Load Balancer   [Khung mở rộng]"
+    echo "5) Triển khai dịch vụ hạ tầng mạng     [Khung mở rộng]"
     echo "0) Thoát chương trình"
     if ! read -r -p "Vui lòng chọn (0-5) [2]: " TOP_CHOICE; then
         echo ""
@@ -161,13 +161,22 @@ while true; do
             run_elastic_menu
             ;;
         3)
-            log_info "Tính năng triển khai Zabbix Server đang trong lộ trình phát triển."
+            # Nạp và khởi chạy menu Zabbix
+            # shellcheck source=products/zabbix/menu.sh
+            source "${REPO_ROOT}/products/zabbix/menu.sh"
+            run_zabbix_menu
             ;;
         4)
-            log_info "Tính năng triển khai HAProxy đang trong lộ trình phát triển."
+            # Nạp và khởi chạy menu HAProxy
+            # shellcheck source=products/haproxy/menu.sh
+            source "${REPO_ROOT}/products/haproxy/menu.sh"
+            run_haproxy_menu
             ;;
         5)
-            log_info "Tính năng triển khai dịch vụ hạ tầng mạng đang trong lộ trình phát triển."
+            # Nạp và khởi chạy menu Dịch vụ hạ tầng mạng
+            # shellcheck source=products/infra-services/menu.sh
+            source "${REPO_ROOT}/products/infra-services/menu.sh"
+            run_infra_services_menu
             ;;
         0)
             log_info "Thoát chương trình."

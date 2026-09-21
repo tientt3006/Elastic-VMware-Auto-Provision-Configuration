@@ -1,0 +1,15 @@
+---
+# ==============================================================================
+# Playbook: Deploy HAProxy & Keepalived Load Balancer Cluster (Scaffold)
+# ==============================================================================
+- name: Deploy HAProxy and Keepalived
+  hosts: haproxy_cluster
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Ping target host
+      ansible.builtin.ping:
+
+    - name: Display deployment readiness status
+      ansible.builtin.debug:
+        msg: "HAProxy node {{ inventory_hostname }} is reachable and ready for cluster configuration."

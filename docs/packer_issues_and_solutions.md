@@ -52,7 +52,7 @@ Plugin `vsphere-iso` tiêu chuẩn của Packer không tích hợp sẵn cơ ch�
    search_spec = vim.host.DatastoreBrowser.SearchSpec()
    search_spec.matchPattern = ["*ubuntu-24.04*.iso"]
    ```
-2. Cập nhật đường dẫn tuyệt đối đã phân giải vào file cấu hình [packer.pkrvars.hcl](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/packer_test/packer.pkrvars.hcl):
+2. Cập nhật đường dẫn tuyệt đối đã phân giải vào file cấu hình [packer.pkrvars.hcl](file:///d:/neit_ng/prjs_i/auto_provision_configuration/packer/templates/ubuntu-24.04/packer.pkrvars.hcl):
    ```hcl
    iso_paths = [
      "[DS_100_3] contentlib-a0bc3584-8b7c-40cc-b2fd-bae7a6b9bf6c/befc5a25-2315-479a-833a-2cc168de715c/ubuntu-24.04.4-live-server-amd64_58a8cfa8-32e5-437c-b161-b18e4dc8d7aa.iso"

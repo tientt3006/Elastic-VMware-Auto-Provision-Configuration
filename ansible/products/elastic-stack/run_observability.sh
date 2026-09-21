@@ -10,6 +10,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+cleanup() {
+    echo ""
+    echo "Dọn dẹp thông tin bí mật khỏi bộ nhớ RAM..."
+    unset SSH_PASS SUDO_PASS ELASTIC_PASS KIBANA_PASS || true
+    echo "Hoàn tất dọn dẹp."
+}
+trap cleanup EXIT INT TERM
+
 echo "=============================================================================="
 echo "Hệ thống điều phối triển khai Ansible an toàn In-Memory"
 echo "=============================================================================="

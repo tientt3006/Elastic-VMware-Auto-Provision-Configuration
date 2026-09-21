@@ -24,34 +24,29 @@ Hệ thống phân tán trên 4 máy ảo chuyên dụng:
 ## 2. Cấu trúc thư mục dự án
 
 ```text
-ansible_test/
+ansible/
 ├── ansible.cfg                                     # Cấu hình môi trường thực thi Ansible
-├── run_ansible_secure.sh                           # Kịch bản triển khai cụm lõi với cơ chế tiêm mật khẩu RAM
-├── run_observability_setup.sh                      # Kịch bản tự động hóa 100% hệ thống quan sát Day-2
-├── run_backup_restore.sh                           # Kịch bản điều phối sao lưu và phục hồi thảm họa an toàn
-├── 01_runbook.md                                   # Sổ tay các bước thực thi và kiểm tra hệ thống
-├── 02_deployment_guide_and_troubleshooting.md      # Hướng dẫn chi tiết và cẩm nang xử lý sự cố kỹ thuật
-├── inventories/
-│   └── lab/
-│       ├── hosts.yml                               # Định nghĩa địa chỉ IP, phân nhóm và vai trò nút (tự sinh từ Terraform)
-│       └── group_vars/all/main.yml                 # Khai báo các tham số cấu hình chung của hệ thống
-├── playbooks/
-│   ├── site.yml                                    # Master playbook gọi toàn bộ quy trình triển khai
-│   ├── deploy_cluster.yml                          # Triển khai cụm Elasticsearch HA và Kibana Gateway
-│   ├── site_observability.yml                      # Master playbook điều phối cấu hình Observability
-│   ├── configure_stack_policies.yml                # Cấu hình ILM, Fleet Agent Policies và Integrations
-│   ├── deploy_fleet_server.yml                     # Cài đặt Fleet Server trên srv-kibana-gw
-│   ├── enroll_agents.yml                           # Ghi danh tự động Elastic Agent trên các nút dữ liệu
-│   ├── setup_backup_repository.yml                 # Đăng ký Snapshot Repository và cấu hình SLM tự động
-│   ├── restore_snapshot.yml                        # Tự động đóng index và khôi phục dữ liệu từ snapshot chỉ định
-│   └── teardown.yml                                # Playbook gỡ bỏ sạch sẽ toàn bộ môi trường
-└── roles/
-    ├── elastic_cluster/                            # Cài đặt Elasticsearch, khởi tạo mTLS PKI và đặt mật khẩu
-    ├── kibana_fleet_gateway/                       # Cài đặt và cấu hình Kibana Web Interface
-    ├── elastic_stack_config/                       # Thiết lập ILM, Fleet API và các gói tích hợp
-    ├── fleet_server/                               # Sinh Service Token và khởi chạy Fleet Server native
-    ├── elastic_agent/                              # Cài đặt và ghi danh Elastic Agent vào Fleet
-    └── elastic_backup_restore/                     # Quản lý kho lưu trữ snapshot, quyền hệ thống, API SLM và Restore
+├── requirements.yml                                # Phụ thuộc Galaxy Collections
+└── products/
+    └── elastic-stack/
+        ├── run_deploy.sh                           # Kịch bản triển khai cụm lõi với cơ chế tiêm mật khẩu RAM
+        ├── run_observability.sh                    # Kịch bản tự động hóa 100% hệ thống quan sát Day-2
+        ├── run_backup.sh                           # Kịch bản điều phối sao lưu và phục hồi thảm họa an toàn
+        ├── inventories/
+        │   └── lab/
+        │       ├── hosts.yml                       # Định nghĩa địa chỉ IP, phân nhóm và vai trò nút (tự sinh từ Terraform)
+        │       └── group_vars/all/main.yml         # Khai báo các tham số cấu hình chung của hệ thống
+        ├── playbooks/
+        │   ├── deploy_cluster.yml                  # Triển khai cụm Elasticsearch HA và Kibana Gateway
+        │   ├── setup_observability.yml             # Triển khai Fleet Server, Policies và Integrations
+        │   └── backup_restore.yml                  # Quản lý sao lưu snapshot và phục hồi
+        └── roles/
+            ├── ca_setup/
+            ├── elasticsearch/
+            ├── kibana/
+            ├── fleet_server/
+            ├── agent_integration/
+            └── elastic_observability/
 ```
 
 ---
@@ -61,7 +56,7 @@ ansible_test/
 ### Bước 1: Kích hoạt môi trường thực thi trên WSL
 
 ```bash
-cd /mnt/d/neit_ng/prjs_i/auto_provision_configuration/ansible_test
+cd /mnt/d/neit_ng/prjs_i/auto_provision_configuration/ansible/products/elastic-stack
 source ~/.venvs/ansible-env/bin/activate
 ```
 
@@ -70,7 +65,7 @@ source ~/.venvs/ansible-env/bin/activate
 Thực thi kịch bản bọc bảo mật để cài đặt cụm dịch vụ lõi:
 
 ```bash
-./run_ansible_secure.sh
+./run_deploy.sh
 ```
 
 Nhập các mật khẩu quản trị ẩn theo yêu cầu trên màn hình. Kịch bản sẽ hoàn tất cài đặt cụm HA trong khoảng 3 đến 5 phút.

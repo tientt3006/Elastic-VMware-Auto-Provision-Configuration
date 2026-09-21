@@ -1,0 +1,27 @@
+# ==============================================================================
+# HAProxy & Keepalived Load Balancer Configuration Example
+# Multi-Product VMware Automation Platform
+# ==============================================================================
+
+# --- vCenter Server Connection ---
+SITE_VCSA_IP="<VCENTER_IP>"
+VCENTER_USER="<VCENTER_USER>"
+
+# --- vSphere Infrastructure Placement ---
+VCENTER_DC="Datacenter"
+VCENTER_CLUSTER="Cluster1"
+ISO_DATASTORE="<DATASTORE_NAME>"
+PKR_NETWORK="VM Network"
+VM_FOLDER="Load_Balancers"
+TPL_NAME="tpl-ubuntu-2404-golden"
+
+# --- Guest OS Administrative Account ---
+SSH_USER="<SSH_USER>"
+
+# --- Static Network Topology (HA Cluster) ---
+IP_HAPROXY_01="<IP_HAPROXY_NODE_01>"
+IP_HAPROXY_02="<IP_HAPROXY_NODE_02>"
+VIP_HAPROXY="<VIRTUAL_IP_KEEPALIVED>"
+GW="<GATEWAY>"
+NETMASK="24"
+DNS_SERVER="<DNS_SERVER>"

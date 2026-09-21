@@ -16,14 +16,18 @@ Dự án Terraform này chịu trách nhiệm tự động hóa việc khởi t�
 ## 2. Cấu trúc thư mục dự án
 
 ```text
-terraform_test/
-├── versions.tf                     # Ràng buộc phiên bản Terraform core và vSphere provider
-├── variables.tf                    # Định nghĩa schema đầu vào có kiểm tra kiểu dữ liệu
-├── main.tf                         # Tệp điều phối trung tâm kết nối các data source và module
-├── outputs.tf                      # Xuất thông tin IP, ID tài nguyên và inventory cho Ansible
-├── terraform.tfvars                # Tham số cấu hình thực tế của môi trường lab
-├── terraform.tfvars.example        # Tệp mẫu tham khảo không chứa thông tin nhạy cảm
-├── run_provision_secure.sh         # Kịch bản thực thi an toàn với cơ chế tiêm mật khẩu In-Memory
+terraform/
+├── modules/                        # Các module dùng chung (compute, network, folder, cluster_rules, content_library)
+└── profiles/
+    └── elastic-stack/
+        ├── versions.tf             # Ràng buộc phiên bản Terraform core và vSphere provider
+        ├── variables.tf            # Định nghĩa schema đầu vào có kiểm tra kiểu dữ liệu
+        ├── main.tf                 # Tệp điều phối trung tâm kết nối các data source và module
+        ├── outputs.tf              # Xuất thông tin IP, ID tài nguyên và inventory cho Ansible
+        ├── terraform.tfvars.example # Tệp mẫu tham khảo không chứa thông tin nhạy cảm
+        ├── run.sh                  # Kịch bản thực thi an toàn với cơ chế tiêm mật khẩu In-Memory
+        └── templates/
+            └── hosts.yml.tpl       # Template sinh inventory Ansible
 ├── README.md                       # Tài liệu hướng dẫn vận hành kỹ thuật
 ├── giai_thich_ke_hoach_thuc_thi.md # Phân tích chi tiết các giai đoạn Plan và Apply
 └── modules/
@@ -77,13 +81,13 @@ Thực hiện từ môi trường dòng lệnh WSL Ubuntu:
 ### Bước 1: Điều hướng vào thư mục dự án
 
 ```bash
-cd /mnt/d/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/terraform_test
+cd /mnt/d/neit_ng/prjs_i/auto_provision_configuration/terraform/profiles/elastic-stack
 ```
 
 ### Bước 2: Khởi chạy kịch bản triển khai bảo mật
 
 ```bash
-./run_provision_secure.sh
+./run.sh
 ```
 
 Tiến trình yêu cầu nhập ẩn mật khẩu tài khoản vCenter (`<VCENTER_USER>`). Mật khẩu được nạp vào biến môi trường `TF_VAR_vsphere_password` trong bộ nhớ RAM và tự động hủy sau khi lệnh hoàn tất.

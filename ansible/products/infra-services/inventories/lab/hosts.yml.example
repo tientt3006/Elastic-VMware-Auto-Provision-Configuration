@@ -1,0 +1,21 @@
+# ==============================================================================
+# Sample Inventory for Infrastructure Services (DNS / NTP)
+# ==============================================================================
+all:
+  vars:
+    ansible_user: sysops
+    ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+
+  children:
+    dns_servers:
+      hosts:
+        srv-infra-01:
+          ansible_host: 192.168.10.51
+          node_role: dns_primary
+
+    ntp_servers:
+      hosts:
+        srv-infra-01:
+          ansible_host: 192.168.10.51
+          node_role: ntp_server

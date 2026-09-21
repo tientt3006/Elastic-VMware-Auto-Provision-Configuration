@@ -17,25 +17,23 @@ Bản mẫu máy ảo sau khi hoàn tất quá trình đóng gói đáp ứng đ
 ## 2. Cấu trúc thư mục
 
 ```text
-packer_test/
-├── README.md                                 # Tài liệu hướng dẫn quy trình và vận hành
-├── build_packer_secure.sh                    # Kịch bản điều phối build an toàn In-Memory kết hợp govc
-├── co_che_ghi_de_va_quan_ly_vong_doi_template.md # Hướng dẫn xử lý trùng tên và vòng đời template
-├── giai_phap_bao_mat_bien_moi_truong_packer.md   # Phân tích kỹ thuật giải pháp In-Memory Secrets
-├── packer_capabilities_assessment.md         # Đánh giá mức độ đáp ứng 5 trụ cột năng lực Packer
-├── packer_issues_and_solutions.md            # Sổ tay sự cố và giải pháp khắc phục chi tiết (INC-01 đến INC-11)
-├── variables.pkr.hcl                         # Khai báo biến và ràng buộc kiểu dữ liệu Packer HCL
-├── ubuntu-24.04.pkr.hcl                      # Định nghĩa nguồn vsphere-iso và quy trình build chính
-├── packer.pkrvars.hcl                        # Giá trị tham số môi trường vCenter mục tiêu
-├── packer.pkrvars.hcl.example                # File tham số mẫu phục vụ lưu trữ Git
-├── http/
-│   ├── meta-data                             # Metadata cấu hình máy ảo cho Cloud-Init
-│   └── user-data                             # Cấu hình cài đặt tự động Subiquity
-└── scripts/
-    ├── 01_install_open_vm_tools.sh           # Cài đặt và kích hoạt open-vm-tools, chrony
-    ├── 02_harden_ssh.sh                      # Gia cố an ninh cấu hình máy chủ OpenSSH
-    ├── 03_configure_ufw.sh                   # Thiết lập chính sách tường lửa host UFW
-    └── 04_generalize_template.sh             # Dọn dẹp machine-id, xóa SSH key, làm sạch log
+packer/
+├── build.sh                                  # Kịch bản điều phối build an toàn In-Memory kết hợp govc
+├── ansible/                                  # Playbook cấu hình cho Packer provisioner
+└── templates/
+    └── ubuntu-24.04/
+        ├── variables.pkr.hcl                 # Khai báo biến và ràng buộc kiểu dữ liệu Packer HCL
+        ├── ubuntu-24.04.pkr.hcl              # Định nghĩa nguồn vsphere-iso và quy trình build chính
+        ├── packer.pkrvars.hcl                # Giá trị tham số môi trường vCenter mục tiêu
+        ├── packer.pkrvars.hcl.example        # File tham số mẫu phục vụ lưu trữ Git
+        ├── http/
+        │   ├── meta-data                     # Metadata cấu hình máy ảo cho Cloud-Init
+        │   └── user-data                     # Cấu hình cài đặt tự động Subiquity
+        └── scripts/
+            ├── 01_install_open_vm_tools.sh   # Cài đặt và kích hoạt open-vm-tools, chrony
+            ├── 02_harden_ssh.sh              # Gia cố an ninh cấu hình máy chủ OpenSSH
+            ├── 03_configure_ufw.sh           # Thiết lập chính sách tường lửa host UFW
+            └── 04_generalize_template.sh     # Dọn dẹp machine-id, xóa SSH key, làm sạch log
 ```
 
 ---
@@ -84,7 +82,7 @@ Trước khi thực thi quy trình đóng gói trong hệ điều hành phụ WS
 
 ### 4.1. Bảng ánh xạ thông số vCenter
 
-File cấu hình [packer.pkrvars.hcl](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/packer_test/packer.pkrvars.hcl) được thiết lập tương thích với hạ tầng vCenter Server:
+File cấu hình [packer.pkrvars.hcl](file:///d:/neit_ng/prjs_i/auto_provision_configuration/packer/templates/ubuntu-24.04/packer.pkrvars.hcl) được thiết lập tương thích với hạ tầng vCenter Server:
 
 | Tham số | Giá trị gán | Ý nghĩa kỹ thuật |
 | :--- | :--- | :--- |
@@ -135,19 +133,19 @@ boot_command = [
 
 ## 6. Quy trình thực thi đóng gói an toàn bằng kịch bản In-Memory
 
-Để bảo đảm tuyệt đối không lưu mật khẩu vCenter và mật khẩu tài khoản quản trị máy ảo vào file cấu hình trên ổ đĩa, toàn bộ quy trình build được kích hoạt qua kịch bản điều phối [build_packer_secure.sh](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/packer_test/build_packer_secure.sh).
+Để bảo đảm tuyệt đối không lưu mật khẩu vCenter và mật khẩu tài khoản quản trị máy ảo vào file cấu hình trên ổ đĩa, toàn bộ quy trình build được kích hoạt qua kịch bản điều phối [build.sh](file:///d:/neit_ng/prjs_i/auto_provision_configuration/packer/build.sh).
 
 ### 6.1. Các bước thực hiện
 
-1. Điều hướng vào thư mục `packer_test` trong môi trường WSL:
+1. Điều hướng vào thư mục `packer` trong môi trường WSL:
    ```bash
-   cd /mnt/d/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/packer_test
+   cd /mnt/d/neit_ng/prjs_i/auto_provision_configuration/packer
    ```
 
 2. Cấp quyền thực thi và khởi chạy kịch bản:
    ```bash
-   chmod +x ./build_packer_secure.sh
-   ./build_packer_secure.sh
+   chmod +x ./build.sh
+   ./build.sh --template ubuntu-24.04
    ```
 
 3. Kịch bản yêu cầu nhập mật khẩu quản trị vCenter và mật khẩu quản trị máy khách (chuỗi ký tự được ẩn hoàn toàn trên màn hình terminal):
@@ -187,7 +185,7 @@ boot_command = [
 
 ## 7. Khắc phục sự cố thường gặp
 
-Chi tiết phân tích mã lỗi, nhật ký điều tra và 11 tình huống sự cố thực tế được trình bày đầy đủ tại [packer_issues_and_solutions.md](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/packer_test/packer_issues_and_solutions.md). Dưới đây là các sự cố thường gặp nhất:
+Chi tiết phân tích mã lỗi, nhật ký điều tra và 11 tình huống sự cố thực tế được trình bày đầy đủ tại [packer_issues_and_solutions.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/docs/packer_issues_and_solutions.md). Dưới đây là các sự cố thường gặp nhất:
 
 ### 7.1. Lỗi: Template đã tồn tại trên vCenter (The name already exists)
 
@@ -197,7 +195,7 @@ Chi tiết phân tích mã lỗi, nhật ký điều tra và 11 tình huống s�
   ```
 - **Nguyên nhân**: vCenter không cho phép tạo hai đối tượng trùng tên trong cùng thư mục kiểm kê.
 - **Biện pháp xử lý**:
-  - Khi sử dụng `build_packer_secure.sh`, kịch bản tự động phát hiện và hỏi người dùng có muốn xóa bản cũ hay không.
+  - Khi sử dụng `build.sh`, kịch bản tự động phát hiện và hỏi người dùng có muốn xóa bản cũ hay không.
   - Hoặc thực hiện xóa thủ công qua công cụ `govc`:
     ```bash
     govc vm.destroy "tpl-ubuntu-2404-golden"
@@ -208,7 +206,7 @@ Chi tiết phân tích mã lỗi, nhật ký điều tra và 11 tình huống s�
 
 - **Hiện tượng**: Màn hình console máy ảo dừng tại giao diện lựa chọn ngôn ngữ, Packer bị timeout kết nối SSH.
 - **Nguyên nhân**: Lệnh khởi động GRUB không truyền được tham số `autoinstall ds=nocloud` vào kernel hoặc đĩa CD-ROM `cidata` không được gắn đúng nhãn.
-- **Biện pháp xử lý**: Kiểm tra lại cấu hình `boot_command` trong [ubuntu-24.04.pkr.hcl](file:///d:/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/packer_test/ubuntu-24.04.pkr.hcl). Đảm bảo sử dụng chế độ nhập dòng lệnh GRUB `c` và tìm kiếm đúng phân vùng chứa kernel bằng lệnh `search --set=root --file /casper/vmlinuz`.
+- **Biện pháp xử lý**: Kiểm tra lại cấu hình `boot_command` trong [ubuntu-24.04.pkr.hcl](file:///d:/neit_ng/prjs_i/auto_provision_configuration/packer/templates/ubuntu-24.04/ubuntu-24.04.pkr.hcl). Đảm bảo sử dụng chế độ nhập dòng lệnh GRUB `c` và tìm kiếm đúng phân vùng chứa kernel bằng lệnh `search --set=root --file /casper/vmlinuz`.
 
 ### 7.3. Lỗi: Hết thời gian chờ tùy biến máy ảo khi Terraform nhân bản
 
