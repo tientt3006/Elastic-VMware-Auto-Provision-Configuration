@@ -1,23 +1,23 @@
 # ==============================================================================
 # vCenter Server Connection Configuration
 # ==============================================================================
-vsphere_server              = "<VCENTER_IP_OR_FQDN>"
+vsphere_server              = "<VCENTER_IP>"
 vsphere_user                = "<VCENTER_USER>"
 vsphere_insecure_connection = true
 
 # ==============================================================================
 # vSphere Infrastructure Targets
 # ==============================================================================
-vsphere_datacenter    = "Datacenter"
-vsphere_cluster       = "Cluster1"
-vsphere_datastore     = "datastore1"
-vsphere_template_name = "tpl-ubuntu-2404-golden"
+vsphere_datacenter    = "<VCENTER_DATACENTER>"
+vsphere_cluster       = "<VCENTER_CLUSTER>"
+vsphere_datastore     = "<VCENTER_DATASTORE>"
+vsphere_template_name = "<VM_TEMPLATE_NAME>"
 
 # ==============================================================================
 # Inventory Folder Configuration
 # ==============================================================================
-vm_folders       = ["Generic_Workloads"]
-vm_target_folder = "Generic_Workloads"
+vm_folders       = ["<VCENTER_FOLDER>"]
+vm_target_folder = "<VCENTER_FOLDER>"
 
 # ==============================================================================
 # ESXi Host & Standard Switch Configuration (Optional port groups)
@@ -46,15 +46,15 @@ drs_rule_mandatory = false
 # ==============================================================================
 vms = {
   "web_01" = {
-    name         = "srv-web-01"
+    name         = "<VM_NAME_1>"
     hostname     = "web-01"
     cpu_count    = 2
     memory_mb    = 4096
     disk_size_gb = 40
-    network_name = "VM Network"
-    ip_address   = "192.168.10.21"
+    network_name = "<VCENTER_NETWORK>"
+    ip_address   = "<VM_IP_1>"
     netmask      = 24
-    gateway      = "192.168.10.1"
+    gateway      = "<GATEWAY_IP>"
     # [TÙY CHỌN] Tên nhóm trong Ansible inventory (nếu không khai báo, mặc định là "generic")
     role         = "web_server"
 
@@ -66,15 +66,15 @@ vms = {
     # domain_name    = "custom.local"
   },
   "db_01" = {
-    name         = "srv-db-01"
+    name         = "<VM_NAME_2>"
     hostname     = "db-01"
     cpu_count    = 4
     memory_mb    = 8192
     disk_size_gb = 80
-    network_name = "VM Network"
-    ip_address   = "192.168.10.22"
+    network_name = "<VCENTER_NETWORK>"
+    ip_address   = "<VM_IP_2>"
     netmask      = 24
-    gateway      = "192.168.10.1"
+    gateway      = "<GATEWAY_IP>"
     role         = "database"
   }
 }

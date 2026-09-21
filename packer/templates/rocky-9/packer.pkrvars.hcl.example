@@ -1,8 +1,8 @@
 # ==============================================================================
-# Sample Environment Variables for Ubuntu 24.04 Template Build
+# Sample Environment Variables for Rocky Linux 9 Minimal Template Build
 # Rename or copy to packer.pkrvars.hcl and supply infrastructure values.
 # Sensitive passwords (vcenter_password, ssh_password) must NOT be stored here;
-# inject them via memory (PKR_VAR_*) or via scripts/build_packer_secure.sh.
+# inject them via memory (PKR_VAR_*) or via build.sh.
 # ==============================================================================
 
 vcenter_server              = "<VCENTER_IP>"

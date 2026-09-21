@@ -190,6 +190,9 @@ sync_packer_vars_from_terraform() {
     tf_cluster=$(grep -E '^\s*vsphere_cluster\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
     tf_ds=$(grep -E '^\s*vsphere_datastore\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
     tf_net=$(grep -E '^\s*vsphere_network\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
+    if [[ -z "${tf_net}" || "${tf_net}" == *"<"*">"* ]]; then
+        tf_net=$(grep -E '^\s*network_name\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
+    fi
     tf_ssh=$(grep -E '^\s*ssh_username\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
 
     local updated=0
@@ -291,31 +294,40 @@ export PKR_VAR_vcenter_password="${VCENTER_PASS}"
 export PKR_VAR_ssh_password="${SSH_PASS}"
 export_govc_env "${VCENTER_SERVER}" "${VCENTER_USER}" "${VCENTER_PASS}"
 
-# Đồng bộ tài khoản và mật khẩu vào tệp user-data autoinstall nếu còn chứa placeholder
+# Tạo mã băm SHA-512 an toàn trong RAM cho Kickstart / Autoinstall
+SSH_HASH=""
+if command -v openssl &>/dev/null; then
+    SSH_HASH=$(openssl passwd -6 "${SSH_PASS}" 2>/dev/null || true)
+fi
+if [[ -z "${SSH_HASH}" ]]; then
+    SSH_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}" 2>/dev/null || true)
+fi
+if [[ -n "${SSH_HASH}" ]]; then
+    export PKR_VAR_ssh_password_hash="${SSH_HASH}"
+fi
+
+PUB_KEY=""
+if [[ -f "${HOME}/.ssh/id_ed25519.pub" ]]; then
+    PUB_KEY=$(cat "${HOME}/.ssh/id_ed25519.pub")
+elif [[ -f "${HOME}/.ssh/id_rsa.pub" ]]; then
+    PUB_KEY=$(cat "${HOME}/.ssh/id_rsa.pub")
+fi
+if [[ -n "${PUB_KEY}" ]]; then
+    export PKR_VAR_ssh_public_key="${PUB_KEY}"
+fi
+
+# Đồng bộ tài khoản và mật khẩu vào tệp user-data autoinstall nếu còn chứa placeholder (Ubuntu)
 USER_DATA_PATH="${TEMPLATE_DIR}/http/user-data"
 if [[ -f "${USER_DATA_PATH}" ]]; then
     if grep -q "CHANGE_ME_PASSWORD_HASH" "${USER_DATA_PATH}" || grep -q "<SSH_USER>" "${USER_DATA_PATH}"; then
         log_info "Đồng bộ tài khoản và mật khẩu mã hóa vào tệp user-data autoinstall..."
         SSH_TARGET_USER=$(grep -E '^\s*ssh_username\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2 || true)
-        SSH_HASH=""
-        if command -v openssl &>/dev/null; then
-            SSH_HASH=$(openssl passwd -6 "${SSH_PASS}" 2>/dev/null || true)
-        fi
-        if [[ -z "${SSH_HASH}" ]]; then
-            SSH_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}" 2>/dev/null || true)
-        fi
         if [[ -n "${SSH_HASH}" ]]; then
             sed -i -E "s|(password:\s*\").*(\")|\1${SSH_HASH}\2|" "${USER_DATA_PATH}"
         fi
         if [[ -n "${SSH_TARGET_USER}" && "${SSH_TARGET_USER}" != *"<"*">"* ]]; then
             sed -i -E "s/(username:\s*).*/\1${SSH_TARGET_USER}/" "${USER_DATA_PATH}"
             sed -i "s|<SSH_USER>|${SSH_TARGET_USER}|g" "${USER_DATA_PATH}"
-        fi
-        PUB_KEY=""
-        if [[ -f "${HOME}/.ssh/id_ed25519.pub" ]]; then
-            PUB_KEY=$(cat "${HOME}/.ssh/id_ed25519.pub")
-        elif [[ -f "${HOME}/.ssh/id_rsa.pub" ]]; then
-            PUB_KEY=$(cat "${HOME}/.ssh/id_rsa.pub")
         fi
         if [[ -n "${PUB_KEY}" ]]; then
             sed -i "s|<SSH_PUB_KEY>|${PUB_KEY}|g" "${USER_DATA_PATH}"

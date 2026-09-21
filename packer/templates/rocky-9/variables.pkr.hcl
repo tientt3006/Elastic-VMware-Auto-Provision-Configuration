@@ -1,5 +1,5 @@
 # ==============================================================================
-# Input Variables Specification for Ubuntu 24.04 VMware Template Pipeline
+# Input Variables Specification for Rocky Linux 9 Minimal VMware Template
 # ==============================================================================
 
 variable "vcenter_server" {
@@ -9,7 +9,7 @@ variable "vcenter_server" {
 
 variable "vcenter_user" {
   type        = string
-  description = "Administrative or service account username for vCenter authentication."
+  description = "Administrative account username for vCenter authentication."
 }
 
 variable "vcenter_password" {
@@ -20,7 +20,7 @@ variable "vcenter_password" {
 
 variable "vcenter_insecure_connection" {
   type        = bool
-  description = "Set to true to skip TLS certificate validation for self-signed vCenter certificates."
+  description = "Set to true to skip TLS certificate validation for self-signed certificates."
   default     = true
 }
 
@@ -41,7 +41,7 @@ variable "vcenter_datastore" {
 
 variable "vcenter_network" {
   type        = string
-  description = "Target virtual switch portgroup providing network connectivity and active DHCP service."
+  description = "Target virtual switch portgroup providing network connectivity."
 }
 
 variable "vcenter_folder" {
@@ -52,7 +52,7 @@ variable "vcenter_folder" {
 
 variable "iso_paths" {
   type        = list(string)
-  description = "List containing the datastore path to the Ubuntu 24.04 live server ISO image."
+  description = "List containing the datastore path to the Rocky Linux 9 minimal ISO image."
 }
 
 variable "vm_name" {
@@ -62,7 +62,7 @@ variable "vm_name" {
 
 variable "vm_cpu_cores" {
   type        = number
-  description = "Number of virtual CPU cores allocated per socket."
+  description = "Number of virtual CPU cores allocated."
   default     = 2
 }
 
@@ -86,19 +86,26 @@ variable "vm_disk_size" {
 
 variable "vm_disk_thin" {
   type        = bool
-  description = "Flag enabling thin disk provisioning format to conserve physical storage."
+  description = "Flag enabling thin disk provisioning format."
   default     = true
 }
 
 variable "ssh_username" {
   type        = string
-  description = "Default administrative username created via cloud-init autoinstall."
+  description = "Default administrative username created via Kickstart."
 }
 
 variable "ssh_password" {
   type        = string
   description = "Password for the administrative user to establish SSH connectivity."
   sensitive   = true
+}
+
+variable "ssh_password_hash" {
+  type        = string
+  description = "SHA-512 encrypted password hash for Anaconda kickstart user creation."
+  sensitive   = true
+  default     = ""
 }
 
 variable "ssh_public_key" {
@@ -112,4 +119,10 @@ variable "ssh_timeout" {
   type        = string
   description = "Maximum duration Packer waits for SSH service availability before terminating."
   default     = "30m"
+}
+
+variable "additional_packages" {
+  type        = list(string)
+  description = "Additional RPM package names installed during Kickstart."
+  default     = []
 }

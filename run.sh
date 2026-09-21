@@ -67,26 +67,26 @@ run_platform_tools_menu() {
                 local chosen_os=""
                 if [[ ${#os_templates[@]} -eq 1 ]]; then
                     chosen_os="${os_templates[0]}"
-                    echo "Hệ điều hành template mặc định: ${chosen_os}"
+                    echo "Hệ điều hành template khả dụng: ${chosen_os}"
                     local input_os=""
-                    if ! read -r -p "Nhấn [Enter] để tiếp tục (hoặc nhập tên khác) [${chosen_os}]: " input_os; then
+                    if ! read -r -p "Nhấn [Enter] để tiếp tục (hoặc nhập tên OS khác) [${chosen_os}]: " input_os; then
                         echo ""
                         return 0
                     fi
                     input_os="${input_os%$'\r'}"
                     chosen_os="${input_os:-${chosen_os}}"
                 else
-                    echo "Danh sách hệ điều hành template có sẵn:"
+                    echo "Danh sách hệ điều hành (OS) hỗ trợ đóng gói template:"
                     for idx in "${!os_templates[@]}"; do
                         echo "  $((idx+1))) ${os_templates[$idx]}"
                     done
                     local sel=""
-                    if ! read -r -p "Chọn hệ điều hành (1-${#os_templates[@]}) [1]: " sel; then
+                    if ! read -r -p "Vui lòng chọn hệ điều hành cần tạo template (1-${#os_templates[@]}) [${#os_templates[@]}]: " sel; then
                         echo ""
                         return 0
                     fi
                     sel="${sel%$'\r'}"
-                    sel="${sel:-1}"
+                    sel="${sel:-${#os_templates[@]}}"
                     if [[ "${sel}" =~ ^[0-9]+$ ]] && [ "${sel}" -ge 1 ] && [ "${sel}" -le "${#os_templates[@]}" ]; then
                         chosen_os="${os_templates[$((sel-1))]}"
                     else
@@ -94,10 +94,10 @@ run_platform_tools_menu() {
                     fi
                 fi
 
-                # Nếu người dùng nhập tên không tồn tại trong thư mục templates/:
+                # Nếu người dùng nhập tên OS không tồn tại trong thư mục templates/:
                 if [[ ! -d "${REPO_ROOT}/packer/templates/${chosen_os}" ]]; then
-                    log_warn "Thư mục template '${chosen_os}' không tồn tại trong packer/templates/."
-                    log_info "Tự động sử dụng thư mục template mặc định: ${default_os}."
+                    log_warn "Thư mục template hệ điều hành '${chosen_os}' không tồn tại trong packer/templates/."
+                    log_info "Tự động sử dụng thư mục hệ điều hành mặc định: ${default_os}."
                     echo "Nhấn [Enter] để đồng ý sử dụng [${default_os}] (hoặc nhập 'q' để hủy)..."
                     local confirm=""
                     if ! read -r confirm; then
@@ -108,22 +108,34 @@ run_platform_tools_menu() {
                     if [[ "${confirm}" == "q" || "${confirm}" == "Q" ]]; then
                         continue
                     fi
-                    local original_input="${chosen_os}"
                     chosen_os="${default_os}"
+                fi
 
-                    # Nếu người dùng nhập tên mang ý nghĩa tên VM (ví dụ: template_ubuntu_no1),
-                    # cung cấp tùy chọn đặt tên vm_name của template thành tên đó
-                    if [[ -n "${original_input}" && "${original_input}" != "${default_os}" ]]; then
-                        local pkr_file="${REPO_ROOT}/packer/templates/${chosen_os}/packer.pkrvars.hcl"
-                        [[ ! -f "${pkr_file}" && -f "${pkr_file}.example" ]] && cp "${pkr_file}.example" "${pkr_file}"
-                        if [[ -f "${pkr_file}" ]]; then
-                            echo "Bạn đã nhập tên: '${original_input}'."
-                            if confirm_action "Bạn có muốn đặt tên VM Template trên vCenter là '${original_input}' không?" "Y"; then
-                                sed -i -E "s/^\s*vm_name\s*=.*/vm_name                     = \"${original_input}\"/" "${pkr_file}"
-                                log_success "Đã cập nhật vm_name thành '${original_input}' trong packer.pkrvars.hcl."
-                            fi
-                        fi
-                    fi
+                # Tự động khởi tạo tệp cấu hình nếu chưa có
+                local pkr_file="${REPO_ROOT}/packer/templates/${chosen_os}/packer.pkrvars.hcl"
+                [[ ! -f "${pkr_file}" && -f "${pkr_file}.example" ]] && cp "${pkr_file}.example" "${pkr_file}"
+
+                # Xác định tên máy ảo VM Template sẽ hiển thị trên vCenter
+                local current_vm_name="tpl-${chosen_os}-golden"
+                if [[ -f "${pkr_file}" ]]; then
+                    local v
+                    v=$(grep -E '^\s*vm_name\s*=' "${pkr_file}" | head -n 1 | cut -d'"' -f2 || true)
+                    [[ -n "${v}" ]] && current_vm_name="${v}"
+                fi
+
+                echo ""
+                echo "Thiết lập định danh máy ảo VM Template trên vCenter:"
+                local input_vm_name=""
+                if ! read -r -p "Nhập tên máy ảo trên vCenter [${current_vm_name}]: " input_vm_name; then
+                    echo ""
+                    return 0
+                fi
+                input_vm_name="${input_vm_name%$'\r'}"
+                input_vm_name="${input_vm_name:-${current_vm_name}}"
+
+                if [[ -n "${input_vm_name}" && -f "${pkr_file}" ]]; then
+                    sed -i -E "s/^\s*vm_name\s*=.*/vm_name                     = \"${input_vm_name}\"/" "${pkr_file}"
+                    log_success "Đã lưu tên máy ảo VM Template: ${input_vm_name}"
                 fi
 
                 (cd "${REPO_ROOT}/packer" && ./build.sh --template "${chosen_os}")
@@ -159,9 +171,32 @@ run_platform_tools_menu() {
                 ;;
             3)
                 log_banner "QUẢN LÝ TỆP ISO TRÊN DATASTORE"
+                local os_templates=()
+                mapfile -t os_templates < <(find "${REPO_ROOT}/packer/templates" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort || true)
+                local target_os="ubuntu-24.04"
+                if [[ ${#os_templates[@]} -gt 1 ]]; then
+                    echo "Chọn hệ điều hành để cấu hình tệp ISO:"
+                    for idx in "${!os_templates[@]}"; do
+                        echo "  $((idx+1))) ${os_templates[$idx]}"
+                    done
+                    local sel_os=""
+                    if read -r -p "Vui lòng chọn (1-${#os_templates[@]}) [${#os_templates[@]}]: " sel_os; then
+                        sel_os="${sel_os%$'\r'}"
+                        sel_os="${sel_os:-${#os_templates[@]}}"
+                        if [[ "${sel_os}" =~ ^[0-9]+$ ]] && [ "${sel_os}" -ge 1 ] && [ "${sel_os}" -le "${#os_templates[@]}" ]; then
+                            target_os="${os_templates[$((sel_os-1))]}"
+                        fi
+                    fi
+                elif [[ ${#os_templates[@]} -eq 1 ]]; then
+                    target_os="${os_templates[0]}"
+                fi
+
+                local target_pkr="${REPO_ROOT}/packer/templates/${target_os}/packer.pkrvars.hcl"
+                [[ ! -f "${target_pkr}" && -f "${target_pkr}.example" ]] && cp "${target_pkr}.example" "${target_pkr}"
+
                 local default_ds=""
-                if [[ -f "${REPO_ROOT}/packer/templates/ubuntu-24.04/packer.pkrvars.hcl" ]]; then
-                    default_ds=$(grep -E '^\s*vcenter_datastore\s*=' "${REPO_ROOT}/packer/templates/ubuntu-24.04/packer.pkrvars.hcl" | head -n 1 | cut -d'"' -f2 || true)
+                if [[ -f "${target_pkr}" ]]; then
+                    default_ds=$(grep -E '^\s*vcenter_datastore\s*=' "${target_pkr}" | head -n 1 | cut -d'"' -f2 || true)
                 fi
                 if [[ -z "${default_ds}" || "${default_ds}" == *"<"*">"* ]]; then
                     if [[ -f "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" ]]; then
@@ -185,7 +220,7 @@ run_platform_tools_menu() {
                     log_error "Tên Datastore không được để trống hoặc chứa placeholder."
                     continue
                 fi
-                run_iso_menu "${TARGET_DS}" "${REPO_ROOT}/packer/templates/ubuntu-24.04/packer.pkrvars.hcl" "${REPO_ROOT}/products/elastic-stack/product.conf" "${REPO_ROOT}/seed"
+                run_iso_menu "${TARGET_DS}" "${target_pkr}" "${REPO_ROOT}/products/elastic-stack/product.conf" "${REPO_ROOT}/seed"
                 ;;
             4)
                 log_banner "CÀI ĐẶT MÔI TRƯỜNG CÔNG CỤ (SEED SETUP)"

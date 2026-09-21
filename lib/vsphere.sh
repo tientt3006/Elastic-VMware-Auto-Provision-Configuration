@@ -216,6 +216,12 @@ iso_paths = [\
     else
         log_warn "Cấu trúc iso_paths không tìm thấy trong ${pkr_file} để cập nhật."
     fi
+
+    # Cập nhật vcenter_datastore nếu đang chứa placeholder
+    if grep -q -E 'vcenter_datastore\s*=\s*"<.*>"' "${pkr_file}"; then
+        sed -i -E "s/(vcenter_datastore\s*=\s*\")[^\"]+(\")/\1${datastore}\2/" "${pkr_file}"
+        log_success "Đã cập nhật vcenter_datastore trong ${pkr_file} thành: ${datastore}"
+    fi
 }
 
 save_last_used_iso() {
