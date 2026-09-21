@@ -28,6 +28,122 @@ check_vsphere_connectivity() {
     fi
 }
 
+ensure_govc_session() {
+    local pkr_file="${1:-}"
+    local config_file="${2:-}"
+
+    if ! command -v govc &> /dev/null; then
+        log_error "Lệnh govc chưa được cài đặt trên hệ thống."
+        log_info "Vui lòng chọn mục '4) Cài đặt môi trường công cụ tự động hóa (Seed Setup)' để cài đặt govc."
+        return 1
+    fi
+
+    # Nếu govc đã xác thực thành công trong session hiện tại thì không hỏi lại
+    if [[ -n "${GOVC_URL:-}" && -n "${GOVC_PASSWORD:-}" ]] && govc about &> /dev/null; then
+        return 0
+    fi
+
+    log_banner "XÁC THỰC KẾT NỐI VCENTER (GOVC)"
+
+    local repo_base
+    repo_base="$(cd "${SCRIPT_LIB_DIR}/.." && pwd)"
+
+    local detected_server=""
+    local detected_user=""
+
+    # 1. Tra cứu từ tệp Packer pkrvars nếu có
+    if [[ -n "${pkr_file}" && -f "${pkr_file}" ]]; then
+        detected_server=$(grep -E '^\s*vcenter_server\s*=' "${pkr_file}" | head -n 1 | cut -d'"' -f2 || true)
+        detected_user=$(grep -E '^\s*vcenter_user\s*=' "${pkr_file}" | head -n 1 | cut -d'"' -f2 || true)
+    fi
+
+    # 2. Tra cứu từ tệp Terraform tfvars nếu chưa có
+    if [[ -z "${detected_server}" || "${detected_server}" == *"<"*">"* ]]; then
+        for tf_path in "${repo_base}/terraform/profiles/generic-vms/terraform.tfvars" "${repo_base}/terraform/profiles/elastic-stack/terraform.tfvars"; do
+            if [[ -f "${tf_path}" ]]; then
+                local s u
+                s=$(grep -E '^\s*vsphere_server\s*=' "${tf_path}" | head -n 1 | cut -d'"' -f2 || true)
+                u=$(grep -E '^\s*vsphere_user\s*=' "${tf_path}" | head -n 1 | cut -d'"' -f2 || true)
+                if [[ -n "${s}" && "${s}" != *"<"*">"* ]]; then
+                    detected_server="${s}"
+                    detected_user="${u}"
+                    break
+                fi
+            fi
+        done
+    fi
+
+    # 3. Tra cứu từ tệp product.conf nếu chưa có
+    if [[ -z "${detected_server}" || "${detected_server}" == *"<"*">"* ]]; then
+        if [[ -n "${config_file}" && -f "${config_file}" ]]; then
+            local s u
+            s=$(grep -E '^\s*SITE_VCSA_IP=' "${config_file}" | head -n 1 | cut -d'"' -f2 || true)
+            u=$(grep -E '^\s*VCENTER_USER=' "${config_file}" | head -n 1 | cut -d'"' -f2 || true)
+            if [[ -n "${s}" && "${s}" != *"<"*">"* ]]; then
+                detected_server="${s}"
+                detected_user="${u}"
+            fi
+        fi
+    fi
+
+    local target_server=""
+    if [[ -z "${detected_server}" || "${detected_server}" == *"<"*">"* ]]; then
+        if ! read -r -p "Nhập địa chỉ IP / FQDN của vCenter Server: " target_server; then
+            echo ""
+            return 1
+        fi
+        target_server="${target_server%$'\r'}"
+    else
+        local s_prompt="Nhập địa chỉ vCenter Server [${detected_server}]"
+        local input_server=""
+        if ! read -r -p "${s_prompt}: " input_server; then
+            echo ""
+            return 1
+        fi
+        input_server="${input_server%$'\r'}"
+        target_server="${input_server:-${detected_server}}"
+    fi
+
+    if [[ -z "${target_server}" || "${target_server}" == *"<"*">"* ]]; then
+        log_error "Địa chỉ vCenter Server không hợp lệ."
+        return 1
+    fi
+
+    local default_user="${detected_user:-administrator@vsphere.local}"
+    [[ "${default_user}" == *"<"*">"* ]] && default_user="administrator@vsphere.local"
+    local target_user=""
+    local u_prompt="Nhập tài khoản vCenter [${default_user}]"
+    local input_user=""
+    if ! read -r -p "${u_prompt}: " input_user; then
+        echo ""
+        return 1
+    fi
+    input_user="${input_user%$'\r'}"
+    target_user="${input_user:-${default_user}}"
+
+    if [[ -z "${VCENTER_PASS:-}" ]]; then
+        prompt_password "VCENTER_PASS" "Nhập mật khẩu quản trị vCenter (${target_user})" || return 1
+    fi
+
+    export VCENTER_PASS
+    export VSPHERE_PASSWORD="${VCENTER_PASS}"
+    export PKR_VAR_vcenter_password="${VCENTER_PASS}"
+    export TF_VAR_vsphere_password="${VCENTER_PASS}"
+    export_govc_env "${target_server}" "${target_user}" "${VCENTER_PASS}"
+
+    log_info "Đang kiểm tra kết nối và xác thực tới vCenter (${target_server})..."
+    local about_out
+    if about_out=$(govc about 2>&1); then
+        log_success "Xác thực vCenter Server thành công."
+        return 0
+    else
+        log_error "Không thể xác thực tới vCenter Server:"
+        echo "${about_out}"
+        unset VCENTER_PASS GOVC_PASSWORD
+        return 1
+    fi
+}
+
 check_vsphere_template() {
     local template_name="$1"
     if ! command -v govc &> /dev/null; then
@@ -111,6 +227,12 @@ run_iso_menu() {
     local seed_dir="${4:-seed}"
 
     log_banner "QUẢN LÝ TỆP TIN ISO HỆ ĐIỀU HÀNH CHO PACKER"
+
+    # Đảm bảo phiên xác thực govc sẵn sàng
+    if ! ensure_govc_session "${pkr_file}" "${config_file}"; then
+        log_error "Không thể thiết lập phiên kết nối vCenter cho govc."
+        return 1
+    fi
 
     # Kiểm tra ISO đã lưu lần trước
     local last_iso=""
@@ -214,13 +336,15 @@ run_iso_menu() {
                 break
                 ;;
             3)
-                if ! command -v govc &> /dev/null; then
-                    log_error "Lệnh govc chưa được cài đặt để duyệt Datastore."
+                log_info "Đang quét danh sách tệp .iso trên Datastore [${datastore}]..."
+                local raw_ls
+                if ! raw_ls=$(govc datastore.ls -R -ds="${datastore}" 2>&1); then
+                    log_error "Lỗi khi truy vấn danh sách tệp trên Datastore [${datastore}]:"
+                    echo "${raw_ls}"
                     continue
                 fi
 
-                log_info "Đang quét danh sách tệp .iso trên Datastore [${datastore}]..."
-                mapfile -t REMOTE_ISOS < <(govc datastore.ls -R -ds="${datastore}" 2>/dev/null | grep -i "\.iso$" || true)
+                mapfile -t REMOTE_ISOS < <(echo "${raw_ls}" | grep -i "\.iso$" || true)
                 if [[ ${#REMOTE_ISOS[@]} -eq 0 ]]; then
                     log_warn "Không tìm thấy tệp .iso nào trên Datastore [${datastore}]."
                     continue

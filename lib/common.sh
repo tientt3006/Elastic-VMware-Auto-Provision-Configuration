@@ -141,8 +141,54 @@ init_tmux_session() {
 
     # Khởi tạo tmux nếu ở trong terminal tương tác và tmux khả dụng
     if [[ -t 0 ]] && command -v tmux &> /dev/null; then
-        echo "Khởi tạo phiên tmux (${session_name}) để chống đứt kết nối SSH..."
-        exec tmux new-session -s "${session_name}" \
+        local target_session="${session_name}"
+
+        # Kiểm tra nếu phiên chính hoặc các phiên liên quan đã tồn tại
+        local active_sessions=()
+        mapfile -t active_sessions < <(tmux list-sessions -F "#{session_name}" 2>/dev/null | grep -E "^${session_name}(_[0-9]+)?$" || true)
+
+        if [[ ${#active_sessions[@]} -gt 0 ]]; then
+            # Tìm số thứ tự kế tiếp chưa tồn tại
+            local idx=2
+            while tmux has-session -t "${session_name}_${idx}" 2>/dev/null; do
+                ((idx++))
+            done
+            local next_session="${session_name}_${idx}"
+            local new_opt_idx=$(( ${#active_sessions[@]} + 1 ))
+
+            echo ""
+            echo "=============================================================================="
+            echo "PHÁT HIỆN PHIÊN TMUX ĐANG HOẠT ĐỘNG"
+            echo "=============================================================================="
+            for i in "${!active_sessions[@]}"; do
+                echo "  $((i+1))) Kết nối lại vào phiên đang chạy: [${active_sessions[$i]}]"
+            done
+            echo "  ${new_opt_idx}) Khởi tạo phiên mới có đánh số: [${next_session}]"
+            echo "  0) Hủy"
+
+            local choice=""
+            if read -r -p "Vui lòng chọn (0-${new_opt_idx}) [${new_opt_idx}]: " choice; then
+                choice="${choice%$'\r'}"
+                choice="${choice:-${new_opt_idx}}"
+                if [[ "${choice}" == "0" ]]; then
+                    echo "Hủy khởi chạy phiên làm việc."
+                    exit 0
+                elif [[ "${choice}" =~ ^[0-9]+$ ]] && [ "${choice}" -ge 1 ] && [ "${choice}" -le "${#active_sessions[@]}" ]; then
+                    local chosen_attach="${active_sessions[$((choice-1))]}"
+                    echo "Đang kết nối lại vào phiên tmux [${chosen_attach}]..."
+                    exec tmux attach-session -t "${chosen_attach}"
+                elif [[ "${choice}" == "${new_opt_idx}" ]]; then
+                    target_session="${next_session}"
+                else
+                    target_session="${next_session}"
+                fi
+            else
+                target_session="${next_session}"
+            fi
+        fi
+
+        echo "Khởi tạo phiên tmux (${target_session}) để chống đứt kết nối SSH..."
+        exec tmux new-session -s "${target_session}" \
             "bash -c 'trap \":\" SIGINT; bash \"$0\" \"$@\" 2>&1 | tee -a \"${log_file}\"; EXIT_CODE=\${PIPESTATUS[0]}; echo \"\"; echo \"=== Kết thúc với mã thoát: \${EXIT_CODE} ===\"; echo \"Bạn đang ở trong tmux. Gõ exit để đóng, hoặc nhấn Ctrl+B rồi D để detach.\"; exec bash'"
     else
         if [[ -t 0 ]]; then

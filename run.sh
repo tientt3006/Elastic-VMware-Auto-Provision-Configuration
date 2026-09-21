@@ -96,8 +96,18 @@ run_platform_tools_menu() {
             3)
                 log_banner "QUẢN LÝ TỆP ISO TRÊN DATASTORE"
                 local default_ds=""
-                if [[ -f "${REPO_ROOT}/products/elastic-stack/product.conf" ]]; then
-                    default_ds=$(grep -E '^\s*ISO_DATASTORE=' "${REPO_ROOT}/products/elastic-stack/product.conf" | cut -d'"' -f2 || true)
+                if [[ -f "${REPO_ROOT}/packer/templates/ubuntu-24.04/packer.pkrvars.hcl" ]]; then
+                    default_ds=$(grep -E '^\s*vcenter_datastore\s*=' "${REPO_ROOT}/packer/templates/ubuntu-24.04/packer.pkrvars.hcl" | head -n 1 | cut -d'"' -f2 || true)
+                fi
+                if [[ -z "${default_ds}" || "${default_ds}" == *"<"*">"* ]]; then
+                    if [[ -f "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" ]]; then
+                        default_ds=$(grep -E '^\s*vsphere_datastore\s*=' "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" | head -n 1 | cut -d'"' -f2 || true)
+                    fi
+                fi
+                if [[ -z "${default_ds}" || "${default_ds}" == *"<"*">"* ]]; then
+                    if [[ -f "${REPO_ROOT}/products/elastic-stack/product.conf" ]]; then
+                        default_ds=$(grep -E '^\s*ISO_DATASTORE=' "${REPO_ROOT}/products/elastic-stack/product.conf" | cut -d'"' -f2 || true)
+                    fi
                 fi
                 local ds_prompt="Nhập tên Datastore đích"
                 [[ -n "${default_ds}" && "${default_ds}" != *"<"*">"* ]] && ds_prompt="${ds_prompt} [${default_ds}]"
