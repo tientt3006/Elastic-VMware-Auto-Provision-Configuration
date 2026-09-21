@@ -116,7 +116,7 @@ variable "vms" {
   type = map(object({
     name           = string
     hostname       = string
-    vm_id          = number
+    vm_id          = optional(number, null)
     cpu_count      = number
     memory_mb      = number
     disk_size_gb   = number

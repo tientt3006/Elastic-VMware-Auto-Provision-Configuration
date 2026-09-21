@@ -9,15 +9,13 @@ all:
     ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
 
   children:
-%{ for role in distinct([for k, vm in vms : vm.role if vm.role != null && vm.role != ""]) ~}
+%{ for role in distinct([for k, vm in vms : vm.role if vm.role != null && vm.role != "" && vm.role != "generic"]) ~}
     ${role}:
       hosts:
 %{ for k, vm in vms ~}
 %{ if vm.role == role ~}
         ${vm.name}:
           ansible_host: ${vm.ip_address}
-          node_id: ${vm.vm_id}
-          node_role: ${vm.role}
 %{ endif ~}
 %{ endfor ~}
 
@@ -27,6 +25,4 @@ all:
 %{ for k, vm in vms ~}
         ${vm.name}:
           ansible_host: ${vm.ip_address}
-          node_id: ${vm.vm_id}
-          node_role: ${vm.role != null ? vm.role : "generic"}
 %{ endfor ~}

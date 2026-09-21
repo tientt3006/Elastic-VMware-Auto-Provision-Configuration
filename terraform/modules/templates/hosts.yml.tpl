@@ -16,7 +16,9 @@ all:
 %{ if vm.role == role ~}
         ${vm.name}:
           ansible_host: ${vm.ip_address}
+%{ if vm.vm_id != null ~}
           node_id: ${vm.vm_id}
+%{ endif ~}
           node_role: ${vm.role}
 %{ endif ~}
 %{ endfor ~}
@@ -27,6 +29,8 @@ all:
 %{ for k, vm in vms ~}
         ${vm.name}:
           ansible_host: ${vm.ip_address}
+%{ if vm.vm_id != null ~}
           node_id: ${vm.vm_id}
+%{ endif ~}
           node_role: ${vm.role != null ? vm.role : "generic"}
 %{ endfor ~}

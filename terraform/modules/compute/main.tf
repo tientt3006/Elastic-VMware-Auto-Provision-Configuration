@@ -62,15 +62,16 @@ resource "vsphere_virtual_machine" "vm" {
   wait_for_guest_net_timeout  = 5
 
   extra_config = merge(
-    {
-      "guestinfo.node.id"           = tostring(each.value.vm_id)
-      "guestinfo.node.role"         = try(each.value.role, "standard")
-      "guestinfo.metadata"          = base64encode(<<-EOF
-        instance-id: "${each.value.name}"
-        local-hostname: "${each.value.hostname}"
-      EOF
-      )
-      "guestinfo.metadata.encoding"  = "base64"
+    merge(
+      each.value.vm_id != null ? { "guestinfo.node.id" = tostring(each.value.vm_id) } : {},
+      each.value.role != null && each.value.role != "" && each.value.role != "generic" && each.value.role != "standard" ? { "guestinfo.node.role" = each.value.role } : {},
+      {
+        "guestinfo.metadata"          = base64encode(<<-EOF
+          instance-id: "${each.value.name}"
+          local-hostname: "${each.value.hostname}"
+        EOF
+        )
+        "guestinfo.metadata.encoding"  = "base64"
       "guestinfo.userdata"          = base64encode(<<-EOF
         #cloud-config
         hostname: ${each.value.hostname}
@@ -88,8 +89,9 @@ resource "vsphere_virtual_machine" "vm" {
 %{ endif ~}
       EOF
       )
-      "guestinfo.userdata.encoding"  = "base64"
-    },
+        "guestinfo.userdata.encoding"  = "base64"
+      }
+    ),
     try(each.value.extra_config, {})
   )
 

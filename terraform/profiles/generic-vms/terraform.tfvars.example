@@ -48,7 +48,6 @@ vms = {
   "web_01" = {
     name         = "srv-web-01"
     hostname     = "web-01"
-    vm_id        = 201
     cpu_count    = 2
     memory_mb    = 4096
     disk_size_gb = 40
@@ -56,15 +55,19 @@ vms = {
     ip_address   = "192.168.10.21"
     netmask      = 24
     gateway      = "192.168.10.1"
+    # [TÙY CHỌN] Tên nhóm trong Ansible inventory (nếu không khai báo, mặc định là "generic")
     role         = "web_server"
-    extra_config = {
-      "guestinfo.node.role" = "web_server"
-    }
+
+    # [TÙY CHỌN - GHI ĐÈ] Ghi đè cấu hình hạ tầng cho từng máy ảo riêng biệt
+    # host_name      = "<ESXI_HOST_01>"
+    # datastore_name = "<DS_LOCAL_1>"
+    # folder_name    = "<CUSTOM_FOLDER_NAME>"
+    # dns_servers    = ["1.1.1.1", "8.8.8.8"]
+    # domain_name    = "custom.local"
   },
   "db_01" = {
     name         = "srv-db-01"
     hostname     = "db-01"
-    vm_id        = 202
     cpu_count    = 4
     memory_mb    = 8192
     disk_size_gb = 80
@@ -73,9 +76,6 @@ vms = {
     netmask      = 24
     gateway      = "192.168.10.1"
     role         = "database"
-    extra_config = {
-      "guestinfo.node.role" = "database"
-    }
   }
 }
 
