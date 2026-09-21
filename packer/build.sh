@@ -101,8 +101,40 @@ fi
 
 TEMPLATE_DIR="${SCRIPT_DIR}/templates/${TEMPLATE_NAME}"
 if [[ ! -d "${TEMPLATE_DIR}" ]]; then
-    log_error "Thư mục template không tồn tại: ${TEMPLATE_DIR}"
-    exit 1
+    log_warn "Thư mục template '${TEMPLATE_NAME}' không tồn tại trong packer/templates/."
+    local default_os="ubuntu-24.04"
+    if [[ -d "${SCRIPT_DIR}/templates/${default_os}" ]]; then
+        log_info "Tự động sử dụng thư mục template mặc định: ${default_os}."
+        echo "Nhấn [Enter] để đồng ý sử dụng [${default_os}] (hoặc nhập 'q' để hủy)..."
+        local confirm=""
+        read -r confirm || true
+        confirm="${confirm%$'\r'}"
+        if [[ "${confirm}" == "q" || "${confirm}" == "Q" ]]; then
+            exit 0
+        fi
+        local original_name="${TEMPLATE_NAME}"
+        TEMPLATE_NAME="${default_os}"
+        TEMPLATE_DIR="${SCRIPT_DIR}/templates/${TEMPLATE_NAME}"
+        PKRVARS="${TEMPLATE_DIR}/packer.pkrvars.hcl"
+
+        # Tự động khởi tạo packer.pkrvars.hcl từ example nếu chưa tồn tại
+        if [[ ! -f "${PKRVARS}" && -f "${PKRVARS}.example" ]]; then
+            log_info "Khởi tạo tệp biến cấu hình từ ${PKRVARS}.example..."
+            cp "${PKRVARS}.example" "${PKRVARS}"
+        fi
+
+        # Cung cấp tùy chọn đặt vm_name nếu người dùng đã nhập tên VM
+        if [[ -n "${original_name}" && "${original_name}" != "${default_os}" && -f "${PKRVARS}" ]]; then
+            echo "Bạn đã chỉ định tên: '${original_name}'."
+            if confirm_action "Bạn có muốn đặt tên VM Template trên vCenter là '${original_name}' không?" "Y"; then
+                sed -i -E "s/^\s*vm_name\s*=.*/vm_name                     = \"${original_name}\"/" "${PKRVARS}"
+                log_success "Đã cập nhật vm_name thành '${original_name}' trong packer.pkrvars.hcl."
+            fi
+        fi
+    else
+        log_error "Không tìm thấy thư mục template nào khả dụng trong ${SCRIPT_DIR}/templates."
+        exit 1
+    fi
 fi
 
 PKRVARS="${TEMPLATE_DIR}/packer.pkrvars.hcl"
@@ -127,6 +159,79 @@ if [[ ! -f "${PKRVARS}" ]]; then
     log_error "Không tìm thấy tệp biến cấu hình: ${PKRVARS}"
     exit 1
 fi
+
+# Tự động đồng bộ thông số hạ tầng từ Terraform nếu có sẵn
+sync_packer_vars_from_terraform() {
+    local pkr_file="$1"
+    local tmpl_dir
+    tmpl_dir="$(dirname "${pkr_file}")"
+
+    [[ ! -f "${pkr_file}" ]] && return 0
+
+    local tf_file=""
+    for candidate in "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" \
+                     "${REPO_ROOT}/terraform/profiles/elastic-stack/terraform.tfvars"; do
+        if [[ -f "${candidate}" ]]; then
+            local test_server
+            test_server=$(grep -E '^\s*vsphere_server\s*=' "${candidate}" | head -n 1 | cut -d'"' -f2 || true)
+            if [[ -n "${test_server}" && "${test_server}" != *"<"*">"* ]]; then
+                tf_file="${candidate}"
+                break
+            fi
+        fi
+    done
+
+    [[ -z "${tf_file}" ]] && return 0
+
+    local tf_server tf_user tf_dc tf_cluster tf_ds tf_net tf_ssh
+    tf_server=$(grep -E '^\s*vsphere_server\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
+    tf_user=$(grep -E '^\s*vsphere_user\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
+    tf_dc=$(grep -E '^\s*vsphere_datacenter\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
+    tf_cluster=$(grep -E '^\s*vsphere_cluster\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
+    tf_ds=$(grep -E '^\s*vsphere_datastore\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
+    tf_net=$(grep -E '^\s*vsphere_network\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
+    tf_ssh=$(grep -E '^\s*ssh_username\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
+
+    local updated=0
+    if [[ -n "${tf_server}" && "${tf_server}" != *"<"*">"* ]] && grep -q -E 'vcenter_server\s*=\s*"<.*>"' "${pkr_file}"; then
+        sed -i -E "s/(vcenter_server\s*=\s*\")[^\"]+(\")/\1${tf_server}\2/" "${pkr_file}"
+        updated=1
+    fi
+    if [[ -n "${tf_user}" && "${tf_user}" != *"<"*">"* ]] && grep -q -E 'vcenter_user\s*=\s*"<.*>"' "${pkr_file}"; then
+        sed -i -E "s/(vcenter_user\s*=\s*\")[^\"]+(\")/\1${tf_user}\2/" "${pkr_file}"
+        updated=1
+    fi
+    if [[ -n "${tf_dc}" && "${tf_dc}" != *"<"*">"* ]] && grep -q -E 'vcenter_datacenter\s*=\s*"<.*>"' "${pkr_file}"; then
+        sed -i -E "s/(vcenter_datacenter\s*=\s*\")[^\"]+(\")/\1${tf_dc}\2/" "${pkr_file}"
+        updated=1
+    fi
+    if [[ -n "${tf_cluster}" && "${tf_cluster}" != *"<"*">"* ]] && grep -q -E 'vcenter_cluster\s*=\s*"<.*>"' "${pkr_file}"; then
+        sed -i -E "s/(vcenter_cluster\s*=\s*\")[^\"]+(\")/\1${tf_cluster}\2/" "${pkr_file}"
+        updated=1
+    fi
+    if [[ -n "${tf_ds}" && "${tf_ds}" != *"<"*">"* ]] && grep -q -E 'vcenter_datastore\s*=\s*"<.*>"' "${pkr_file}"; then
+        sed -i -E "s/(vcenter_datastore\s*=\s*\")[^\"]+(\")/\1${tf_ds}\2/" "${pkr_file}"
+        updated=1
+    fi
+    if [[ -n "${tf_net}" && "${tf_net}" != *"<"*">"* ]] && grep -q -E 'vcenter_network\s*=\s*"<.*>"' "${pkr_file}"; then
+        sed -i -E "s/(vcenter_network\s*=\s*\")[^\"]+(\")/\1${tf_net}\2/" "${pkr_file}"
+        updated=1
+    fi
+    if [[ -n "${tf_ssh}" && "${tf_ssh}" != *"<"*">"* ]] && grep -q -E 'ssh_username\s*=\s*"<.*>"' "${pkr_file}"; then
+        sed -i -E "s/(ssh_username\s*=\s*\")[^\"]+(\")/\1${tf_ssh}\2/" "${pkr_file}"
+        updated=1
+    fi
+
+    local user_data="${tmpl_dir}/http/user-data"
+    if [[ -f "${user_data}" && -n "${tf_ssh}" && "${tf_ssh}" != *"<"*">"* ]]; then
+        sed -i "s/<SSH_USER>/${tf_ssh}/g" "${user_data}"
+    fi
+
+    if [[ ${updated} -eq 1 ]]; then
+        log_success "Đã tự động đồng bộ thông số hạ tầng từ Terraform sang Packer (${pkr_file})."
+    fi
+}
+sync_packer_vars_from_terraform "${PKRVARS}"
 
 # 3. Kiểm tra liên tục các thông số chưa điền (placeholder) trong packer.pkrvars.hcl
 while true; do

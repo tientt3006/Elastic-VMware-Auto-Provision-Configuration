@@ -56,13 +56,77 @@ run_platform_tools_menu() {
         case "${TOOL_CHOICE}" in
             1)
                 log_banner "TẠO GOLDEN TEMPLATE (PACKER)"
-                if ! read -r -p "Nhập tên template OS [ubuntu-24.04]: " OS_TEMPLATE; then
-                    echo ""
-                    return 0
+                local os_templates=()
+                mapfile -t os_templates < <(find "${REPO_ROOT}/packer/templates" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort || true)
+                local default_os="ubuntu-24.04"
+                if [[ ${#os_templates[@]} -eq 0 ]]; then
+                    log_error "Không tìm thấy thư mục template hệ điều hành nào trong packer/templates/."
+                    continue
                 fi
-                OS_TEMPLATE="${OS_TEMPLATE%$'\r'}"
-                OS_TEMPLATE=${OS_TEMPLATE:-ubuntu-24.04}
-                (cd "${REPO_ROOT}/packer" && ./build.sh --template "${OS_TEMPLATE}")
+
+                local chosen_os=""
+                if [[ ${#os_templates[@]} -eq 1 ]]; then
+                    chosen_os="${os_templates[0]}"
+                    echo "Hệ điều hành template mặc định: ${chosen_os}"
+                    local input_os=""
+                    if ! read -r -p "Nhấn [Enter] để tiếp tục (hoặc nhập tên khác) [${chosen_os}]: " input_os; then
+                        echo ""
+                        return 0
+                    fi
+                    input_os="${input_os%$'\r'}"
+                    chosen_os="${input_os:-${chosen_os}}"
+                else
+                    echo "Danh sách hệ điều hành template có sẵn:"
+                    for idx in "${!os_templates[@]}"; do
+                        echo "  $((idx+1))) ${os_templates[$idx]}"
+                    done
+                    local sel=""
+                    if ! read -r -p "Chọn hệ điều hành (1-${#os_templates[@]}) [1]: " sel; then
+                        echo ""
+                        return 0
+                    fi
+                    sel="${sel%$'\r'}"
+                    sel="${sel:-1}"
+                    if [[ "${sel}" =~ ^[0-9]+$ ]] && [ "${sel}" -ge 1 ] && [ "${sel}" -le "${#os_templates[@]}" ]; then
+                        chosen_os="${os_templates[$((sel-1))]}"
+                    else
+                        chosen_os="${sel}"
+                    fi
+                fi
+
+                # Nếu người dùng nhập tên không tồn tại trong thư mục templates/:
+                if [[ ! -d "${REPO_ROOT}/packer/templates/${chosen_os}" ]]; then
+                    log_warn "Thư mục template '${chosen_os}' không tồn tại trong packer/templates/."
+                    log_info "Tự động sử dụng thư mục template mặc định: ${default_os}."
+                    echo "Nhấn [Enter] để đồng ý sử dụng [${default_os}] (hoặc nhập 'q' để hủy)..."
+                    local confirm=""
+                    if ! read -r confirm; then
+                        echo ""
+                        return 0
+                    fi
+                    confirm="${confirm%$'\r'}"
+                    if [[ "${confirm}" == "q" || "${confirm}" == "Q" ]]; then
+                        continue
+                    fi
+                    local original_input="${chosen_os}"
+                    chosen_os="${default_os}"
+
+                    # Nếu người dùng nhập tên mang ý nghĩa tên VM (ví dụ: template_ubuntu_no1),
+                    # cung cấp tùy chọn đặt tên vm_name của template thành tên đó
+                    if [[ -n "${original_input}" && "${original_input}" != "${default_os}" ]]; then
+                        local pkr_file="${REPO_ROOT}/packer/templates/${chosen_os}/packer.pkrvars.hcl"
+                        [[ ! -f "${pkr_file}" && -f "${pkr_file}.example" ]] && cp "${pkr_file}.example" "${pkr_file}"
+                        if [[ -f "${pkr_file}" ]]; then
+                            echo "Bạn đã nhập tên: '${original_input}'."
+                            if confirm_action "Bạn có muốn đặt tên VM Template trên vCenter là '${original_input}' không?" "Y"; then
+                                sed -i -E "s/^\s*vm_name\s*=.*/vm_name                     = \"${original_input}\"/" "${pkr_file}"
+                                log_success "Đã cập nhật vm_name thành '${original_input}' trong packer.pkrvars.hcl."
+                            fi
+                        fi
+                    fi
+                fi
+
+                (cd "${REPO_ROOT}/packer" && ./build.sh --template "${chosen_os}")
                 ;;
             2)
                 log_banner "CẤP PHÁT HẠ TẦNG (TERRAFORM)"

@@ -191,8 +191,19 @@ update_iso_in_packer() {
     local iso_remote_path="$3"
 
     if [[ ! -f "${pkr_file}" ]]; then
-        log_warn "Không tìm thấy file cấu hình Packer: ${pkr_file}"
-        return 1
+        if [[ -f "${pkr_file}.example" ]]; then
+            log_info "Khởi tạo tệp biến cấu hình Packer từ ${pkr_file}.example..."
+            cp "${pkr_file}.example" "${pkr_file}"
+        else
+            log_warn "Không tìm thấy file cấu hình Packer: ${pkr_file}"
+            return 1
+        fi
+    fi
+
+    local pkr_dir
+    pkr_dir="$(dirname "${pkr_file}")"
+    if [[ ! -f "${pkr_dir}/http/user-data" && -f "${pkr_dir}/http/user-data.example" ]]; then
+        cp "${pkr_dir}/http/user-data.example" "${pkr_dir}/http/user-data"
     fi
 
     # Cập nhật danh sách iso_paths trong file HCL/pkrvars
