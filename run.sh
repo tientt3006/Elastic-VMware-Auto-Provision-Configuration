@@ -76,11 +76,15 @@ run_platform_tools_menu() {
                 for idx in "${!profiles[@]}"; do
                     echo "  $((idx+1))) ${profiles[$idx]}"
                 done
-                if ! read -r -p "Chọn số thứ tự profile muốn chạy: " PROF_IDX; then
+                echo "  0) Quay lại"
+                if ! read -r -p "Chọn số thứ tự profile muốn chạy (0-${#profiles[@]}): " PROF_IDX; then
                     echo ""
                     return 0
                 fi
                 PROF_IDX="${PROF_IDX%$'\r'}"
+                if [[ "${PROF_IDX}" == "0" ]]; then
+                    continue
+                fi
                 if ! [[ "${PROF_IDX}" =~ ^[0-9]+$ ]] || [ "${PROF_IDX}" -lt 1 ] || [ "${PROF_IDX}" -gt "${#profiles[@]}" ]; then
                     log_error "Lựa chọn không hợp lệ."
                     continue

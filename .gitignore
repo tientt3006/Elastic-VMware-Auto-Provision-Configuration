@@ -13,7 +13,7 @@ iso_cache/
 
 # Terraform local states and cache
 **/.terraform/
-.terraform.lock.hcl
+**/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfvars

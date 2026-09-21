@@ -1,144 +1,202 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Secure In-Memory Packer Golden Image Build Wrapper (Decentralized Component)
-# - Run directly from inside packer directory: ./build.sh
-# - Extracts target vCenter topology directly from ./packer.pkrvars.hcl
-# - Prompts for vCenter & SSH passwords via masked terminal input (read -s -p)
-# - Exports credentials strictly in memory (PKR_VAR_* and GOVC_*)
-# - Executes sub-second pre-flight check via govc about
-# - Validates Packer configuration syntax (packer validate)
-# - Checks for existing duplicate template and prompts for overwrite
-# - Prompts user confirmation before initiating build
+# Secure In-Memory Packer Golden Image Build Wrapper (Generalized Component)
+# - Run directly from inside packer directory: ./build.sh [--template <os_name>]
+# - Dynamically scans and supports multiple OS templates in packer/templates/
+# - Interactively prompts for OS template selection if no argument is provided
+# - Extracts target vCenter topology directly from template's packer.pkrvars.hcl
+# - Manages credentials strictly in RAM via lib/common.sh & lib/secrets.sh
+# - Executes pre-flight check via govc and prompts for duplicate VM overwrite
 # - Automatically clears in-memory credentials upon exit via shell trap
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-TEMPLATE_NAME="${1:-ubuntu-24.04}"
-if [[ "${TEMPLATE_NAME}" == "--template" ]]; then
-    TEMPLATE_NAME="${2:-ubuntu-24.04}"
+# Nạp các thư viện nền tảng nếu có sẵn
+# shellcheck source=lib/common.sh
+[[ -f "${REPO_ROOT}/lib/common.sh" ]] && source "${REPO_ROOT}/lib/common.sh"
+# shellcheck source=lib/secrets.sh
+[[ -f "${REPO_ROOT}/lib/secrets.sh" ]] && source "${REPO_ROOT}/lib/secrets.sh"
+# shellcheck source=lib/vsphere.sh
+[[ -f "${REPO_ROOT}/lib/vsphere.sh" ]] && source "${REPO_ROOT}/lib/vsphere.sh"
+
+trap cleanup_secrets EXIT INT TERM
+
+show_usage() {
+    echo "Sử dụng: $0 [TÙY CHỌN]"
+    echo ""
+    echo "Tùy chọn:"
+    echo "  -t, --template <tên_os>   Chỉ định tên template OS (ví dụ: ubuntu-24.04)"
+    echo "  -h, --help                Hiển thị hướng dẫn này"
+    echo ""
+    echo "Danh sách template có sẵn:"
+    local tmpls=()
+    mapfile -t tmpls < <(find "${SCRIPT_DIR}/templates" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort || true)
+    for t in "${tmpls[@]}"; do
+        echo "  - ${t}"
+    done
+}
+
+# 1. Xử lý tham số dòng lệnh
+TEMPLATE_NAME=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -t|--template)
+            TEMPLATE_NAME="${2:-}"
+            shift 2 || true
+            ;;
+        -h|--help)
+            show_usage
+            exit 0
+            ;;
+        *)
+            if [[ -z "${TEMPLATE_NAME}" ]]; then
+                TEMPLATE_NAME="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# 2. Tự động phát hiện hoặc hiển thị menu chọn template nếu chưa chỉ định
+AVAILABLE_TEMPLATES=()
+mapfile -t AVAILABLE_TEMPLATES < <(find "${SCRIPT_DIR}/templates" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort || true)
+
+if [[ ${#AVAILABLE_TEMPLATES[@]} -eq 0 ]]; then
+    log_error "Không tìm thấy thư mục template nào trong ${SCRIPT_DIR}/templates."
+    exit 1
 fi
 
-if [[ -d "${SCRIPT_DIR}/templates/${TEMPLATE_NAME}" ]]; then
-    TEMPLATE_DIR="${SCRIPT_DIR}/templates/${TEMPLATE_NAME}"
-elif [[ -f "${SCRIPT_DIR}/ubuntu-24.04.pkr.hcl" ]]; then
-    TEMPLATE_DIR="${SCRIPT_DIR}"
-else
-    TEMPLATE_DIR="${SCRIPT_DIR}/templates/ubuntu-24.04"
+if [[ -z "${TEMPLATE_NAME}" ]]; then
+    if [[ ${#AVAILABLE_TEMPLATES[@]} -eq 1 ]]; then
+        TEMPLATE_NAME="${AVAILABLE_TEMPLATES[0]}"
+        log_info "Tự động chọn template khả dụng duy nhất: ${TEMPLATE_NAME}"
+    else
+        log_banner "LỰA CHỌN HỆ ĐIỀU HÀNH CHO GOLDEN TEMPLATE (PACKER)"
+        echo "Danh sách template hệ điều hành có sẵn:"
+        for idx in "${!AVAILABLE_TEMPLATES[@]}"; do
+            echo "  $((idx+1))) ${AVAILABLE_TEMPLATES[$idx]}"
+        done
+        echo "  0) Hủy và thoát"
+        SEL_IDX=""
+        if ! read -r -p "Vui lòng chọn hệ điều hành (0-${#AVAILABLE_TEMPLATES[@]}) [1]: " SEL_IDX; then
+            echo ""
+            exit 0
+        fi
+        SEL_IDX="${SEL_IDX%$'\r'}"
+        SEL_IDX=${SEL_IDX:-1}
+        if [[ "${SEL_IDX}" == "0" ]]; then
+            log_info "Hủy thao tác tạo template."
+            exit 0
+        fi
+        if ! [[ "${SEL_IDX}" =~ ^[0-9]+$ ]] || [ "${SEL_IDX}" -lt 1 ] || [ "${SEL_IDX}" -gt "${#AVAILABLE_TEMPLATES[@]}" ]; then
+            log_error "Lựa chọn số thứ tự không hợp lệ."
+            exit 1
+        fi
+        TEMPLATE_NAME="${AVAILABLE_TEMPLATES[$((SEL_IDX-1))]}"
+    fi
+fi
+
+TEMPLATE_DIR="${SCRIPT_DIR}/templates/${TEMPLATE_NAME}"
+if [[ ! -d "${TEMPLATE_DIR}" ]]; then
+    log_error "Thư mục template không tồn tại: ${TEMPLATE_DIR}"
+    exit 1
 fi
 
 PKRVARS="${TEMPLATE_DIR}/packer.pkrvars.hcl"
 
-echo "=============================================================================="
-echo "He thong dieu phoi dong goi Template Packer an toan In-Memory"
-echo "Template: ${TEMPLATE_NAME} (${TEMPLATE_DIR})"
-echo "=============================================================================="
+log_banner "ĐÓNG GÓI GOLDEN TEMPLATE (PACKER) - IN-MEMORY"
+log_info "Hệ điều hành mục tiêu: ${TEMPLATE_NAME}"
+log_info "Thư mục làm việc:      ${TEMPLATE_DIR}"
 
-if [[ ! -f "${PKRVARS}" ]]; then
-    echo "Loi: Khong tim thay file cau hinh tai: ${PKRVARS}" >&2
-    exit 1
+# Tự động khởi tạo packer.pkrvars.hcl từ example nếu chưa tồn tại
+if [[ ! -f "${PKRVARS}" && -f "${PKRVARS}.example" ]]; then
+    log_info "Khởi tạo tệp biến cấu hình từ ${PKRVARS}.example..."
+    cp "${PKRVARS}.example" "${PKRVARS}"
 fi
 
-# Tu dong khoi tao user-data tu example neu chua ton tai
+# Tự động khởi tạo user-data từ example nếu chưa tồn tại
 if [[ ! -f "${TEMPLATE_DIR}/http/user-data" && -f "${TEMPLATE_DIR}/http/user-data.example" ]]; then
-    echo "Phat hien chua co user-data. Dang tu dong tao tu template example..."
+    log_info "Khởi tạo tệp user-data autoinstall từ example..."
     cp "${TEMPLATE_DIR}/http/user-data.example" "${TEMPLATE_DIR}/http/user-data"
 fi
 
-# 1. Trich xuat thong so vCenter tu file cau hinh
-VCENTER_SERVER=$(grep -E '^\s*vcenter_server\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2)
-VCENTER_USER=$(grep -E '^\s*vcenter_user\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2)
-VM_NAME=$(grep -E '^\s*vm_name\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2)
-
-echo "May chu vCenter: ${VCENTER_SERVER}"
-echo "Tai khoan:       ${VCENTER_USER}"
-echo "Ten template VM: ${VM_NAME}"
-echo "------------------------------------------------------------------------------"
-
-# 2. Nhap mat khau an tu terminal (Ho tro luu vet trong RAM)
-if [[ -n "${VCENTER_PASS:-}" ]]; then
-    echo "Mat khau vCenter da duoc nap tu bien moi truong."
-else
-    while [[ -z "${VCENTER_PASS:-}" ]]; do
-        read -s -p "Nhap mat khau quan tri vCenter: " VCENTER_PASS
-        echo ""
-        [[ -z "${VCENTER_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
-    done
+if [[ ! -f "${PKRVARS}" ]]; then
+    log_error "Không tìm thấy tệp biến cấu hình: ${PKRVARS}"
+    exit 1
 fi
 
-if [[ -n "${SSH_PASS:-}" ]]; then
-    echo "Mat khau SSH da duoc nap tu bien moi truong."
-else
-    while [[ -z "${SSH_PASS:-}" ]]; do
-        read -s -p "Nhap mat khau SSH khoi tao may ao: " SSH_PASS
-        echo ""
-        [[ -z "${SSH_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
-    done
+# 3. Trích xuất thông số vCenter từ tệp cấu hình
+VCENTER_SERVER=$(grep -E '^\s*vcenter_server\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2 || true)
+VCENTER_USER=$(grep -E '^\s*vcenter_user\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2 || true)
+VM_NAME=$(grep -E '^\s*vm_name\s*=' "${PKRVARS}" | head -n 1 | cut -d'"' -f2 || true)
+
+log_info "Máy chủ vCenter: ${VCENTER_SERVER}"
+log_info "Tài khoản:       ${VCENTER_USER}"
+log_info "Tên VM Template: ${VM_NAME}"
+
+# 4. Thu thập mật khẩu an toàn vào bộ nhớ RAM
+if [[ -z "${VCENTER_PASS:-}" ]]; then
+    prompt_password "VCENTER_PASS" "Nhập mật khẩu quản trị vCenter" || exit 1
 fi
 
-# 3. Nap bien moi truong vao RAM
+if [[ -z "${SSH_PASS:-}" ]]; then
+    prompt_password "SSH_PASS" "Nhập mật khẩu SSH khởi tạo máy ảo" || exit 1
+fi
+
 export PKR_VAR_vcenter_password="${VCENTER_PASS}"
 export PKR_VAR_ssh_password="${SSH_PASS}"
-export GOVC_URL="https://${VCENTER_SERVER}"
-export GOVC_USERNAME="${VCENTER_USER}"
-export GOVC_PASSWORD="${VCENTER_PASS}"
-export GOVC_INSECURE="1"
+export_govc_env "${VCENTER_SERVER}" "${VCENTER_USER}" "${VCENTER_PASS}"
 
-# 4. Kiem tra truoc (Pre-flight Check) va kiem tra trung lap Template bang govc
+# 5. Pre-flight Check và kiểm tra trùng lặp template trên vCenter
 if command -v govc &>/dev/null; then
-    echo "Dang xac thuc ket noi toi vCenter qua govc API..."
-    if govc about >/dev/null 2>&1; then
-        echo "Xac thuc vCenter thanh cong."
-    else
-        echo "Loi: Xac thuc vCenter that bai. Vui long kiem tra lai mat khau." >&2
+    log_info "Đang xác thực kết nối vCenter qua govc API..."
+    if ! check_vsphere_connectivity; then
+        log_error "Xác thực vCenter thất bại. Vui lòng kiểm tra lại thông tin đăng nhập hoặc mạng."
         exit 1
     fi
+    log_success "Xác thực kết nối vCenter thành công."
 
-    # Kiem tra xem VM hoac template da ton tai tren vCenter hay chua (tim kiem de quy)
-    VM_PATH=$(govc find -type m -name "${VM_NAME}" 2>/dev/null | head -n 1)
+    # Kiểm tra máy ảo / template đã tồn tại trên vCenter
+    VM_PATH=$(govc find -type m -name "${VM_NAME}" 2>/dev/null | head -n 1 || true)
     if [[ -n "${VM_PATH}" ]]; then
-        echo "------------------------------------------------------------------------------"
-        echo "CANH BAO: May ao / Template '${VM_NAME}' da ton tai tren vCenter tai:"
-        echo "Duong dan: ${VM_PATH}"
-        echo "Mac dinh Packer se gap loi 'The name already exists' va khong the build tiep."
-        echo "(Ghi chu: Neu ban khong thay no hien thi la Template, co the no la mot may ao (VM) bi kiet do lan build truoc bi loi)."
-        echo "------------------------------------------------------------------------------"
-        read -p "Ban co muon xoa VM/Template cu de build lai khong? (y/N): " OVERWRITE
-        OVERWRITE="${OVERWRITE%$'\r'}"
-        if [[ "${OVERWRITE}" =~ ^[yY]([eE][sS])?$ ]]; then
-            echo "Dang xoa '${VM_PATH}' tren vCenter..."
+        log_warn "Máy ảo / Template '${VM_NAME}' đã tồn tại trên vCenter tại: ${VM_PATH}"
+        log_warn "Mặc định Packer sẽ gặp lỗi duplicate name nếu không xử lý."
+        if confirm_action "Bạn có muốn xóa VM/Template cũ để đóng gói lại không?" "N"; then
+            log_info "Đang xóa '${VM_PATH}' trên vCenter..."
             if govc vm.destroy "${VM_PATH}"; then
-                echo "Da xoa thanh cong."
+                log_success "Đã xóa VM cũ thành công."
             else
-                echo "Canh bao: govc khong the xoa. Packer se tiep tuc chay nhung co the gap loi..."
+                log_warn "Lệnh xóa qua govc không thành công. Tiến trình Packer có thể gặp lỗi nếu trùng tên."
             fi
         else
-            echo "Dung tien trinh. Vui long doi ten 'vm_name' trong ${PKRVARS} de build phien ban moi."
+            log_info "Dừng tiến trình. Vui lòng đổi tên 'vm_name' trong ${PKRVARS} để đóng gói bản mới."
             exit 0
         fi
     fi
 fi
 
-# 5. Kiem tra cu phap Packer
-cd "${TEMPLATE_DIR}"
-echo "Cai dat plugin va kiem tra tinh hop le cua cau hinh Packer..."
-packer init .
-packer validate -var-file="${PKRVARS}" .
-echo "Cau hinh hop le."
+# 6. Kiểm tra cú pháp cấu hình Packer
+log_info "Cài đặt plugin và kiểm tra tính hợp lệ của cấu hình Packer..."
+(
+    cd "${TEMPLATE_DIR}"
+    packer init .
+    packer validate -var-file="${PKRVARS}" .
+)
+log_success "Cấu hình Packer hợp lệ."
 
-# 6. Yeu cau xac nhan truoc khi build
-echo "------------------------------------------------------------------------------"
-read -p "Xac nhan bat dau build template bang Packer? (Y/n): " CONFIRM
-CONFIRM="${CONFIRM%$'\r'}"
-CONFIRM=${CONFIRM:-Y}
-if [[ ! "${CONFIRM}" =~ ^[yY]([eE][sS])?$ ]]; then
-    echo "Huy tien trinh theo yeu cau cua nguoi dung."
+# 7. Xác nhận trước khi bắt đầu build
+if ! confirm_action "Xác nhận bắt đầu đóng gói template '${TEMPLATE_NAME}' bằng Packer?" "Y"; then
+    log_info "Hủy tiến trình theo yêu cầu của người dùng."
     exit 0
 fi
 
-# 7. Thuc thi build
-echo "=============================================================================="
-echo "Khoi chay Packer build..."
-echo "=============================================================================="
-packer build -var-file="${PKRVARS}" .
+# 8. Thực thi đóng gói template
+log_banner "BẮT ĐẦU ĐÓNG GÓI GOLDEN TEMPLATE: ${TEMPLATE_NAME}"
+(
+    cd "${TEMPLATE_DIR}"
+    packer build -var-file="${PKRVARS}" .
+)
+log_success "Hoàn tất đóng gói Golden Template: ${TEMPLATE_NAME}"

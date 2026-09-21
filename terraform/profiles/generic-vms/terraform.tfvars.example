@@ -1,0 +1,86 @@
+# ==============================================================================
+# vCenter Server Connection Configuration
+# ==============================================================================
+vsphere_server              = "<VCENTER_IP_OR_FQDN>"
+vsphere_user                = "<VCENTER_USER>"
+vsphere_insecure_connection = true
+
+# ==============================================================================
+# vSphere Infrastructure Targets
+# ==============================================================================
+vsphere_datacenter    = "Datacenter"
+vsphere_cluster       = "Cluster1"
+vsphere_datastore     = "datastore1"
+vsphere_template_name = "tpl-ubuntu-2404-golden"
+
+# ==============================================================================
+# Inventory Folder Configuration
+# ==============================================================================
+vm_folders       = ["Generic_Workloads"]
+vm_target_folder = "Generic_Workloads"
+
+# ==============================================================================
+# ESXi Host & Standard Switch Configuration (Optional port groups)
+# ==============================================================================
+esxi_hosts          = []
+virtual_switch_name = "vSwitch0"
+port_groups         = {}
+
+default_domain_name = "lab.local"
+default_dns_servers = ["8.8.8.8", "1.1.1.1"]
+
+# ==============================================================================
+# OS Credentials (Ansible Integration)
+# ==============================================================================
+ssh_username   = "sysops"
+ssh_public_key = "<YOUR_SSH_PUBLIC_KEY>"
+
+# ==============================================================================
+# DRS Cluster Rules Configuration
+# ==============================================================================
+enable_drs_rule    = false
+drs_rule_mandatory = false
+
+# ==============================================================================
+# Virtual Machine Workloads (Customizable Map of N Virtual Machines)
+# ==============================================================================
+vms = {
+  "web_01" = {
+    name         = "srv-web-01"
+    hostname     = "web-01"
+    vm_id        = 201
+    cpu_count    = 2
+    memory_mb    = 4096
+    disk_size_gb = 40
+    network_name = "VM Network"
+    ip_address   = "192.168.10.21"
+    netmask      = 24
+    gateway      = "192.168.10.1"
+    role         = "web_server"
+    extra_config = {
+      "guestinfo.node.role" = "web_server"
+    }
+  },
+  "db_01" = {
+    name         = "srv-db-01"
+    hostname     = "db-01"
+    vm_id        = 202
+    cpu_count    = 4
+    memory_mb    = 8192
+    disk_size_gb = 80
+    network_name = "VM Network"
+    ip_address   = "192.168.10.22"
+    netmask      = 24
+    gateway      = "192.168.10.1"
+    role         = "database"
+    extra_config = {
+      "guestinfo.node.role" = "database"
+    }
+  }
+}
+
+# ==============================================================================
+# Ansible Inventory Generation Options
+# ==============================================================================
+generate_ansible_inventory = true
+# ansible_inventory_path   = "./hosts.yml"
