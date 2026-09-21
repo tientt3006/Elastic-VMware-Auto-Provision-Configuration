@@ -5,12 +5,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATE_DIR="${SCRIPT_DIR}/../state"
+PRODUCT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${PRODUCT_DIR}/../.." && pwd)"
+STATE_DIR="${REPO_ROOT}/state"
 mkdir -p "${STATE_DIR}"
 
-VARS_CONF="${SCRIPT_DIR}/../vars.conf"
-if [[ -f "${VARS_CONF}" ]]; then
-    source "${VARS_CONF}"
+if [[ -f "${PRODUCT_DIR}/product.conf" ]]; then
+    source "${PRODUCT_DIR}/product.conf"
+elif [[ -f "${REPO_ROOT}/vars.conf" ]]; then
+    source "${REPO_ROOT}/vars.conf"
 fi
 
 ACTION="${1:-apply}"
@@ -257,8 +260,8 @@ PYEOF
 run_fleet_ansible_integration() {
     echo ""
     echo "--- [4/4] CẤU HÌNH KIBANA FLEET INTEGRATION QUA ANSIBLE ---"
-    cd "${SCRIPT_DIR}/../ansible/products/elastic-stack"
-    export ANSIBLE_CONFIG="${SCRIPT_DIR}/../ansible/ansible.cfg"
+    cd "${REPO_ROOT}/ansible/products/elastic-stack"
+    export ANSIBLE_CONFIG="${REPO_ROOT}/ansible/ansible.cfg"
 
     ansible-playbook playbooks/configure_vsphere_observability.yml \
         -e "vcenter_server=${SITE_VCSA_IP} vcenter_readonly_user=${SVC_USER} vcenter_readonly_password=${SVC_PASS} elastic_password=${ELASTIC_PASS}"
@@ -376,8 +379,8 @@ PYEOF
 
     echo ""
     echo "--- GỠ BỎ CHÍNH SÁCH GIÁM SÁT VSPHERE TRÊN KIBANA FLEET ---"
-    cd "${SCRIPT_DIR}/../ansible/products/elastic-stack"
-    export ANSIBLE_CONFIG="${SCRIPT_DIR}/../ansible/ansible.cfg"
+    cd "${REPO_ROOT}/ansible/products/elastic-stack"
+    export ANSIBLE_CONFIG="${REPO_ROOT}/ansible/ansible.cfg"
 
     ansible-playbook playbooks/rollback_vsphere_observability.yml \
         -e "elastic_password=${ELASTIC_PASS}" || true

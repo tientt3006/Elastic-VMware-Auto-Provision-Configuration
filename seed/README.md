@@ -1,64 +1,16 @@
-# Huong dan van hanh may ao Automation va quan ly ISO
+# Trạm điều khiển tự động hóa và quản lý ISO (Seed Appliance)
 
-Thu muc nay chua cac kịch ban khoi tao moi truong va quan ly tep ISO tren may ao dieu phoi tai cho (Automation Ubuntu Seed Appliance).
+Thư mục này chứa các kịch bản nền tảng khởi tạo môi trường công cụ tự động hóa và quản lý tệp ISO trên hạ tầng VMware vSphere.
 
-## 1. Danh muc kich ban
+## 1. Danh mục kịch bản
 
-| Kich ban | Chuc nang chinh |
+| Kịch bản | Mô tả chức năng |
 | :--- | :--- |
-| `setup_automation_env.sh` | Cai dat toan bo bo cong cu IaC: Packer, Terraform, Ansible, govc, pyvmomi, git tren Ubuntu. |
-| `download_iso.sh` | Tu dong tai tep ISO (Ubuntu Server, VCSA) kem xac thuc ma bam SHA256 va ho tro tiep tuc tai (resume). |
-| `upload_iso_to_vcenter.sh` | Day tep ISO len ESXi Datastore hoac vCenter Content Library qua `govc` hoac HTTPS endpoint. |
+| [`setup_env.sh`](file:///d:/neit_ng/prjs_i/auto_provision_configuration/seed/setup_env.sh) | Cài đặt toàn bộ bộ công cụ IaC: Packer, Terraform, Ansible, govc, pyVmomi trên Ubuntu. |
+| [`download_iso.sh`](file:///d:/neit_ng/prjs_i/auto_provision_configuration/seed/download_iso.sh) | Tự động tải tệp ISO Ubuntu Server / VCSA kèm kiểm tra mã băm SHA256. |
+| [`upload_iso.sh`](file:///d:/neit_ng/prjs_i/auto_provision_configuration/seed/upload_iso.sh) | Đẩy tệp ISO lên Datastore của ESXi hoặc import vào VMware Content Library. |
 
----
+## 2. Tài liệu kỹ thuật chi tiết
 
-## 2. Quy trinh van hanh
-
-### Buoc 1: Cai dat bo cong cu IaC len may Automation
-Thuc thi kịch ban voi quyen `sudo`:
-```bash
-sudo ./setup_automation_env.sh
-```
-
-Kịch ban se tu dong:
-- Cai dat cac goi he thong can thiet.
-- Cau hinh kho luu tru HashiCorp va cai dat `terraform`, `packer`.
-- Khoi tao Python virtual environment tai `/opt/venvs/ansible-env`, cai dat `ansible`, `pyvmomi`, tao symlink he thong.
-- Tai va cai dat binary `govc` moi nhat tu GitHub vao `/usr/local/bin/govc`.
-- Kiem tra phien ban cac cong cu sau khi hoan tat.
-
----
-
-### Buoc 2: Tai tep ISO cai dat
-Tai ban Ubuntu 24.04 LTS Live Server:
-```bash
-./download_iso.sh --ubuntu
-```
-
-Hoac tai tep ISO tu URL noi bo:
-```bash
-./download_iso.sh --custom "http://mirror.internal/isos/custom.iso" "sha256_checksum_neu_co"
-```
-Tep ISO se duoc luu mac dinh tai thu muc `./iso_cache/`.
-
----
-
-### Buoc 3: Day ISO len Datastore hoac Content Library
-- **Day len Datastore tren ESXi Host 1** (truoc khi co vCenter):
-  ```bash
-  ./upload_iso_to_vcenter.sh \
-    -f ./iso_cache/ubuntu-24.04.1-live-server-amd64.iso \
-    -H <ESXI_HOST_IP> \
-    -u root \
-    -d datastore1 \
-    -p iso
-  ```
-
-- **Import vao Content Library tren vCenter** (sau khi da cai VCSA):
-  ```bash
-  ./upload_iso_to_vcenter.sh \
-    -f ./iso_cache/ubuntu-24.04.1-live-server-amd64.iso \
-    -H vcsa.lab.internal \
-    -u <VCENTER_USER> \
-    -l "Content-Library-Lab"
-  ```
+Quy trình vận hành, tham số dòng lệnh và hướng dẫn từng bước được trình bày chi tiết tại:
+- [docs/00_seed_and_iso_management_guide.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/docs/00_seed_and_iso_management_guide.md)

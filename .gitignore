@@ -19,11 +19,17 @@ iso_cache/
 *.tfvars
 *.tfvars.json
 !*.tfvars.example
+*.tfplan
+tfplan
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 
 # Ansible runtime artifacts and auto-generated shared env
 *.retry
 ansible/products/*/inventories/*/group_vars/all/shared_env.yml
-.vault_pass*
+.vault*
 
 # Packer build caches
 packer_cache/
@@ -47,6 +53,7 @@ backup_pre_refactor_gd1/
 ansible/products/*/inventories/*/hosts.yml
 ansible/products/*/inventories/*/group_vars/all/main.yml
 packer/templates/*/http/user-data
+state/
 
 # Execution and deploy logs
 *.log

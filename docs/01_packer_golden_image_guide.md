@@ -185,7 +185,7 @@ boot_command = [
 
 ## 7. Khắc phục sự cố thường gặp
 
-Chi tiết phân tích mã lỗi, nhật ký điều tra và 11 tình huống sự cố thực tế được trình bày đầy đủ tại [packer_issues_and_solutions.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/docs/packer_issues_and_solutions.md). Dưới đây là các sự cố thường gặp nhất:
+Chi tiết phân tích mã lỗi, nhật ký điều tra và 11 tình huống sự cố thực tế được trình bày đầy đủ tại [01_packer_troubleshooting_runbook.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/docs/01_packer_troubleshooting_runbook.md). Dưới đây là các sự cố thường gặp nhất:
 
 ### 7.1. Lỗi: Template đã tồn tại trên vCenter (The name already exists)
 

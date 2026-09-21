@@ -93,7 +93,7 @@ run_elastic_vsphere_observability() {
         return 1
     fi
 
-    "${REPO_ROOT}/seed/manage_vsphere_observability.sh" apply
+    "${PRODUCT_DIR}/scripts/manage_vsphere_observability.sh" apply
 }
 
 run_elastic_vsphere_rollback() {
@@ -103,7 +103,7 @@ run_elastic_vsphere_rollback() {
         return 1
     fi
 
-    "${REPO_ROOT}/seed/manage_vsphere_observability.sh" rollback
+    "${PRODUCT_DIR}/scripts/manage_vsphere_observability.sh" rollback
 }
 
 ensure_elastic_configured() {

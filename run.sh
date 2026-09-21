@@ -16,7 +16,7 @@ chmod +x "${REPO_ROOT}/packer/build.sh" \
          "${REPO_ROOT}/seed/download_iso.sh" \
          "${REPO_ROOT}/seed/upload_iso.sh" \
          "${REPO_ROOT}/seed/setup_env.sh" \
-         "${REPO_ROOT}/seed/manage_vsphere_observability.sh" 2>/dev/null || true
+         "${REPO_ROOT}/products/elastic-stack/scripts/manage_vsphere_observability.sh" 2>/dev/null || true
 
 # Nạp các thư viện dùng chung
 # shellcheck source=lib/common.sh

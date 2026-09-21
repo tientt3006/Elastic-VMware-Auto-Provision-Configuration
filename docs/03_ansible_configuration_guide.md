@@ -25,28 +25,28 @@ Hệ thống phân tán trên 4 máy ảo chuyên dụng:
 
 ```text
 ansible/
-├── ansible.cfg                                     # Cấu hình môi trường thực thi Ansible
+├── ansible.cfg                                     # Cấu hình môi trường thực thi Ansible nền tảng
 ├── requirements.yml                                # Phụ thuộc Galaxy Collections
 └── products/
-    └── elastic-stack/
-        ├── run_deploy.sh                           # Kịch bản triển khai cụm lõi với cơ chế tiêm mật khẩu RAM
-        ├── run_observability.sh                    # Kịch bản tự động hóa 100% hệ thống quan sát Day-2
-        ├── run_backup.sh                           # Kịch bản điều phối sao lưu và phục hồi thảm họa an toàn
-        ├── inventories/
-        │   └── lab/
-        │       ├── hosts.yml                       # Định nghĩa địa chỉ IP, phân nhóm và vai trò nút (tự sinh từ Terraform)
-        │       └── group_vars/all/main.yml         # Khai báo các tham số cấu hình chung của hệ thống
-        ├── playbooks/
-        │   ├── deploy_cluster.yml                  # Triển khai cụm Elasticsearch HA và Kibana Gateway
-        │   ├── setup_observability.yml             # Triển khai Fleet Server, Policies và Integrations
-        │   └── backup_restore.yml                  # Quản lý sao lưu snapshot và phục hồi
+    ├── elastic-stack/                              # Sản phẩm Elastic Stack HA
+    │   ├── run_deploy.sh                           # Kịch bản triển khai cụm lõi với cơ chế tiêm mật khẩu RAM
+    │   ├── run_observability.sh                    # Kịch bản tự động hóa 100% hệ thống quan sát Day-2
+    │   ├── run_backup.sh                           # Kịch bản điều phối sao lưu và phục hồi thảm họa an toàn
+    │   ├── inventories/lab/                        # Inventory máy chủ lab (hosts.yml, group_vars)
+    │   ├── playbooks/                              # Playbooks: deploy_cluster, site_observability, backup...
+    │   └── roles/                                  # Roles: ca_setup, elasticsearch, kibana, fleet_server...
+    ├── zabbix/                                     # Khung sản phẩm Zabbix Monitoring
+    │   ├── inventories/lab/hosts.yml.example
+    │   ├── playbooks/deploy_stack.yml
+    │   └── roles/
+    ├── haproxy/                                    # Khung sản phẩm HAProxy & Keepalived
+    │   ├── inventories/lab/hosts.yml.example
+    │   ├── playbooks/deploy_stack.yml
+    │   └── roles/
+    └── infra-services/                             # Khung sản phẩm dịch vụ hạ tầng mạng (DNS/NTP)
+        ├── inventories/lab/hosts.yml.example
+        ├── playbooks/deploy_stack.yml
         └── roles/
-            ├── ca_setup/
-            ├── elasticsearch/
-            ├── kibana/
-            ├── fleet_server/
-            ├── agent_integration/
-            └── elastic_observability/
 ```
 
 ---

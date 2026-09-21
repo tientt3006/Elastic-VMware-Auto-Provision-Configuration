@@ -17,25 +17,25 @@ Dự án Terraform này chịu trách nhiệm tự động hóa việc khởi t�
 
 ```text
 terraform/
-├── modules/                        # Các module dùng chung (compute, network, folder, cluster_rules, content_library)
+├── modules/                        # Các module dùng chung (compute, network, folder, cluster_rules, content_library, templates)
 └── profiles/
-    └── elastic-stack/
-        ├── versions.tf             # Ràng buộc phiên bản Terraform core và vSphere provider
-        ├── variables.tf            # Định nghĩa schema đầu vào có kiểm tra kiểu dữ liệu
-        ├── main.tf                 # Tệp điều phối trung tâm kết nối các data source và module
-        ├── outputs.tf              # Xuất thông tin IP, ID tài nguyên và inventory cho Ansible
-        ├── terraform.tfvars.example # Tệp mẫu tham khảo không chứa thông tin nhạy cảm
-        ├── run.sh                  # Kịch bản thực thi an toàn với cơ chế tiêm mật khẩu In-Memory
+    ├── elastic-stack/              # Profile triển khai cụm Elastic Stack HA
+    │   ├── versions.tf             # Ràng buộc phiên bản Terraform core và vSphere provider
+    │   ├── variables.tf            # Định nghĩa schema đầu vào có kiểm tra kiểu dữ liệu
+    │   ├── main.tf                 # Tệp điều phối trung tâm kết nối các data source và module
+    │   ├── outputs.tf              # Xuất thông tin IP, ID tài nguyên và inventory cho Ansible
+    │   ├── terraform.tfvars.example # Tệp mẫu tham khảo không chứa thông tin nhạy cảm
+    │   ├── run.sh                  # Kịch bản thực thi an toàn với cơ chế tiêm mật khẩu In-Memory
+    │   └── templates/
+    │       └── hosts.yml.tpl       # Template sinh inventory Ansible riêng cho Elastic Stack
+    └── generic-vms/                # Profile cấp phát máy ảo tùy chỉnh đa mục đích
+        ├── variables.tf            # Khai báo biến profile tổng quát
+        ├── main.tf                 # Tệp điều phối cấp phát máy ảo tùy chọn
+        ├── outputs.tf              # Xuất thông tin máy ảo và inventory
+        ├── terraform.tfvars.example # Cấu hình mẫu cho máy ảo tùy biến (Web/DB)
+        ├── run.sh                  # Kịch bản thực thi an toàn In-Memory
         └── templates/
-            └── hosts.yml.tpl       # Template sinh inventory Ansible
-├── README.md                       # Tài liệu hướng dẫn vận hành kỹ thuật
-├── giai_thich_ke_hoach_thuc_thi.md # Phân tích chi tiết các giai đoạn Plan và Apply
-└── modules/
-    ├── folder/                     # Module khởi tạo hàng loạt thư mục máy ảo
-    ├── content_library/            # Module đồng bộ mẫu máy ảo vào Content Library
-    ├── network/                    # Module tạo port group trên vSwitch vật lý
-    ├── compute/                    # Module nhân bản và tùy biến hệ điều hành máy ảo
-    └── cluster_rules/              # Module cấu hình quy tắc DRS Anti-Affinity
+            └── hosts.yml.tpl       # Template sinh inventory Ansible đa vai trò
 ```
 
 ---
