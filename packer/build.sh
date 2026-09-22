@@ -374,15 +374,15 @@ log_info "Cài đặt plugin và kiểm tra tính hợp lệ của cấu hình P
 log_success "Cấu hình Packer hợp lệ."
 
 # 7. Xác nhận trước khi bắt đầu build
-if ! confirm_action "Xác nhận bắt đầu đóng gói template '${TEMPLATE_NAME}' bằng Packer?" "Y"; then
+if ! confirm_action "Xác nhận bắt đầu đóng gói VM Template '${VM_NAME}' (Hệ điều hành: ${TEMPLATE_NAME}) bằng Packer?" "Y"; then
     log_info "Hủy tiến trình theo yêu cầu của người dùng."
     exit 0
 fi
 
 # 8. Thực thi đóng gói template
-log_banner "BẮT ĐẦU ĐÓNG GÓI GOLDEN TEMPLATE: ${TEMPLATE_NAME}"
+log_banner "BẮT ĐẦU ĐÓNG GÓI VM TEMPLATE: ${VM_NAME} (HỆ ĐIỀU HÀNH: ${TEMPLATE_NAME})"
 (
     cd "${TEMPLATE_DIR}"
     packer build -var-file="${PKRVARS}" .
 )
-log_success "Hoàn tất đóng gói Golden Template: ${TEMPLATE_NAME}"
+log_success "Hoàn tất đóng gói VM Template: ${VM_NAME} (${TEMPLATE_NAME})"

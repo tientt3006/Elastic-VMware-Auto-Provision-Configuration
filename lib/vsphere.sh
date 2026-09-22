@@ -10,6 +10,8 @@ SCRIPT_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_LIB_DIR}/common.sh"
 # shellcheck source=lib/secrets.sh
 source "${SCRIPT_LIB_DIR}/secrets.sh"
+# shellcheck source=lib/content_library.sh
+[[ -f "${SCRIPT_LIB_DIR}/content_library.sh" ]] && source "${SCRIPT_LIB_DIR}/content_library.sh"
 
 check_vsphere_connectivity() {
     if ! command -v govc &> /dev/null; then
@@ -257,7 +259,7 @@ run_iso_menu() {
         last_iso=$(grep -E '^LAST_USED_ISO=' "${config_file}" | cut -d'"' -f2 || true)
     fi
 
-    if [[ -n "${last_iso}" ]]; then
+    if [[ -n "${last_iso}" && -n "${datastore}" && "${datastore}" != *"<"*">"* ]]; then
         log_info "Phát hiện tệp ISO đã dùng trong cấu hình gần nhất: ${last_iso}"
         if confirm_action "Tiếp tục sử dụng tệp ISO này trên Datastore [${datastore}]?" "Y"; then
             update_iso_in_packer "${pkr_file}" "${datastore}" "${last_iso}"
@@ -265,14 +267,30 @@ run_iso_menu() {
         fi
     fi
 
+    ensure_target_datastore() {
+        if [[ -z "${datastore}" || "${datastore}" == *"<"*">"* ]]; then
+            local input_ds=""
+            read -r -p "Nhập tên Datastore đích trên vCenter: " input_ds
+            input_ds="${input_ds%$'\r'}"
+            if [[ -z "${input_ds}" || "${input_ds}" == *"<"*">"* ]]; then
+                log_error "Tên Datastore không được để trống hoặc chứa ký tự mẫu."
+                return 1
+            fi
+            datastore="${input_ds}"
+        fi
+        return 0
+    }
+
     while true; do
         echo ""
         echo "Phương thức thiết lập ISO cài đặt hệ điều hành:"
         echo "  1) Tải ISO tự động từ Internet (Ubuntu 24.04 LTS Live Server) & upload lên Datastore"
         echo "  2) Chọn tệp ISO từ đĩa cục bộ & upload lên Datastore"
         echo "  3) Chọn tệp ISO đã có sẵn trên Datastore vCenter"
+        echo "  4) Chọn tệp ISO từ vSphere Content Library"
+        echo "  5) Quản lý kho vSphere Content Library (Tạo thư viện, nạp ISO)"
         echo "  0) Hủy và quay lại"
-        if ! read -r -p "Nhập lựa chọn (0-3) [1]: " ISO_CHOICE; then
+        if ! read -r -p "Nhập lựa chọn (0-5) [1]: " ISO_CHOICE; then
             echo ""
             return 1
         fi
@@ -285,6 +303,7 @@ run_iso_menu() {
                 return 1
                 ;;
             1)
+                ensure_target_datastore || continue
                 log_info "Bắt đầu tải ISO từ nguồn phát hành Ubuntu..."
                 if [[ -x "${seed_dir}/download_iso.sh" ]]; then
                     (cd "${seed_dir}" && ./download_iso.sh --ubuntu)
@@ -311,6 +330,7 @@ run_iso_menu() {
                 break
                 ;;
             2)
+                ensure_target_datastore || continue
                 if ! read -r -p "Nhập đường dẫn thư mục chứa ISO cục bộ (ví dụ: /mnt/d/ISO hoặc .): " LOCAL_DIR; then
                     echo ""
                     return 1
@@ -353,6 +373,7 @@ run_iso_menu() {
                 break
                 ;;
             3)
+                ensure_target_datastore || continue
                 log_info "Đang quét danh sách tệp .iso trên Datastore [${datastore}]..."
                 local raw_ls
                 if ! raw_ls=$(govc datastore.ls -R -ds="${datastore}" 2>&1); then
@@ -386,6 +407,14 @@ run_iso_menu() {
                 update_iso_in_packer "${pkr_file}" "${datastore}" "${chosen_remote}"
                 save_last_used_iso "${config_file}" "${chosen_remote}"
                 break
+                ;;
+            4)
+                if select_iso_from_content_library "${pkr_file}" "${config_file}"; then
+                    break
+                fi
+                ;;
+            5)
+                run_content_library_menu "${config_file}"
                 ;;
             *)
                 log_warn "Lựa chọn không hợp lệ."

@@ -21,10 +21,11 @@ source "vsphere-iso" "ubuntu" {
   insecure_connection = var.vcenter_insecure_connection
 
   # Infrastructure placement
-  datacenter = var.vcenter_datacenter
-  cluster    = var.vcenter_cluster
-  datastore  = var.vcenter_datastore
-  # folder     = var.vcenter_folder
+  datacenter                     = var.vcenter_datacenter
+  cluster                        = var.vcenter_cluster
+  datastore                      = var.vcenter_datastore
+  # folder                       = var.vcenter_folder
+  set_host_for_datastore_uploads = true
 
   # Virtual machine identity and lifecycle
   vm_name             = var.vm_name

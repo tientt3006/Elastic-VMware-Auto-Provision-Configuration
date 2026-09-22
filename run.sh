@@ -43,7 +43,7 @@ run_platform_tools_menu() {
         echo "=============================================================================="
         echo "1) Tạo Golden Template (Packer)"
         echo "2) Cấp phát hạ tầng (Terraform Profile)"
-        echo "3) Quản lý tệp ISO trên Datastore"
+        echo "3) Quản lý kho ISO & Content Library"
         echo "4) Cài đặt môi trường công cụ tự động hóa (Seed Setup)"
         echo "0) Quay lại menu chính"
         if ! read -r -p "Vui lòng chọn (0-4) [1]: " TOOL_CHOICE; then
@@ -87,16 +87,16 @@ run_platform_tools_menu() {
                     fi
                     sel="${sel%$'\r'}"
                     sel="${sel:-${#os_templates[@]}}"
-                    if [[ "${sel}" =~ ^[0-9]+$ ]] && [ "${sel}" -ge 1 ] && [ "${sel}" -le "${#os_templates[@]}" ]; then
-                        chosen_os="${os_templates[$((sel-1))]}"
-                    else
-                        chosen_os="${sel}"
+                    if ! [[ "${sel}" =~ ^[0-9]+$ ]] || [ "${sel}" -lt 1 ] || [ "${sel}" -gt "${#os_templates[@]}" ]; then
+                        log_error "Lựa chọn không hợp lệ."
+                        continue
                     fi
+                    chosen_os="${os_templates[$((sel-1))]}"
                 fi
 
                 # Nếu người dùng nhập tên OS không tồn tại trong thư mục templates/:
                 if [[ ! -d "${REPO_ROOT}/packer/templates/${chosen_os}" ]]; then
-                    log_warn "Thư mục template hệ điều hành '${chosen_os}' không tồn tại trong packer/templates/."
+                    log_warn "Thư mục template '${chosen_os}' không tồn tại trong packer/templates/."
                     log_info "Tự động sử dụng thư mục hệ điều hành mặc định: ${default_os}."
                     echo "Nhấn [Enter] để đồng ý sử dụng [${default_os}] (hoặc nhập 'q' để hủy)..."
                     local confirm=""
@@ -120,7 +120,7 @@ run_platform_tools_menu() {
                 if [[ -f "${pkr_file}" ]]; then
                     local v
                     v=$(grep -E '^\s*vm_name\s*=' "${pkr_file}" | head -n 1 | cut -d'"' -f2 || true)
-                    [[ -n "${v}" ]] && current_vm_name="${v}"
+                    [[ -n "${v}" && "${v}" != *"<"*">"* ]] && current_vm_name="${v}"
                 fi
 
                 echo ""
@@ -138,14 +138,15 @@ run_platform_tools_menu() {
                     log_success "Đã lưu tên máy ảo VM Template: ${input_vm_name}"
                 fi
 
+                log_info "Khởi chạy quy trình đóng gói Golden Template cho: ${chosen_os}..."
                 (cd "${REPO_ROOT}/packer" && ./build.sh --template "${chosen_os}")
                 ;;
             2)
                 log_banner "CẤP PHÁT HẠ TẦNG (TERRAFORM)"
                 local profiles=()
-                mapfile -t profiles < <(find "${REPO_ROOT}/terraform/profiles" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+                mapfile -t profiles < <(find "${REPO_ROOT}/terraform/profiles" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort || true)
                 if [[ ${#profiles[@]} -eq 0 ]]; then
-                    log_warn "Không tìm thấy hồ sơ (profile) Terraform nào."
+                    log_error "Không tìm thấy profile Terraform nào trong terraform/profiles/."
                     continue
                 fi
                 echo "Danh sách profile Terraform có sẵn:"
@@ -153,7 +154,8 @@ run_platform_tools_menu() {
                     echo "  $((idx+1))) ${profiles[$idx]}"
                 done
                 echo "  0) Quay lại"
-                if ! read -r -p "Chọn số thứ tự profile muốn chạy (0-${#profiles[@]}): " PROF_IDX; then
+                local PROF_IDX=""
+                if ! read -r -p "Vui lòng chọn profile cần triển khai (0-${#profiles[@]}) [1]: " PROF_IDX; then
                     echo ""
                     return 0
                 fi
@@ -170,11 +172,31 @@ run_platform_tools_menu() {
                 (cd "${REPO_ROOT}/terraform/profiles/${selected_profile}" && ./run.sh)
                 ;;
             3)
-                log_banner "QUẢN LÝ TỆP ISO TRÊN DATASTORE"
+                log_banner "QUẢN LÝ KHO ISO VÀ VSPHERE CONTENT LIBRARY"
+                echo "Chọn phạm vi thao tác:"
+                echo "  1) Cấu hình tệp ISO cho Golden Template (Packer)"
+                echo "  2) Quản lý kho vSphere Content Library (Liệt kê, tạo mới, nạp ISO)"
+                echo "  0) Quay lại"
+                local iso_scope=""
+                if ! read -r -p "Vui lòng chọn (0-2) [1]: " iso_scope; then
+                    echo ""
+                    continue
+                fi
+                iso_scope="${iso_scope%$'\r'}"
+                iso_scope="${iso_scope:-1}"
+
+                if [[ "${iso_scope}" == "0" ]]; then
+                    continue
+                elif [[ "${iso_scope}" == "2" ]]; then
+                    run_content_library_menu "${REPO_ROOT}/products/elastic-stack/product.conf"
+                    continue
+                fi
+
                 local os_templates=()
                 mapfile -t os_templates < <(find "${REPO_ROOT}/packer/templates" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort || true)
                 local target_os="ubuntu-24.04"
                 if [[ ${#os_templates[@]} -gt 1 ]]; then
+                    echo ""
                     echo "Chọn hệ điều hành để cấu hình tệp ISO:"
                     for idx in "${!os_templates[@]}"; do
                         echo "  $((idx+1))) ${os_templates[$idx]}"
@@ -208,19 +230,7 @@ run_platform_tools_menu() {
                         default_ds=$(grep -E '^\s*ISO_DATASTORE=' "${REPO_ROOT}/products/elastic-stack/product.conf" | cut -d'"' -f2 || true)
                     fi
                 fi
-                local ds_prompt="Nhập tên Datastore đích"
-                [[ -n "${default_ds}" && "${default_ds}" != *"<"*">"* ]] && ds_prompt="${ds_prompt} [${default_ds}]"
-                if ! read -r -p "${ds_prompt}: " TARGET_DS; then
-                    echo ""
-                    return 0
-                fi
-                TARGET_DS="${TARGET_DS%$'\r'}"
-                TARGET_DS="${TARGET_DS:-${default_ds}}"
-                if [[ -z "${TARGET_DS}" || "${TARGET_DS}" == *"<"*">"* ]]; then
-                    log_error "Tên Datastore không được để trống hoặc chứa placeholder."
-                    continue
-                fi
-                run_iso_menu "${TARGET_DS}" "${target_pkr}" "${REPO_ROOT}/products/elastic-stack/product.conf" "${REPO_ROOT}/seed"
+                run_iso_menu "${default_ds}" "${target_pkr}" "${REPO_ROOT}/products/elastic-stack/product.conf" "${REPO_ROOT}/seed"
                 ;;
             4)
                 log_banner "CÀI ĐẶT MÔI TRƯỜNG CÔNG CỤ (SEED SETUP)"
