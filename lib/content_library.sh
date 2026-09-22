@@ -341,20 +341,40 @@ select_iso_from_content_library() {
     fi
 
     local chosen_iso_file="${iso_list[$((sel_iso-1))]}"
-    log_info "Đang phân giải đường dẫn tầng Datastore cho: ${chosen_iso_file}..."
+    log_info "Đang xác định định danh chuẩn vSphere Content Library cho: ${chosen_iso_file}..."
 
-    local resolved_path
-    resolved_path=$(resolve_content_library_iso_datastore_path "${chosen_lib}" "${chosen_iso_file}")
-    if [[ -z "${resolved_path}" ]]; then
-        log_error "Không thể phân giải đường dẫn Datastore của ISO trong Content Library."
-        return 1
+    # Truy vấn tệp con bên trong item (nếu có)
+    local sub_file=""
+    local files_raw
+    files_raw=$(govc library.ls "/${chosen_lib}/${chosen_iso_file}/" 2>/dev/null || true)
+    if [[ -n "${files_raw}" ]]; then
+        sub_file=$(echo "${files_raw}" | sed "s|^/${chosen_lib}/${chosen_iso_file}/||" | tr -d '\r' | grep -i '\.iso$' | head -n 1 || true)
     fi
 
-    log_success "Đường dẫn Datastore hợp lệ: ${resolved_path}"
+    local cl_iso_path=""
+    if [[ -n "${sub_file}" && "${chosen_iso_file}" != "${sub_file}" ]]; then
+        cl_iso_path="${chosen_lib}/${chosen_iso_file}/${sub_file}"
+    elif [[ -n "${sub_file}" && "${chosen_iso_file}" == "${sub_file}" ]]; then
+        cl_iso_path="${chosen_lib}/${chosen_iso_file}"
+    else
+        cl_iso_path="${chosen_lib}/${chosen_iso_file}"
+    fi
 
-    # Trích xuất tên Datastore từ đường dẫn dạng [DatastoreName] path...
-    local lib_datastore
-    lib_datastore=$(echo "${resolved_path}" | sed -E 's/^\[([^]]+)\].*/\1/' || true)
+    log_success "Định danh ISO chuẩn vSphere Content Library: ${cl_iso_path}"
+
+    # Xác định Datastore lưu trữ của Content Library (phục vụ kiểm tra/đồng bộ vcenter_datastore)
+    local lib_datastore=""
+    local resolved_ds_path
+    resolved_ds_path=$(resolve_content_library_iso_datastore_path "${chosen_lib}" "${chosen_iso_file}" 2>/dev/null || true)
+    if [[ -n "${resolved_ds_path}" ]]; then
+        lib_datastore=$(echo "${resolved_ds_path}" | sed -E 's/^\[([^]]+)\].*/\1/' || true)
+    fi
+    if [[ -z "${lib_datastore}" ]]; then
+        lib_datastore=$(govc library.info "/${chosen_lib}" 2>/dev/null | tr -d '\r' | grep -i 'Datastore:' | awk '{print $2}' || true)
+    fi
+    if [[ -n "${lib_datastore}" ]]; then
+        log_info "Datastore lưu trữ của Content Library: [${lib_datastore}]"
+    fi
 
     # Khởi tạo tệp cấu hình Packer từ .example nếu chưa tồn tại
     if [[ ! -f "${pkr_file}" && -f "${pkr_file}.example" ]]; then
@@ -370,34 +390,36 @@ select_iso_from_content_library() {
 
     # Cập nhật vào file packer.pkrvars.hcl
     if [[ -f "${pkr_file}" ]]; then
-        # Cập nhật danh sách iso_paths
+        # Cập nhật danh sách iso_paths bằng định danh chuẩn Content Library
         if grep -q "^iso_paths" "${pkr_file}"; then
             sed -i -e '/^iso_paths[[:space:]]*=[[:space:]]*\[/,/^[[:space:]]*\]/c\
 iso_paths = [\
-  "'"${resolved_path}"'"\
+  "'"${cl_iso_path}"'"\
 ]' "${pkr_file}"
             log_success "Đã cập nhật iso_paths trong ${pkr_file}:"
-            log_success "  ${resolved_path}"
+            log_success "  ${cl_iso_path}"
         fi
 
         # Kiểm tra và đồng bộ vcenter_datastore nếu đang chứa placeholder
-        local cur_ds
-        cur_ds=$(grep -E '^\s*vcenter_datastore\s*=' "${pkr_file}" | head -n 1 | cut -d'"' -f2 || true)
-        if [[ -z "${cur_ds}" || "${cur_ds}" == *"<"*">"* ]]; then
-            sed -i -E "s/(vcenter_datastore\s*=\s*\")[^\"]+(\")/\1${lib_datastore}\2/" "${pkr_file}"
-            log_success "Đã tự động đồng bộ vcenter_datastore thành Datastore của Content Library: ${lib_datastore}"
-        elif [[ "${cur_ds}" != "${lib_datastore}" ]]; then
-            log_warn "Cảnh báo: Datastore của VM (${cur_ds}) khác Datastore của Content Library (${lib_datastore})."
-            echo "Để tránh lỗi 'Invalid configuration for device 0', hai Datastore này nên truy cập được từ cùng host ESXi."
-            if confirm_action "Bạn có muốn đồng bộ vcenter_datastore sang '${lib_datastore}' không?" "Y"; then
+        if [[ -n "${lib_datastore}" ]]; then
+            local cur_ds
+            cur_ds=$(grep -E '^\s*vcenter_datastore\s*=' "${pkr_file}" | head -n 1 | cut -d'"' -f2 || true)
+            if [[ -z "${cur_ds}" || "${cur_ds}" == *"<"*">"* ]]; then
                 sed -i -E "s/(vcenter_datastore\s*=\s*\")[^\"]+(\")/\1${lib_datastore}\2/" "${pkr_file}"
-                log_success "Đã cập nhật vcenter_datastore thành: ${lib_datastore}"
+                log_success "Đã tự động đồng bộ vcenter_datastore thành Datastore của Content Library: ${lib_datastore}"
+            elif [[ "${cur_ds}" != "${lib_datastore}" ]]; then
+                log_warn "Cảnh báo: Datastore của VM (${cur_ds}) khác Datastore của Content Library (${lib_datastore})."
+                echo "Để tránh lỗi 'Invalid configuration for device 0', hai Datastore này nên truy cập được từ cùng host ESXi."
+                if confirm_action "Bạn có muốn đồng bộ vcenter_datastore sang '${lib_datastore}' không?" "Y"; then
+                    sed -i -E "s/(vcenter_datastore\s*=\s*\")[^\"]+(\")/\1${lib_datastore}\2/" "${pkr_file}"
+                    log_success "Đã cập nhật vcenter_datastore thành: ${lib_datastore}"
+                fi
             fi
         fi
     fi
 
     if [[ -n "${config_file}" ]] && declare -f save_last_used_iso &>/dev/null; then
-        save_last_used_iso "${config_file}" "${resolved_path}"
+        save_last_used_iso "${config_file}" "${cl_iso_path}"
     fi
 
     return 0

@@ -232,19 +232,29 @@ update_iso_in_packer() {
         cp "${pkr_dir}/http/user-data.example" "${pkr_dir}/http/user-data"
     fi
 
+    # Chuẩn hóa chuỗi iso_paths: hỗ trợ cả Datastore và Content Library
+    local formatted_iso_path=""
+    if [[ "${iso_remote_path}" =~ ^\[.*\] ]]; then
+        formatted_iso_path="${iso_remote_path}"
+    elif [[ -n "${datastore}" && "${datastore}" != *"<"*">"* ]]; then
+        formatted_iso_path="[${datastore}] ${iso_remote_path}"
+    else
+        formatted_iso_path="${iso_remote_path}"
+    fi
+
     # Cập nhật danh sách iso_paths trong file HCL/pkrvars
     if grep -q "^iso_paths" "${pkr_file}"; then
         sed -i -e '/^iso_paths[[:space:]]*=[[:space:]]*\[/,/^[[:space:]]*\]/c\
 iso_paths = [\
-  "['"${datastore}"'] '"${iso_remote_path}"'"\
+  "'"${formatted_iso_path}"'"\
 ]' "${pkr_file}"
-        log_success "Đã cập nhật iso_paths trong ${pkr_file} thành: [${datastore}] ${iso_remote_path}"
+        log_success "Đã cập nhật iso_paths trong ${pkr_file} thành: ${formatted_iso_path}"
     else
         log_warn "Cấu trúc iso_paths không tìm thấy trong ${pkr_file} để cập nhật."
     fi
 
-    # Cập nhật vcenter_datastore nếu đang chứa placeholder
-    if grep -q -E 'vcenter_datastore\s*=\s*"<.*>"' "${pkr_file}"; then
+    # Cập nhật vcenter_datastore nếu đang chứa placeholder và datastore hợp lệ
+    if [[ -n "${datastore}" && "${datastore}" != *"<"*">"* ]] && grep -q -E 'vcenter_datastore\s*=\s*"<.*>"' "${pkr_file}"; then
         sed -i -E "s/(vcenter_datastore\s*=\s*\")[^\"]+(\")/\1${datastore}\2/" "${pkr_file}"
         log_success "Đã cập nhật vcenter_datastore trong ${pkr_file} thành: ${datastore}"
     fi
@@ -283,11 +293,25 @@ run_iso_menu() {
         last_iso=$(grep -E '^LAST_USED_ISO=' "${config_file}" | cut -d'"' -f2 || true)
     fi
 
-    if [[ -n "${last_iso}" && -n "${datastore}" && "${datastore}" != *"<"*">"* ]]; then
-        log_info "Phát hiện tệp ISO đã dùng trong cấu hình gần nhất: ${last_iso}"
-        if confirm_action "Tiếp tục sử dụng tệp ISO này trên Datastore [${datastore}]?" "Y"; then
-            update_iso_in_packer "${pkr_file}" "${datastore}" "${last_iso}"
-            return 0
+    if [[ -n "${last_iso}" ]]; then
+        if [[ "${last_iso}" =~ ^\[.*\] ]]; then
+            log_info "Phát hiện tệp ISO đã dùng gần nhất trên Datastore: ${last_iso}"
+            if confirm_action "Tiếp tục sử dụng tệp ISO này cho Packer?" "Y"; then
+                update_iso_in_packer "${pkr_file}" "" "${last_iso}"
+                return 0
+            fi
+        elif [[ "${last_iso}" == *"/"* && "${last_iso}" != "iso/"* ]]; then
+            log_info "Phát hiện tệp ISO đã dùng gần nhất từ Content Library: ${last_iso}"
+            if confirm_action "Tiếp tục sử dụng tệp ISO Content Library này cho Packer?" "Y"; then
+                update_iso_in_packer "${pkr_file}" "" "${last_iso}"
+                return 0
+            fi
+        elif [[ -n "${datastore}" && "${datastore}" != *"<"*">"* ]]; then
+            log_info "Phát hiện tệp ISO đã dùng trong cấu hình gần nhất: ${last_iso}"
+            if confirm_action "Tiếp tục sử dụng tệp ISO này trên Datastore [${datastore}]?" "Y"; then
+                update_iso_in_packer "${pkr_file}" "${datastore}" "${last_iso}"
+                return 0
+            fi
         fi
     fi
 

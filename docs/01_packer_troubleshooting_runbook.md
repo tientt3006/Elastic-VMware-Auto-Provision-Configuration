@@ -28,6 +28,7 @@ Tài liệu này ghi lại toàn bộ các thách thức kỹ thuật, phân tí
 | **INC-09** | Cài đặt hệ điều hành | Curtin bị treo hơn 30 phút tại bước `installing-kernel` | Curtin thực thi lệnh `apt-get` cài đặt `linux-generic`; mạng drop gói gây ra cơn bão chờ TCP timeout | Cấu hình `apt: fallback: offline-install` và loại bỏ DNS công cộng không thể định tuyến |
 | **INC-10** | Khởi động autoinstall | Subiquity tự động chuyển sang chế độ cài đặt thủ công qua giao diện | Sai cú pháp JSON schema do lặp khóa `network:` lồng nhau trong file YAML | Chuẩn hóa cấu trúc Netplan đặt trực tiếp `version: 2` dưới khóa `autoinstall.network` |
 | **INC-11** | Trình khởi động GRUB | Yêu cầu xác nhận `Continue with autoinstall? (yes\|no)` chặn tiến trình tự động | Điều hướng phím mũi tên trong GRUB bị lệch dòng, khiến tham số `autoinstall` không vào kernel | Chuyển sang giao diện dòng lệnh GRUB `c` kết hợp lệnh `search --set=root` và chuyển sang dùng ổ CD-ROM ảo `cidata` |
+| **INC-12** | Khởi động máy ảo (EFI) | Lỗi `Virtual SATA CDROM Drive... No Media` và Packer dừng tại `Waiting for IP` | Trỏ file ISO bằng đường dẫn raw datastore UUID của Content Library (`[DS] contentlib-*`) bị Content Library lease/lock, ESXi không mount được | Chuẩn hóa `iso_paths` sang cú pháp định danh Content Library (`"Library/Item/file.iso"` hoặc `"Library/Item"`), cấu hình `boot_order = "cdrom,disk"` và `cd_label = "OEMDRV"` |
 
 ---
 
@@ -292,6 +293,44 @@ Tiến trình cài đặt bị dừng chờ kỹ sư nhập `yes` trên bàn ph�
    ]
    ```
 Lệnh này đảm bảo kernel luôn nhận được tham số `autoinstall ds=nocloud`, triệt tiêu hoàn toàn lời nhắc xác nhận và không phụ thuộc vào bất kỳ kết nối mạng nào trong giai đoạn cài đặt hệ điều hành.
+
+### 3.12. Sự cố 12 (INC-12): Khóa tệp Content Library trên Datastore dẫn đến lỗi No Media trên ổ đĩa CD-ROM EFI
+
+#### Hiện tượng
+Quá trình khởi động máy ảo Rocky Linux 9 (hoặc các bản phân phối Linux chạy EFI) dừng tại màn hình EFI firmware với thông báo:
+```text
+EFI VMware Virtual SATA CDROM Drive (0.0)... No Media
+EFI VMware Virtual SATA CDROM Drive (1.0)... No Media
+```
+Trình cài đặt Anaconda Kickstart không thể khởi động, dẫn đến việc Packer dừng chờ địa chỉ IP (`Waiting for IP...`) cho đến khi vượt quá thời gian chờ (`timeout`).
+
+#### Phân tích nguyên nhân
+1. Khi sử dụng công cụ `govc library.info -L -l` để phân giải tệp ISO trong Content Library, hệ thống nhận được đường dẫn nội bộ tầng Datastore dạng:
+   ```text
+   [DatastoreName] contentlib-<library-uuid>/<item-uuid>/filename.iso
+   ```
+2. Thư mục `contentlib-*` trên Datastore do vSphere Content Library Service trực tiếp quản lý vòng đời và cơ chế khóa tệp (file lease/lock). Khi máy ảo được bật nguồn bởi ESXi host, cơ chế khóa này ngăn cản tiến trình ảo hóa gắn kết tệp ISO vào ổ đĩa quang ảo ở tầng phần cứng, khiến ổ CD-ROM SATA 0.0 rơi vào trạng thái không có phương tiện lưu trữ (`No Media`).
+3. Ổ đĩa thứ hai (SATA 1.0) chứa tệp Kickstart tạm thời do Packer sinh ra (`cd_content`), không chứa bộ khởi động UEFI bootloader nên firmware bỏ qua và không tìm thấy phương tiện nạp hệ điều hành.
+
+#### Giải pháp khắc phục
+1. **Chuẩn hóa cú pháp Content Library trong biến `iso_paths`**:
+   Thay thế đường dẫn raw datastore bằng cú pháp chuẩn được `packer-plugin-vsphere` hỗ trợ trực tiếp qua vSphere Content Library API:
+   ```hcl
+   iso_paths = [
+     "Tên_Content_Library/Tên_Item/Tên_Tệp.iso"
+   ]
+   ```
+   hoặc:
+   ```hcl
+   iso_paths = [
+     "Tên_Content_Library/Tên_Item"
+   ]
+   ```
+   Khi sử dụng cú pháp này, Packer gọi trực tiếp Content Library API để gán tệp ISO vào thiết bị CD-ROM mà không truy cập trực tiếp vào hệ thống tệp bị khóa trên VMFS.
+2. **Cấu hình thứ tự khởi động firmware (`boot_order`)**:
+   Thiết lập tường minh `boot_order = "cdrom,disk"` thay vì `"disk,cdrom"`, đảm bảo ổ CD-ROM chứa ISO cài đặt được ưu tiên kiểm tra trước đĩa cứng trống.
+3. **Định danh nhãn ổ đĩa Kickstart (`cd_label`)**:
+   Bổ sung thuộc tính `cd_label = "OEMDRV"` cho ổ đĩa quang phụ sinh từ `cd_content`, cho phép Anaconda tự động phát hiện tệp cấu hình cài đặt không giám sát `ks.cfg`.
 
 ---
 

@@ -141,7 +141,7 @@ run_platform_tools_menu() {
                 # Kiểm tra và thiết lập đường dẫn ISO cho Golden Template
                 local current_iso=""
                 if [[ -f "${pkr_file}" ]]; then
-                    current_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${pkr_file}" | grep -E '"\[.*\]' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
+                    current_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${pkr_file}" | grep -E '"[^"]+"' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
                 fi
 
                 local default_ds=""

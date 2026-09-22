@@ -50,6 +50,18 @@ variable "vcenter_folder" {
   default     = ""
 }
 
+variable "vcenter_resource_pool" {
+  type        = string
+  description = "Target vSphere Resource Pool name within the cluster or standalone host."
+  default     = ""
+}
+
+variable "boot_order" {
+  type        = string
+  description = "Priority order of boot devices for the virtual machine (e.g. 'cdrom,disk')."
+  default     = "cdrom,disk"
+}
+
 variable "iso_paths" {
   type        = list(string)
   description = "List containing the datastore path to the Ubuntu 24.04 live server ISO image."

@@ -183,11 +183,12 @@ sync_packer_vars_from_terraform() {
 
     [[ -z "${tf_file}" ]] && return 0
 
-    local tf_server tf_user tf_dc tf_cluster tf_ds tf_net tf_ssh
+    local tf_server tf_user tf_dc tf_cluster tf_rp tf_ds tf_net tf_ssh
     tf_server=$(grep -E '^\s*vsphere_server\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
     tf_user=$(grep -E '^\s*vsphere_user\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
     tf_dc=$(grep -E '^\s*vsphere_datacenter\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
     tf_cluster=$(grep -E '^\s*vsphere_cluster\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
+    tf_rp=$(grep -E '^\s*vsphere_resource_pool\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
     tf_ds=$(grep -E '^\s*vsphere_datastore\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
     tf_net=$(grep -E '^\s*vsphere_network\s*=' "${tf_file}" | head -n 1 | cut -d'"' -f2 || true)
     if [[ -z "${tf_net}" || "${tf_net}" == *"<"*">"* ]]; then
@@ -210,6 +211,10 @@ sync_packer_vars_from_terraform() {
     fi
     if [[ -n "${tf_cluster}" && "${tf_cluster}" != *"<"*">"* ]] && grep -q -E 'vcenter_cluster\s*=\s*"<.*>"' "${pkr_file}"; then
         sed -i -E "s/(vcenter_cluster\s*=\s*\")[^\"]+(\")/\1${tf_cluster}\2/" "${pkr_file}"
+        updated=1
+    fi
+    if [[ -n "${tf_rp}" && "${tf_rp}" != *"<"*">"* ]] && grep -q -E 'vcenter_resource_pool\s*=\s*"<.*>"' "${pkr_file}"; then
+        sed -i -E "s/(vcenter_resource_pool\s*=\s*\")[^\"]+(\")/\1${tf_rp}\2/" "${pkr_file}"
         updated=1
     fi
     if [[ -n "${tf_ds}" && "${tf_ds}" != *"<"*">"* ]] && grep -q -E 'vcenter_datastore\s*=\s*"<.*>"' "${pkr_file}"; then

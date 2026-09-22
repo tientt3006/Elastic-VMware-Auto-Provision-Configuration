@@ -11,6 +11,7 @@ vcenter_insecure_connection = true
 
 vcenter_datacenter          = "<VCENTER_DATACENTER>"
 vcenter_cluster             = "<VCENTER_CLUSTER>"
+vcenter_resource_pool       = ""
 vcenter_datastore           = "<VCENTER_DATASTORE>"
 vcenter_network             = "<VCENTER_NETWORK>"
 vcenter_folder              = "<VCENTER_FOLDER>"

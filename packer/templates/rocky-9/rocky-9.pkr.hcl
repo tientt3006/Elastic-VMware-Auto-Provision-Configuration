@@ -93,6 +93,7 @@ source "vsphere-iso" "rocky" {
   # Infrastructure placement
   datacenter                     = var.vcenter_datacenter
   cluster                        = var.vcenter_cluster
+  resource_pool                  = var.vcenter_resource_pool
   datastore                      = var.vcenter_datastore
   folder                         = var.vcenter_folder
   set_host_for_datastore_uploads = true
@@ -125,9 +126,10 @@ source "vsphere-iso" "rocky" {
   # Content Library / Datastore ISO image source
   iso_paths  = var.iso_paths
   cd_content = { "/ks.cfg" = local.kickstart }
+  cd_label   = "OEMDRV"
 
   # EFI boot command sequence for Rocky Linux 9 Anaconda
-  boot_order = "disk,cdrom"
+  boot_order = var.boot_order
   boot_wait  = "3s"
   boot_command = [
     "<up><wait>",

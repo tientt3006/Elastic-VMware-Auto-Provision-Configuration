@@ -23,6 +23,7 @@ source "vsphere-iso" "ubuntu" {
   # Infrastructure placement
   datacenter                     = var.vcenter_datacenter
   cluster                        = var.vcenter_cluster
+  resource_pool                  = var.vcenter_resource_pool
   datastore                      = var.vcenter_datastore
   # folder                       = var.vcenter_folder
   set_host_for_datastore_uploads = true
@@ -65,7 +66,8 @@ source "vsphere-iso" "ubuntu" {
   # GRUB boot sequence for Ubuntu 24.04 Subiquity installer
   # Uses GRUB command line (c) instead of editor (e) to avoid line navigation issues.
   # 'search --set=root' auto-discovers the ISO device without hardcoding (cd0)/(hd0).
-  boot_wait = "5s"
+  boot_order = var.boot_order
+  boot_wait  = "5s"
   boot_command = [
     "c<wait>",
     "search --set=root --file /casper/vmlinuz<enter><wait>",
