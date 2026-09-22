@@ -370,6 +370,12 @@ if command -v govc &>/dev/null; then
     fi
     log_success "Xác thực kết nối vCenter thành công."
 
+    # Xác minh tính sẵn sàng và tính hợp lệ của tệp ISO (Datastore hoặc Content Library)
+    if ! validate_packer_iso_path "${PKRVARS}"; then
+        log_error "Tệp ISO cấu hình không hợp lệ hoặc không tồn tại trên hạ tầng vSphere."
+        exit 1
+    fi
+
     # Kiểm tra máy ảo / template đã tồn tại trên vCenter
     VM_PATH=$(govc find -type m -name "${VM_NAME}" 2>/dev/null | head -n 1 || true)
     if [[ -n "${VM_PATH}" ]]; then

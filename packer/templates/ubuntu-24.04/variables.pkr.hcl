@@ -62,6 +62,12 @@ variable "boot_order" {
   default     = "cdrom,disk"
 }
 
+variable "vm_cdrom_type" {
+  type        = string
+  description = "Virtual CD-ROM controller type ('ide' or 'sata')."
+  default     = "ide"
+}
+
 variable "iso_paths" {
   type        = list(string)
   description = "List containing the datastore path to the Ubuntu 24.04 live server ISO image."

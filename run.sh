@@ -165,6 +165,10 @@ run_platform_tools_menu() {
                 else
                     echo ""
                     echo "Cấu hình tệp ISO hiện tại: ${current_iso}"
+                    if [[ "${current_iso}" =~ ^\[([^]]+)\][[:space:]]*([^/]+)$ ]]; then
+                        log_warn "Lưu ý: Tệp ISO đang trỏ trực tiếp vào thư mục gốc của Datastore [${BASH_REMATCH[1]}]."
+                        log_warn "Nếu tệp thực tế nằm trong thư mục con (ví dụ: [${BASH_REMATCH[1]}] iso/${BASH_REMATCH[2]}), hãy chọn 'Y' để chọn lại."
+                    fi
                     if confirm_action "Xác nhận thay đổi cấu hình tệp ISO này?" "N"; then
                         need_select_iso=1
                     fi

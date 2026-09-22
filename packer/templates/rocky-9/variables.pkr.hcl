@@ -62,6 +62,12 @@ variable "boot_order" {
   default     = "cdrom,disk"
 }
 
+variable "vm_cdrom_type" {
+  type        = string
+  description = "Virtual CD-ROM controller type ('sata' or 'ide')."
+  default     = "sata"
+}
+
 variable "iso_paths" {
   type        = list(string)
   description = "List containing the datastore path to the Rocky Linux 9 minimal ISO image."

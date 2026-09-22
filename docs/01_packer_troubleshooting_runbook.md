@@ -305,12 +305,15 @@ EFI VMware Virtual SATA CDROM Drive (1.0)... No Media
 Trình cài đặt Anaconda Kickstart không thể khởi động, dẫn đến việc Packer dừng chờ địa chỉ IP (`Waiting for IP...`) cho đến khi vượt quá thời gian chờ (`timeout`).
 
 #### Phân tích nguyên nhân
-1. Khi sử dụng công cụ `govc library.info -L -l` để phân giải tệp ISO trong Content Library, hệ thống nhận được đường dẫn nội bộ tầng Datastore dạng:
+1. **Khóa tệp trên Content Library**: Khi sử dụng công cụ `govc library.info -L -l` để phân giải tệp ISO trong Content Library, hệ thống nhận được đường dẫn nội bộ tầng Datastore dạng:
    ```text
    [DatastoreName] contentlib-<library-uuid>/<item-uuid>/filename.iso
    ```
-2. Thư mục `contentlib-*` trên Datastore do vSphere Content Library Service trực tiếp quản lý vòng đời và cơ chế khóa tệp (file lease/lock). Khi máy ảo được bật nguồn bởi ESXi host, cơ chế khóa này ngăn cản tiến trình ảo hóa gắn kết tệp ISO vào ổ đĩa quang ảo ở tầng phần cứng, khiến ổ CD-ROM SATA 0.0 rơi vào trạng thái không có phương tiện lưu trữ (`No Media`).
-3. Ổ đĩa thứ hai (SATA 1.0) chứa tệp Kickstart tạm thời do Packer sinh ra (`cd_content`), không chứa bộ khởi động UEFI bootloader nên firmware bỏ qua và không tìm thấy phương tiện nạp hệ điều hành.
+   Thư mục `contentlib-*` trên Datastore do vSphere Content Library Service trực tiếp quản lý cơ chế khóa tệp (file lease/lock). Khi máy ảo được bật nguồn bởi ESXi host, cơ chế khóa này ngăn cản tiến trình ảo hóa gắn kết tệp ISO vào ổ đĩa quang ảo ở tầng phần cứng, khiến ổ CD-ROM SATA 0.0 rơi vào trạng thái không có phương tiện lưu trữ (`No Media`).
+2. **Sai lệch đường dẫn Datastore thực tế**: Trường hợp người dùng cấu hình đường dẫn trực tiếp trên Datastore dạng `[DatastoreName] filename.iso` (thư mục gốc) nhưng tệp thực tế nằm trong thư mục con (ví dụ: `[DatastoreName] iso/filename.iso`):
+   vCenter vẫn khởi tạo cấu hình VM thành công nhưng khi bật nguồn, ESXi không tìm thấy tệp ISO để mount. ESXi tự động ngắt kết nối ổ ảo (`connected = false`), dẫn đến hiện tượng EFI firmware báo `No Media` khi quét ổ đĩa khởi động.
+3. **Ổ đĩa Kickstart phụ**: Ổ đĩa thứ hai (SATA 1.0) chứa tệp Kickstart tạm thời do Packer sinh ra (`cd_content`), không chứa bộ khởi động UEFI bootloader (`/EFI/BOOT/BOOTX64.EFI`) nên EFI firmware bỏ qua và báo `No Media`, tiếp tục rơi xuống ổ đĩa cứng trống và treo tại `EFI Network...` (PXE boot).
+4. **Thiếu bước tiền kiểm tra (Pre-flight Check)**: Tiến trình build trước đây chưa xác minh sự tồn tại của tệp ISO thông qua govc API trước khi chạy Packer, dẫn đến việc chỉ phát hiện lỗi sau khi VM đã bật nguồn và hết thời gian chờ (`timeout`).
 
 #### Giải pháp khắc phục
 1. **Chuẩn hóa cú pháp Content Library trong biến `iso_paths`**:
@@ -327,9 +330,15 @@ Trình cài đặt Anaconda Kickstart không thể khởi động, dẫn đến 
    ]
    ```
    Khi sử dụng cú pháp này, Packer gọi trực tiếp Content Library API để gán tệp ISO vào thiết bị CD-ROM mà không truy cập trực tiếp vào hệ thống tệp bị khóa trên VMFS.
-2. **Cấu hình thứ tự khởi động firmware (`boot_order`)**:
+2. **Tiền kiểm tra tự động tệp ISO trước khi build (`validate_packer_iso_path`)**:
+   Tích hợp hàm `validate_packer_iso_path` vào `packer/build.sh`. Trước khi khởi chạy Packer, hệ thống tự động kiểm tra sự tồn tại của tệp ISO:
+   - Với Datastore: Thực thi `govc datastore.ls -ds="<DS>" "<PATH>"`. Nếu không tìm thấy, tự động quét đệ quy (`govc datastore.ls -R`) để tìm tệp ISO trùng tên và đề xuất tự động sửa đường dẫn (ví dụ: từ `[DS] Rocky.iso` sang `[DS] iso/Rocky.iso`).
+   - Với Content Library: Thực thi `govc library.ls "/<Library>/<Item>"`.
+3. **Mềm hóa loại bộ điều khiển CD-ROM (`vm_cdrom_type`)**:
+   Khai báo biến `vm_cdrom_type` trong `variables.pkr.hcl` (mặc định `"sata"` cho Rocky Linux và `"ide"` cho Ubuntu), cho phép linh hoạt cấu hình theo từng loại phần cứng ảo thay vì cố định cứng trong mã HCL.
+4. **Cấu hình thứ tự khởi động firmware (`boot_order`)**:
    Thiết lập tường minh `boot_order = "cdrom,disk"` thay vì `"disk,cdrom"`, đảm bảo ổ CD-ROM chứa ISO cài đặt được ưu tiên kiểm tra trước đĩa cứng trống.
-3. **Định danh nhãn ổ đĩa Kickstart (`cd_label`)**:
+5. **Định danh nhãn ổ đĩa Kickstart (`cd_label`)**:
    Bổ sung thuộc tính `cd_label = "OEMDRV"` cho ổ đĩa quang phụ sinh từ `cd_content`, cho phép Anaconda tự động phát hiện tệp cấu hình cài đặt không giám sát `ks.cfg`.
 
 ---

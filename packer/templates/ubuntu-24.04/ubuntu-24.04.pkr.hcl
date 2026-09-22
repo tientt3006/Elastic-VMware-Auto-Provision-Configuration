@@ -33,9 +33,10 @@ source "vsphere-iso" "ubuntu" {
   convert_to_template = true
 
   # Hardware specifications
-  guest_os_type = "ubuntu64Guest"
-  firmware      = "efi"
-  CPUs          = var.vm_cpu_cores
+  guest_os_type   = "ubuntu64Guest"
+  firmware        = "efi"
+  cdrom_type      = var.vm_cdrom_type
+  CPUs            = var.vm_cpu_cores
   cpu_cores     = var.vm_cpu_sockets
   RAM           = var.vm_mem_size
   RAM_reserve_all = false

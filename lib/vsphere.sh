@@ -260,6 +260,87 @@ iso_paths = [\
     fi
 }
 
+# Xác minh sự tồn tại của tệp ISO (Datastore hoặc Content Library) trước khi Packer build
+validate_packer_iso_path() {
+    local pkr_file="$1"
+    [[ ! -f "${pkr_file}" ]] && return 0
+
+    if ! command -v govc &>/dev/null; then
+        return 0
+    fi
+
+    # Trích xuất đường dẫn ISO đầu tiên từ iso_paths trong file HCL
+    local raw_iso
+    raw_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${pkr_file}" | grep -E '"[^"]+"' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
+
+    # Nếu rỗng hoặc còn chứa placeholder thì bỏ qua
+    [[ -z "${raw_iso}" || "${raw_iso}" == *"<"*">"* ]] && return 0
+
+    log_info "Kiểm tra tính sẵn sàng của tệp ISO cấu hình: ${raw_iso}"
+
+    # 1. Trường hợp ISO nằm trên Datastore: [DatastoreName] path/to/file.iso
+    if [[ "${raw_iso}" =~ ^\[([^]]+)\][[:space:]]*(.*)$ ]]; then
+        local target_ds="${BASH_REMATCH[1]}"
+        local rel_path="${BASH_REMATCH[2]}"
+        rel_path="$(echo "${rel_path}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
+        if govc datastore.ls -ds="${target_ds}" "${rel_path}" &>/dev/null; then
+            log_success "Đã xác nhận tệp ISO tồn tại trên Datastore [${target_ds}]: ${rel_path}"
+            return 0
+        fi
+
+        log_error "Tệp ISO KHÔNG tồn tại trên Datastore [${target_ds}] tại đường dẫn: '${rel_path}'"
+        local iso_base
+        iso_base="$(basename "${rel_path}")"
+
+        log_info "Đang quét tìm kiếm tệp '${iso_base}' trên Datastore [${target_ds}]..."
+        local found_match=""
+        found_match=$(govc datastore.ls -R -ds="${target_ds}" 2>/dev/null | tr -d '\r' | grep -i "/${iso_base}$" | head -n 1 || true)
+        if [[ -z "${found_match}" ]]; then
+            found_match=$(govc datastore.ls -R -ds="${target_ds}" 2>/dev/null | tr -d '\r' | grep -i "${iso_base}" | head -n 1 || true)
+        fi
+
+        if [[ -n "${found_match}" ]]; then
+            found_match="${found_match#/}"
+            log_warn "Phát hiện tệp ISO tại vị trí thực tế: [${target_ds}] ${found_match}"
+            if confirm_action "Bạn có muốn tự động sửa đường dẫn thành '[${target_ds}] ${found_match}' không?" "Y"; then
+                update_iso_in_packer "${pkr_file}" "${target_ds}" "${found_match}"
+                return 0
+            fi
+        else
+            log_warn "Không tìm thấy tệp ISO '${iso_base}' trên Datastore [${target_ds}]."
+        fi
+
+        local repo_seed_dir="${SCRIPT_LIB_DIR}/../seed"
+        if confirm_action "Khởi chạy menu quản lý ISO để chọn lại tệp ISO hợp lệ?" "Y"; then
+            run_iso_menu "${target_ds}" "${pkr_file}" "" "${repo_seed_dir}"
+            return $?
+        fi
+        return 1
+
+    # 2. Trường hợp ISO nằm trong vSphere Content Library: LibraryName/ItemName[/FileName]
+    elif [[ "${raw_iso}" == *"/"* ]]; then
+        local lib_name
+        lib_name=$(echo "${raw_iso}" | cut -d'/' -f1)
+        local item_name
+        item_name=$(echo "${raw_iso}" | cut -d'/' -f2)
+
+        if govc library.ls "/${lib_name}/${item_name}" &>/dev/null || govc library.ls "${lib_name}/${item_name}" &>/dev/null; then
+            log_success "Đã xác nhận item ISO tồn tại trong Content Library: ${lib_name}/${item_name}"
+            return 0
+        else
+            log_error "Item ISO KHÔNG tồn tại trong Content Library: ${raw_iso}"
+            if confirm_action "Khởi chạy menu chọn ISO từ Content Library để chọn lại?" "Y"; then
+                select_iso_from_content_library "${pkr_file}" ""
+                return $?
+            fi
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
 save_last_used_iso() {
     local config_file="$1"
     local iso_remote_name="$2"
