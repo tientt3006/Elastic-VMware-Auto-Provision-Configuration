@@ -104,6 +104,7 @@ source "vsphere-iso" "rocky" {
   # Hardware specifications (bám sát iac_rocky_linux_v1)
   guest_os_type        = "rhel9_64Guest"
   firmware             = "efi"
+  cdrom_type           = "sata"
   CPUs                 = var.vm_cpu_cores
   RAM                  = var.vm_mem_size
   disk_controller_type = ["pvscsi"]
