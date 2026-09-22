@@ -67,8 +67,8 @@ locals {
     echo "${var.ssh_username} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${var.ssh_username}
     chmod 0440 /etc/sudoers.d/${var.ssh_username}
     rpm -q open-vm-tools
-    systemctl enable vmtoolsd.service
-    systemctl is-enabled vmtoolsd.service
+    systemctl enable --now vmtoolsd.service
+    systemctl is-active --quiet vmtoolsd.service
     systemctl enable chronyd.service
     systemctl enable firewalld.service
     systemctl enable auditd.service
@@ -125,15 +125,19 @@ source "vsphere-iso" "rocky" {
   # Content Library / Datastore ISO image source
   iso_paths  = var.iso_paths
   cd_content = { "/ks.cfg" = local.kickstart }
+  cd_label   = "KS"
 
   # EFI boot command sequence for Rocky Linux 9 Anaconda
+  # boot_wait of 8s: EFI GRUB requires additional probe time vs BIOS.
+  # inst.ks=hd:LABEL=KS: targets the Packer-generated ISO explicitly,
+  # avoiding ambiguity with the installer ISO when two optical drives are present.
   boot_order = var.boot_order
-  boot_wait  = "3s"
+  boot_wait  = "8s"
   boot_command = [
     "<up><wait>",
     "e<wait>",
     "<down><down><end><wait>",
-    " inst.ks=cdrom:/ks.cfg inst.text",
+    " inst.ks=hd:LABEL=KS:/ks.cfg inst.text",
     "<enter><wait>",
     "<leftCtrlOn>x<leftCtrlOff>"
   ]
