@@ -57,44 +57,86 @@ get_content_library_items() {
     echo "${raw_output}" | sed "s|^/${lib_name}/||" | grep -v '^\s*$' | sort -u
 }
 
-# Liệt kê tất cả tệp ISO trong một Content Library (duyệt đệ quy item và files)
+# Liệt kê tất cả tệp ISO trong một Content Library
+# Hỗ trợ cả item có đuôi .iso và item không có đuôi (được lưu dưới dạng Other Types trong vCenter)
 # $1: Tên Content Library
-# Output: Đường dẫn tương đối dạng: ItemName/FileName.iso
+# Output: Danh sách tên item ISO khả dụng (mỗi dòng một item)
 get_content_library_iso_files() {
     local lib_name="$1"
     [[ -z "${lib_name}" ]] && return 1
 
+    # 1. Thử quét nhanh toàn bộ file bên trong thư viện qua wildcard
+    local batch_output=""
+    batch_output=$(govc library.ls "/${lib_name}/*/" 2>/dev/null || true)
+    if [[ -n "${batch_output}" ]] && echo "${batch_output}" | grep -qi '\.iso$'; then
+        while IFS= read -r fline; do
+            [[ -z "${fline}" ]] && continue
+            if [[ "${fline}" =~ \.iso$|\.ISO$ ]]; then
+                local item_name
+                item_name=$(echo "${fline}" | sed "s|^/${lib_name}/||" | cut -d'/' -f1)
+                [[ -n "${item_name}" ]] && echo "${item_name}"
+            fi
+        done <<< "${batch_output}" | sort -u
+        return 0
+    fi
+
+    # 2. Duyệt từng item trong thư viện nếu quét nhanh wildcard không trả về kết quả
     local items=()
     mapfile -t items < <(get_content_library_items "${lib_name}")
     if [[ ${#items[@]} -eq 0 ]]; then
         return 0
     fi
 
+    local non_iso_regex='\.(tar|tar\.gz|tgz|zip|7z|rar|ovf|ova|vmdk|txt|json|xml|cfg|log|rpm|deb)$'
+
     for item in "${items[@]}"; do
+        # Bỏ qua các item có định dạng tệp rõ ràng không phải ISO
+        if [[ "${item}" =~ ${non_iso_regex} ]]; then
+            continue
+        fi
+
+        # Nếu tên item kết thúc bằng .iso hoặc .ISO
+        if [[ "${item}" =~ \.iso$|\.ISO$ ]]; then
+            echo "${item}"
+            continue
+        fi
+
+        # Kiểm tra tệp con bên trong item bằng dấu gạch chéo cuối
         local files_raw
-        files_raw=$(govc library.ls "/${lib_name}/${item}" 2>/dev/null || true)
-        if [[ -n "${files_raw}" ]]; then
-            while IFS= read -r fpath; do
-                [[ -z "${fpath}" ]] && continue
-                if [[ "${fpath}" =~ \.iso$|\.ISO$ ]]; then
-                    # Trích xuất dạng: ItemName/FileName.iso
-                    local rel_file
-                    rel_file=$(echo "${fpath}" | sed "s|^/${lib_name}/||")
-                    echo "${rel_file}"
-                fi
-            done <<< "${files_raw}"
-        else
-            # Trường hợp bản thân item kết thúc bằng .iso
-            if [[ "${item}" =~ \.iso$|\.ISO$ ]]; then
-                echo "${item}/${item}"
+        files_raw=$(govc library.ls "/${lib_name}/${item}/" 2>/dev/null || true)
+        if [[ -n "${files_raw}" ]] && echo "${files_raw}" | grep -qi '\.iso$'; then
+            echo "${item}"
+            continue
+        fi
+
+        # Kiểm tra đường dẫn lưu trữ tầng Datastore của item bằng govc library.info -L -l
+        local ds_path
+        ds_path=$(govc library.info -L -l "/${lib_name}/${item}" 2>/dev/null || true)
+        if [[ -n "${ds_path}" ]] && echo "${ds_path}" | grep -qi '\.iso'; then
+            echo "${item}"
+            continue
+        fi
+
+        # Kiểm tra metadata của item qua govc library.info
+        local item_info
+        item_info=$(govc library.info "/${lib_name}/${item}" 2>/dev/null || true)
+        if [[ -n "${item_info}" ]]; then
+            if echo "${item_info}" | grep -Ei '^\s*Type:\s*iso\b' &>/dev/null || echo "${item_info}" | grep -qi '\.iso'; then
+                echo "${item}"
+                continue
             fi
         fi
-    done
+
+        # Dự phòng cho các item trong mục Other Types không có đuôi tệp
+        if ! [[ "${item}" =~ \.[a-zA-Z0-9_-]{1,6}$ ]]; then
+            echo "${item}"
+        fi
+    done | sort -u
 }
 
 # Lấy đường dẫn Datastore chuẩn hóa của file ISO trong Content Library
 # $1: Tên Content Library
-# $2: Đường dẫn file trong library (ItemName/FileName.iso hoặc ItemName)
+# $2: Đường dẫn file hoặc tên item trong library
 # Output: [DatastoreName] contentlib-UUID/item-UUID/FileName.iso
 resolve_content_library_iso_datastore_path() {
     local lib_name="$1"
@@ -103,22 +145,30 @@ resolve_content_library_iso_datastore_path() {
     [[ -z "${lib_name}" || -z "${file_rel_path}" ]] && return 1
 
     local full_query="/${lib_name}/${file_rel_path}"
-    local ds_path
-    ds_path=$(govc library.info -L -l "${full_query}" 2>/dev/null || true)
+    local ds_raw
+    ds_raw=$(govc library.info -L -l "${full_query}" 2>/dev/null || true)
 
-    # Nếu truy vấn file trực tiếp chưa có, thử truy vấn item
-    if [[ -z "${ds_path}" || "${ds_path}" != *"["*"]"* ]]; then
+    # Nếu truy vấn trực tiếp chưa có, thử truy vấn theo item
+    if [[ -z "${ds_raw}" || "${ds_raw}" != *"["*"]"* ]]; then
         local item_only
         item_only=$(echo "${file_rel_path}" | cut -d'/' -f1)
-        ds_path=$(govc library.info -L -l "/${lib_name}/${item_only}" 2>/dev/null || true)
+        ds_raw=$(govc library.info -L -l "/${lib_name}/${item_only}" 2>/dev/null || true)
     fi
 
-    if [[ -z "${ds_path}" || "${ds_path}" != *"["*"]"* ]]; then
+    # Trích xuất dòng chứa đường dẫn Datastore chuẩn [DatastoreName] ... .iso
+    local clean_path
+    clean_path=$(echo "${ds_raw}" | tr -d '\r' | grep -E '^\[[^]]+\].*\.iso' | head -n 1 || true)
+    if [[ -z "${clean_path}" ]]; then
+        clean_path=$(echo "${ds_raw}" | tr -d '\r' | grep -E '^\[[^]]+\]' | head -n 1 || true)
+    fi
+    clean_path=$(echo "${clean_path}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+    if [[ -z "${clean_path}" || "${clean_path}" != *"["*"]"* ]]; then
         log_error "Không thể phân giải đường dẫn Datastore cho: ${full_query}"
         return 1
     fi
 
-    echo "${ds_path}"
+    echo "${clean_path}"
 }
 
 # ==============================================================================
@@ -226,28 +276,8 @@ select_iso_from_content_library() {
 
     if [[ ${#libraries[@]} -eq 0 ]]; then
         log_warn "Không tìm thấy Content Library nào trên vCenter."
-        if confirm_action "Bạn có muốn tạo một Content Library mới ngay bây giờ không?" "Y"; then
-            local new_lib_name=""
-            read -r -p "Nhập tên Content Library mới [ISO_Repository]: " new_lib_name
-            new_lib_name="${new_lib_name%$'\r'}"
-            new_lib_name="${new_lib_name:-ISO_Repository}"
-
-            local target_ds=""
-            read -r -p "Nhập tên Datastore lưu trữ thư viện: " target_ds
-            target_ds="${target_ds%$'\r'}"
-            if [[ -z "${target_ds}" ]]; then
-                log_error "Tên Datastore không được để trống."
-                return 1
-            fi
-
-            if create_content_library "${new_lib_name}" "${target_ds}"; then
-                libraries=("${new_lib_name}")
-            else
-                return 1
-            fi
-        else
-            return 1
-        fi
+        log_info "Vui lòng dùng mục '5) Quản lý kho vSphere Content Library' để tạo thư viện mới."
+        return 1
     fi
 
     echo "Danh sách Content Library có sẵn:"
@@ -284,43 +314,6 @@ select_iso_from_content_library() {
 
     if [[ ${#iso_list[@]} -eq 0 ]]; then
         log_warn "Không tìm thấy tệp ISO nào trong Content Library '${chosen_lib}'."
-        echo ""
-        echo "Tùy chọn xử lý:"
-        echo "  1) Nạp tệp ISO từ máy cục bộ vào thư viện này"
-        echo "  2) Nạp tệp ISO trực tiếp từ Internet URL vào thư viện này"
-        echo "  0) Hủy"
-        local add_choice=""
-        read -r -p "Vui lòng chọn (0-2) [1]: " add_choice
-        add_choice="${add_choice%$'\r'}"
-        case "${add_choice}" in
-            1)
-                local local_iso=""
-                read -r -p "Nhập đường dẫn tệp ISO cục bộ: " local_iso
-                local_iso="${local_iso%$'\r'}"
-                if import_iso_to_content_library "${chosen_lib}" "${local_iso}"; then
-                    mapfile -t iso_list < <(get_content_library_iso_files "${chosen_lib}")
-                else
-                    return 1
-                fi
-                ;;
-            2)
-                local url_iso=""
-                read -r -p "Nhập đường dẫn URL của tệp ISO: " url_iso
-                url_iso="${url_iso%$'\r'}"
-                if import_iso_to_content_library "${chosen_lib}" "${url_iso}"; then
-                    mapfile -t iso_list < <(get_content_library_iso_files "${chosen_lib}")
-                else
-                    return 1
-                fi
-                ;;
-            *)
-                return 1
-                ;;
-        esac
-    fi
-
-    if [[ ${#iso_list[@]} -eq 0 ]]; then
-        log_error "Vẫn chưa có tệp ISO nào khả dụng trong thư viện."
         return 1
     fi
 
@@ -363,6 +356,18 @@ select_iso_from_content_library() {
     local lib_datastore
     lib_datastore=$(echo "${resolved_path}" | sed -E 's/^\[([^]]+)\].*/\1/' || true)
 
+    # Khởi tạo tệp cấu hình Packer từ .example nếu chưa tồn tại
+    if [[ ! -f "${pkr_file}" && -f "${pkr_file}.example" ]]; then
+        log_info "Khởi tạo tệp cấu hình Packer từ ${pkr_file}.example..."
+        cp "${pkr_file}.example" "${pkr_file}"
+    fi
+
+    local pkr_dir
+    pkr_dir="$(dirname "${pkr_file}")"
+    if [[ ! -f "${pkr_dir}/http/user-data" && -f "${pkr_dir}/http/user-data.example" ]]; then
+        cp "${pkr_dir}/http/user-data.example" "${pkr_dir}/http/user-data"
+    fi
+
     # Cập nhật vào file packer.pkrvars.hcl
     if [[ -f "${pkr_file}" ]]; then
         # Cập nhật danh sách iso_paths
@@ -389,6 +394,10 @@ iso_paths = [\
                 log_success "Đã cập nhật vcenter_datastore thành: ${lib_datastore}"
             fi
         fi
+    fi
+
+    if [[ -n "${config_file}" ]] && declare -f save_last_used_iso &>/dev/null; then
+        save_last_used_iso "${config_file}" "${resolved_path}"
     fi
 
     return 0

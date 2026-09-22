@@ -24,7 +24,7 @@ locals {
     timezone UTC --utc
     network --bootproto=dhcp --device=link --activate
     rootpw --lock
-    user --name=${var.ssh_username} --groups=wheel %{if var.ssh_password_hash != ""~}--iscrypted --password=${var.ssh_password_hash}%{else~}--plaintext --password=${var.ssh_password}%{endif~}
+    user --name=${var.ssh_username} --groups=wheel --iscrypted --password=${var.ssh_password_hash}
     firewall --enabled --ssh
     selinux --enforcing
     bootloader --location=mbr --append="console=tty0"
@@ -66,7 +66,9 @@ locals {
     fi
     echo "${var.ssh_username} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${var.ssh_username}
     chmod 0440 /etc/sudoers.d/${var.ssh_username}
+    rpm -q open-vm-tools
     systemctl enable vmtoolsd.service
+    systemctl is-enabled vmtoolsd.service
     systemctl enable chronyd.service
     systemctl enable firewalld.service
     systemctl enable auditd.service
@@ -92,22 +94,18 @@ source "vsphere-iso" "rocky" {
   datacenter                     = var.vcenter_datacenter
   cluster                        = var.vcenter_cluster
   datastore                      = var.vcenter_datastore
-  # folder                       = var.vcenter_folder
+  folder                         = var.vcenter_folder
   set_host_for_datastore_uploads = true
 
   # Virtual machine identity and lifecycle
   vm_name             = var.vm_name
   convert_to_template = true
 
-  # Hardware specifications
-  guest_os_type   = "rhel9_64Guest"
-  firmware        = "efi"
-  CPUs            = var.vm_cpu_cores
-  cpu_cores       = var.vm_cpu_sockets
-  RAM             = var.vm_mem_size
-  RAM_reserve_all = false
-
-  # Storage configuration
+  # Hardware specifications (bám sát iac_rocky_linux_v1)
+  guest_os_type        = "rhel9_64Guest"
+  firmware             = "efi"
+  CPUs                 = var.vm_cpu_cores
+  RAM                  = var.vm_mem_size
   disk_controller_type = ["pvscsi"]
   storage {
     disk_size             = var.vm_disk_size
@@ -119,6 +117,9 @@ source "vsphere-iso" "rocky" {
     network      = var.vcenter_network
     network_card = "vmxnet3"
   }
+  vm_version           = 19
+  remove_cdrom         = true
+  tools_upgrade_policy = true
 
   # Content Library / Datastore ISO image source
   iso_paths  = var.iso_paths
@@ -135,6 +136,9 @@ source "vsphere-iso" "rocky" {
     "<enter><wait>",
     "<leftCtrlOn>x<leftCtrlOff>"
   ]
+
+  ip_wait_timeout   = "30m"
+  ip_settle_timeout = "10s"
 
   # SSH communicator setup
   communicator = "ssh"
@@ -155,7 +159,26 @@ build {
       "BUILD_USERNAME=${var.ssh_username}",
       "BUILD_SSH_PUBLIC_KEY=${var.ssh_public_key}"
     ]
-    execute_command = "echo '${var.ssh_password}' | sudo -S -E bash '{{ .Path }}'"
-    script          = "${path.root}/scripts/01_harden_rocky.sh"
+    script = "${path.root}/scripts/01_harden_rocky.sh"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "rpm -q open-vm-tools",
+      "sudo systemctl enable --now vmtoolsd.service",
+      "sudo systemctl is-active --quiet vmtoolsd.service",
+      "sudo dnf -y install NetworkManager-initscripts-updown perl || true",
+      "sudo mkdir -p /etc/sysconfig/network-scripts",
+      "sudo chmod 0755 /etc/sysconfig/network-scripts",
+      "sudo install -d -m 0755 /etc/vmware-tools",
+      "printf '[customization]\\nenable-custom-scripts = true\\n' | sudo tee /etc/vmware-tools/tools.conf",
+      "sudo dnf -y update",
+      "sudo systemctl enable --now chronyd.service",
+      "sudo truncate -s 0 /etc/machine-id",
+      "if [ -d /var/lib/dbus ]; then sudo rm -f /var/lib/dbus/machine-id && sudo ln -sf /etc/machine-id /var/lib/dbus/machine-id; fi",
+      "sudo cloud-init clean --logs 2>/dev/null || true",
+      "sudo rm -f /root/.ssh/authorized_keys",
+      "history -c || true"
+    ]
   }
 }

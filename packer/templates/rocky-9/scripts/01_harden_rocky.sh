@@ -4,6 +4,10 @@
 # ==============================================================================
 set -euo pipefail
 
+if [[ "${EUID}" -ne 0 ]]; then
+  exec sudo -E bash "$0" "$@"
+fi
+
 # 1. Cấu hình SSH Server bảo mật
 install -d -m 0755 /etc/ssh/sshd_config.d
 

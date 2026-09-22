@@ -311,16 +311,19 @@ export PKR_VAR_vcenter_password="${VCENTER_PASS}"
 export PKR_VAR_ssh_password="${SSH_PASS}"
 export_govc_env "${VCENTER_SERVER}" "${VCENTER_USER}" "${VCENTER_PASS}"
 
-# Tạo mã băm SHA-512 an toàn trong RAM cho Kickstart / Autoinstall
+# Tạo mã băm SHA-512 an toàn trong RAM cho Kickstart / Autoinstall (bám sát iac_rocky_linux_v1)
 SSH_HASH=""
 if command -v openssl &>/dev/null; then
-    SSH_HASH=$(openssl passwd -6 "${SSH_PASS}" 2>/dev/null || true)
+    SSH_HASH=$(openssl passwd -6 -- "${SSH_PASS}" 2>/dev/null || true)
 fi
 if [[ -z "${SSH_HASH}" ]]; then
     SSH_HASH=$(python3 -c "import crypt, sys; print(crypt.crypt(sys.argv[1], crypt.mksalt(crypt.METHOD_SHA512)))" "${SSH_PASS}" 2>/dev/null || true)
 fi
 if [[ -n "${SSH_HASH}" ]]; then
     export PKR_VAR_ssh_password_hash="${SSH_HASH}"
+else
+    log_error "Không thể tạo mã băm mật khẩu SHA-512 an toàn cho Kickstart/Autoinstall."
+    exit 1
 fi
 
 PUB_KEY=""
