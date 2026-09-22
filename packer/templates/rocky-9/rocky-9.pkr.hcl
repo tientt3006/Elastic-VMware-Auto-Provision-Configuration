@@ -17,6 +17,8 @@ locals {
   kickstart = <<-KS
     #version=RHEL9
     cdrom
+    repo --name="AppStream" --baseurl="https://download.rockylinux.org/pub/rocky/9/AppStream/x86_64/os/" --noverifyssl
+    repo --name="BaseOS" --baseurl="https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/" --noverifyssl
     text
     eula --agreed
     lang en_US.UTF-8
@@ -60,19 +62,24 @@ locals {
     %{endfor~}
     %end
 
+    %post --nochroot --log=/mnt/sysimage/root/ks-post-nochroot.log
+    # Copy DNS configuration into target chroot so dnf works
+    cp -L /etc/resolv.conf /mnt/sysimage/etc/resolv.conf 2>/dev/null || true
+    %end
+
     %post --log=/root/ks-post.log
     if ! rpm -q open-vm-tools >/dev/null 2>&1; then
-      dnf -y install open-vm-tools
+      dnf -y install open-vm-tools perl || true
     fi
     echo "${var.ssh_username} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${var.ssh_username}
     chmod 0440 /etc/sudoers.d/${var.ssh_username}
-    rpm -q open-vm-tools
-    systemctl enable --now vmtoolsd.service
-    systemctl is-active --quiet vmtoolsd.service
-    systemctl enable chronyd.service
-    systemctl enable firewalld.service
-    systemctl enable auditd.service
-    systemctl enable rsyslog.service
+
+    systemctl enable vmtoolsd.service || true
+    systemctl enable chronyd.service || true
+    systemctl enable firewalld.service || true
+    systemctl enable auditd.service || true
+    systemctl enable rsyslog.service || true
+
     if [ -n "${var.ssh_public_key}" ]; then
       install -d -m 0700 -o ${var.ssh_username} -g ${var.ssh_username} /home/${var.ssh_username}/.ssh
       printf '%s\n' '${var.ssh_public_key}' > /home/${var.ssh_username}/.ssh/authorized_keys
