@@ -241,6 +241,18 @@ sync_packer_vars_from_terraform() {
 }
 sync_packer_vars_from_terraform "${PKRVARS}"
 
+# Tự động tối ưu boot_order và chuẩn hóa CD-ROM controller để tránh lỗi lặp boot / mất IP
+if [[ -f "${PKRVARS}" ]]; then
+    if grep -q -E '^\s*boot_order\s*=\s*"cdrom,disk"' "${PKRVARS}"; then
+        sed -i -E 's/(boot_order\s*=\s*)"cdrom,disk"/\1"disk,cdrom"/' "${PKRVARS}"
+        log_info "Đã tự động cập nhật boot_order thành 'disk,cdrom' trong ${PKRVARS}."
+    fi
+    if grep -q -E '^\s*vm_cdrom_type\s*=\s*"sata"' "${PKRVARS}" && [[ "${TEMPLATE_NAME}" == "rocky-9"* ]]; then
+        sed -i -E 's/(vm_cdrom_type\s*=\s*)"sata"/\1"ide"/' "${PKRVARS}"
+        log_info "Đã tự động chuẩn hóa vm_cdrom_type thành 'ide' cho Rocky Linux trong ${PKRVARS}."
+    fi
+fi
+
 # 3. Kiểm tra liên tục các thông số chưa điền (placeholder) trong packer.pkrvars.hcl
 while true; do
     placeholders=()

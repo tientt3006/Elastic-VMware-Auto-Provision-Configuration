@@ -58,14 +58,14 @@ variable "vcenter_resource_pool" {
 
 variable "boot_order" {
   type        = string
-  description = "Priority order of boot devices for the virtual machine (e.g. 'cdrom,disk')."
-  default     = "cdrom,disk"
+  description = "Priority order of boot devices for the virtual machine (e.g. 'disk,cdrom')."
+  default     = "disk,cdrom"
 }
 
 variable "vm_cdrom_type" {
   type        = string
-  description = "Virtual CD-ROM controller type ('sata' or 'ide')."
-  default     = "sata"
+  description = "Virtual CD-ROM controller type ('ide' or 'sata')."
+  default     = "ide"
 }
 
 variable "iso_paths" {

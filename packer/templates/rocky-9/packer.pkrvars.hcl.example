@@ -26,7 +26,6 @@ vm_cpu_sockets              = 1
 vm_mem_size                 = 4096
 vm_disk_size                = 40960
 vm_disk_thin                = true
-vm_cdrom_type               = "sata"
 
 ssh_username                = "<SSH_USER>"
 ssh_timeout                 = "30m"

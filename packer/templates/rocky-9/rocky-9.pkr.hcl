@@ -105,7 +105,6 @@ source "vsphere-iso" "rocky" {
   # Hardware specifications
   guest_os_type        = "rhel9_64Guest"
   firmware             = "efi"
-  cdrom_type           = var.vm_cdrom_type
   CPUs                 = var.vm_cpu_cores
   RAM                  = var.vm_mem_size
   disk_controller_type = ["pvscsi"]
@@ -126,7 +125,6 @@ source "vsphere-iso" "rocky" {
   # Content Library / Datastore ISO image source
   iso_paths  = var.iso_paths
   cd_content = { "/ks.cfg" = local.kickstart }
-  cd_label   = "OEMDRV"
 
   # EFI boot command sequence for Rocky Linux 9 Anaconda
   boot_order = var.boot_order
