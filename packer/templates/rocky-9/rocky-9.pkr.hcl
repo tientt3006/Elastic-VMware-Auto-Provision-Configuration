@@ -17,8 +17,6 @@ locals {
   kickstart = <<-KS
     #version=RHEL9
     cdrom
-    repo --name="AppStream" --baseurl="https://download.rockylinux.org/pub/rocky/9/AppStream/x86_64/os/" --noverifyssl
-    repo --name="BaseOS" --baseurl="https://download.rockylinux.org/pub/rocky/9/BaseOS/x86_64/os/" --noverifyssl
     text
     eula --agreed
     lang en_US.UTF-8
@@ -28,6 +26,7 @@ locals {
     rootpw --lock
     user --name=${var.ssh_username} --groups=wheel --iscrypted --password=${var.ssh_password_hash}
     firewall --enabled --ssh
+    authselect select sssd
     selinux --enforcing
     bootloader --location=mbr --append="console=tty0"
     zerombr
@@ -35,17 +34,15 @@ locals {
     autopart --type=lvm
     services --enabled=NetworkManager,sshd
     skipx
-    reboot --eject
 
     %packages --ignoremissing --excludedocs
     @core
+    -iwl*firmware
     sudo
     firewalld
     audit
     rsyslog
     openssh-server
-    open-vm-tools
-    perl
     NetworkManager-initscripts-updown
     chrony
     ca-certificates
@@ -63,16 +60,14 @@ locals {
     %end
 
     %post --nochroot --log=/mnt/sysimage/root/ks-post-nochroot.log
-    # Copy DNS configuration into target chroot so dnf works
-    cp -L /etc/resolv.conf /mnt/sysimage/etc/resolv.conf 2>/dev/null || true
+    cp -f /etc/resolv.conf /mnt/sysimage/etc/resolv.conf 2>/dev/null || true
     %end
 
     %post --log=/root/ks-post.log
-    if ! rpm -q open-vm-tools >/dev/null 2>&1; then
-      dnf -y install open-vm-tools perl || true
-    fi
+    dnf -y install sudo open-vm-tools perl
     echo "${var.ssh_username} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${var.ssh_username}
     chmod 0440 /etc/sudoers.d/${var.ssh_username}
+    sed -i "s/^.*requiretty/#Defaults requiretty/" /etc/sudoers 2>/dev/null || true
 
     systemctl enable vmtoolsd.service || true
     systemctl enable chronyd.service || true
@@ -87,6 +82,8 @@ locals {
       chmod 0600 /home/${var.ssh_username}/.ssh/authorized_keys
     fi
     %end
+
+    reboot --eject
   KS
 }
 
