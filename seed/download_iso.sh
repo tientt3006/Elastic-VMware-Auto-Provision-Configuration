@@ -12,12 +12,15 @@ mkdir -p "${DEST_DIR}"
 UBUNTU_2404_URL="https://releases.ubuntu.com/24.04/ubuntu-24.04.5-live-server-amd64.iso"
 UBUNTU_2404_SHA256="97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8"
 
+ROCKY_9_URL="https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9-latest-x86_64-minimal.iso"
+
 usage() {
     cat << EOF
 Cach su dung: $0 [options]
 
 Tuy chon:
   -u, --ubuntu              Tai ban cai dat Ubuntu 24.04 LTS Live Server
+  -r, --rocky               Tai ban cai dat Rocky Linux 9 Minimal
   -v, --vcsa <URL>          Tai ban cai dat VMware vCenter Server Appliance (VCSA) tu URL chi dinh
   -c, --custom <URL> <SHA>  Tai tep ISO bat ky tu URL va doi chieu ma bam SHA256 (tuy chon)
   -d, --dir <PATH>          Thu muc luu tru tep ISO (Mac dinh: ./iso_cache)
@@ -25,6 +28,7 @@ Tuy chon:
 
 Vi du:
   $0 --ubuntu
+  $0 --rocky
   $0 --vcsa "http://internal-mirror.local/isos/VMware-VCSA-all-8.0.2.iso"
   $0 --custom "https://example.com/custom.iso" "abc123sha256..."
 EOF
@@ -92,6 +96,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -u|--ubuntu)
             download_file "${UBUNTU_2404_URL}" "${UBUNTU_2404_SHA256}"
+            shift
+            ;;
+        -r|--rocky)
+            download_file "${ROCKY_9_URL}" ""
             shift
             ;;
         -v|--vcsa)

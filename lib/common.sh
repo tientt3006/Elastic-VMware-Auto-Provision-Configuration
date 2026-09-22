@@ -59,6 +59,33 @@ check_command() {
     return 0
 }
 
+url_encode() {
+    local raw="${1:-}"
+    local safe="${2:-}"
+    if command -v python3 &>/dev/null; then
+        python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1], safe=sys.argv[2]))" "${raw}" "${safe}"
+    else
+        local LC_ALL=C
+        local encoded=""
+        local i c hex
+        for (( i=0; i<${#raw}; i++ )); do
+            c="${raw:i:1}"
+            case "${c}" in
+                [a-zA-Z0-9.~_-]) encoded+="${c}" ;;
+                *)
+                    if [[ -n "${safe}" && "${safe}" == *"${c}"* ]]; then
+                        encoded+="${c}"
+                    else
+                        printf -v hex '%%%02X' "'${c}"
+                        encoded+="${hex}"
+                    fi
+                    ;;
+            esac
+        done
+        echo "${encoded}"
+    fi
+}
+
 prompt_if_placeholder() {
     local var_name="$1"
     local prompt_msg="$2"

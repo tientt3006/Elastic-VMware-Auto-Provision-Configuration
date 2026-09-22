@@ -138,6 +138,44 @@ run_platform_tools_menu() {
                     log_success "Đã lưu tên máy ảo VM Template: ${input_vm_name}"
                 fi
 
+                # Kiểm tra và thiết lập đường dẫn ISO cho Golden Template
+                local current_iso=""
+                if [[ -f "${pkr_file}" ]]; then
+                    current_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${pkr_file}" | grep -E '"\[.*\]' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
+                fi
+
+                local default_ds=""
+                if [[ -f "${pkr_file}" ]]; then
+                    default_ds=$(grep -E '^\s*vcenter_datastore\s*=' "${pkr_file}" | head -n 1 | cut -d'"' -f2 || true)
+                fi
+                if [[ -z "${default_ds}" || "${default_ds}" == *"<"*">"* ]]; then
+                    if [[ -f "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" ]]; then
+                        default_ds=$(grep -E '^\s*vsphere_datastore\s*=' "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" | head -n 1 | cut -d'"' -f2 || true)
+                    fi
+                fi
+                if [[ -z "${default_ds}" || "${default_ds}" == *"<"*">"* ]]; then
+                    if [[ -f "${REPO_ROOT}/products/elastic-stack/product.conf" ]]; then
+                        default_ds=$(grep -E '^\s*ISO_DATASTORE=' "${REPO_ROOT}/products/elastic-stack/product.conf" | cut -d'"' -f2 || true)
+                    fi
+                fi
+
+                local need_select_iso=0
+                if [[ -z "${current_iso}" || "${current_iso}" == *"<"*">"* ]]; then
+                    need_select_iso=1
+                else
+                    echo ""
+                    echo "Cấu hình tệp ISO hiện tại: ${current_iso}"
+                    if confirm_action "Xác nhận thay đổi cấu hình tệp ISO này?" "N"; then
+                        need_select_iso=1
+                    fi
+                fi
+
+                if [[ ${need_select_iso} -eq 1 ]]; then
+                    if ! run_iso_menu "${default_ds}" "${pkr_file}" "${REPO_ROOT}/products/elastic-stack/product.conf" "${REPO_ROOT}/seed"; then
+                        log_warn "Chưa hoàn tất chọn ISO. Quy trình đóng gói có thể bị gián đoạn nếu thiếu ISO."
+                    fi
+                fi
+
                 log_info "Khởi chạy quy trình đóng gói Golden Template cho: ${chosen_os}..."
                 (cd "${REPO_ROOT}/packer" && ./build.sh --template "${chosen_os}")
                 ;;
@@ -172,65 +210,7 @@ run_platform_tools_menu() {
                 (cd "${REPO_ROOT}/terraform/profiles/${selected_profile}" && ./run.sh)
                 ;;
             3)
-                log_banner "QUẢN LÝ KHO ISO VÀ VSPHERE CONTENT LIBRARY"
-                echo "Chọn phạm vi thao tác:"
-                echo "  1) Cấu hình tệp ISO cho Golden Template (Packer)"
-                echo "  2) Quản lý kho vSphere Content Library (Liệt kê, tạo mới, nạp ISO)"
-                echo "  0) Quay lại"
-                local iso_scope=""
-                if ! read -r -p "Vui lòng chọn (0-2) [1]: " iso_scope; then
-                    echo ""
-                    continue
-                fi
-                iso_scope="${iso_scope%$'\r'}"
-                iso_scope="${iso_scope:-1}"
-
-                if [[ "${iso_scope}" == "0" ]]; then
-                    continue
-                elif [[ "${iso_scope}" == "2" ]]; then
-                    run_content_library_menu "${REPO_ROOT}/products/elastic-stack/product.conf"
-                    continue
-                fi
-
-                local os_templates=()
-                mapfile -t os_templates < <(find "${REPO_ROOT}/packer/templates" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort || true)
-                local target_os="ubuntu-24.04"
-                if [[ ${#os_templates[@]} -gt 1 ]]; then
-                    echo ""
-                    echo "Chọn hệ điều hành để cấu hình tệp ISO:"
-                    for idx in "${!os_templates[@]}"; do
-                        echo "  $((idx+1))) ${os_templates[$idx]}"
-                    done
-                    local sel_os=""
-                    if read -r -p "Vui lòng chọn (1-${#os_templates[@]}) [${#os_templates[@]}]: " sel_os; then
-                        sel_os="${sel_os%$'\r'}"
-                        sel_os="${sel_os:-${#os_templates[@]}}"
-                        if [[ "${sel_os}" =~ ^[0-9]+$ ]] && [ "${sel_os}" -ge 1 ] && [ "${sel_os}" -le "${#os_templates[@]}" ]; then
-                            target_os="${os_templates[$((sel_os-1))]}"
-                        fi
-                    fi
-                elif [[ ${#os_templates[@]} -eq 1 ]]; then
-                    target_os="${os_templates[0]}"
-                fi
-
-                local target_pkr="${REPO_ROOT}/packer/templates/${target_os}/packer.pkrvars.hcl"
-                [[ ! -f "${target_pkr}" && -f "${target_pkr}.example" ]] && cp "${target_pkr}.example" "${target_pkr}"
-
-                local default_ds=""
-                if [[ -f "${target_pkr}" ]]; then
-                    default_ds=$(grep -E '^\s*vcenter_datastore\s*=' "${target_pkr}" | head -n 1 | cut -d'"' -f2 || true)
-                fi
-                if [[ -z "${default_ds}" || "${default_ds}" == *"<"*">"* ]]; then
-                    if [[ -f "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" ]]; then
-                        default_ds=$(grep -E '^\s*vsphere_datastore\s*=' "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" | head -n 1 | cut -d'"' -f2 || true)
-                    fi
-                fi
-                if [[ -z "${default_ds}" || "${default_ds}" == *"<"*">"* ]]; then
-                    if [[ -f "${REPO_ROOT}/products/elastic-stack/product.conf" ]]; then
-                        default_ds=$(grep -E '^\s*ISO_DATASTORE=' "${REPO_ROOT}/products/elastic-stack/product.conf" | cut -d'"' -f2 || true)
-                    fi
-                fi
-                run_iso_menu "${default_ds}" "${target_pkr}" "${REPO_ROOT}/products/elastic-stack/product.conf" "${REPO_ROOT}/seed"
+                run_content_library_menu "${REPO_ROOT}/products/elastic-stack/product.conf"
                 ;;
             4)
                 log_banner "CÀI ĐẶT MÔI TRƯỜNG CÔNG CỤ (SEED SETUP)"

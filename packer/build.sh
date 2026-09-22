@@ -242,6 +242,23 @@ while true; do
     mapfile -t placeholders < <(grep -v '^\s*#' "${PKRVARS}" | grep -o -E '<[A-Z0-9_]+>' | sort -u || true)
     
     if [[ ${#placeholders[@]} -gt 0 ]]; then
+        # Kiểm tra nếu các biến chưa điền là ISO hoặc Datastore -> cung cấp bảng chọn trực tiếp
+        local has_iso=0
+        local has_ds=0
+        for p in "${placeholders[@]}"; do
+            [[ "${p}" == "<PATH_TO_ISO>" ]] && has_iso=1
+            [[ "${p}" == "<VCENTER_DATASTORE>" ]] && has_ds=1
+        done
+
+        if [[ ${has_iso} -eq 1 || ${has_ds} -eq 1 ]]; then
+            echo ""
+            log_info "Phát hiện tệp cấu hình ${PKRVARS} chưa được chỉ định ISO hoặc Datastore."
+            echo "Khởi chạy bảng chọn ISO (hỗ trợ Content Library hoặc Datastore) để tự động điền..."
+            if run_iso_menu "" "${PKRVARS}" "" "${REPO_ROOT}/seed"; then
+                continue
+            fi
+        fi
+
         echo ""
         log_warn "Tệp ${PKRVARS} vẫn còn các trường thông số mẫu chưa được điền:"
         for p in "${placeholders[@]}"; do

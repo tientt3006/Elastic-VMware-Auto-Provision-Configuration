@@ -69,5 +69,6 @@ cleanup_secrets() {
     unset ELASTIC_PASS || true
     unset KIBANA_PASS || true
     unset GOVC_PASSWORD || true
+    unset ESXI_PASS || true
     log_success "Hoàn tất giải phóng bộ nhớ RAM."
 }

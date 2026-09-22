@@ -59,6 +59,22 @@ ensure_govc_session() {
         detected_user=$(grep -E '^\s*vcenter_user\s*=' "${pkr_file}" | head -n 1 | cut -d'"' -f2 || true)
     fi
 
+    # Tra cứu từ các tệp packer.pkrvars.hcl trong templates nếu chưa có
+    if [[ -z "${detected_server}" || "${detected_server}" == *"<"*">"* ]]; then
+        for p in "${repo_base}/packer/templates"/*/packer.pkrvars.hcl; do
+            if [[ -f "${p}" ]]; then
+                local s u
+                s=$(grep -E '^\s*vcenter_server\s*=' "${p}" | head -n 1 | cut -d'"' -f2 || true)
+                u=$(grep -E '^\s*vcenter_user\s*=' "${p}" | head -n 1 | cut -d'"' -f2 || true)
+                if [[ -n "${s}" && "${s}" != *"<"*">"* ]]; then
+                    detected_server="${s}"
+                    detected_user="${u}"
+                    break
+                fi
+            fi
+        done
+    fi
+
     # 2. Tra cứu từ tệp Terraform tfvars nếu chưa có
     if [[ -z "${detected_server}" || "${detected_server}" == *"<"*">"* ]]; then
         for tf_path in "${repo_base}/terraform/profiles/generic-vms/terraform.tfvars" "${repo_base}/terraform/profiles/elastic-stack/terraform.tfvars"; do
@@ -137,6 +153,14 @@ ensure_govc_session() {
     local about_out
     if about_out=$(govc about 2>&1); then
         log_success "Xác thực vCenter Server thành công."
+        if [[ -n "${pkr_file}" && -f "${pkr_file}" ]]; then
+            if grep -q -E 'vcenter_server\s*=\s*"<.*>"' "${pkr_file}"; then
+                sed -i -E "s/(vcenter_server\s*=\s*\")[^\"]+(\")/\1${target_server}\2/" "${pkr_file}"
+            fi
+            if grep -q -E 'vcenter_user\s*=\s*"<.*>"' "${pkr_file}"; then
+                sed -i -E "s/(vcenter_user\s*=\s*\")[^\"]+(\")/\1${target_user}\2/" "${pkr_file}"
+            fi
+        fi
         return 0
     else
         log_error "Không thể xác thực tới vCenter Server:"
@@ -269,14 +293,34 @@ run_iso_menu() {
 
     ensure_target_datastore() {
         if [[ -z "${datastore}" || "${datastore}" == *"<"*">"* ]]; then
-            local input_ds=""
-            read -r -p "Nhập tên Datastore đích trên vCenter: " input_ds
-            input_ds="${input_ds%$'\r'}"
-            if [[ -z "${input_ds}" || "${input_ds}" == *"<"*">"* ]]; then
-                log_error "Tên Datastore không được để trống hoặc chứa ký tự mẫu."
-                return 1
+            local ds_candidates=()
+            mapfile -t ds_candidates < <(govc find -type d 2>/dev/null | sed 's|.*/||' | sort -u || true)
+            if [[ ${#ds_candidates[@]} -gt 0 ]]; then
+                echo ""
+                echo "Danh sách Datastore khả dụng trên vCenter:"
+                for idx in "${!ds_candidates[@]}"; do
+                    echo "  $((idx+1))) ${ds_candidates[$idx]}"
+                done
+                local sel_ds=""
+                if read -r -p "Vui lòng chọn Datastore (1-${#ds_candidates[@]}) [1]: " sel_ds; then
+                    sel_ds="${sel_ds%$'\r'}"
+                    sel_ds="${sel_ds:-1}"
+                    if [[ "${sel_ds}" =~ ^[0-9]+$ ]] && [ "${sel_ds}" -ge 1 ] && [ "${sel_ds}" -le "${#ds_candidates[@]}" ]; then
+                        datastore="${ds_candidates[$((sel_ds-1))]}"
+                    fi
+                fi
             fi
-            datastore="${input_ds}"
+
+            if [[ -z "${datastore}" || "${datastore}" == *"<"*">"* ]]; then
+                local input_ds=""
+                read -r -p "Nhập tên Datastore đích trên vCenter: " input_ds
+                input_ds="${input_ds%$'\r'}"
+                if [[ -z "${input_ds}" || "${input_ds}" == *"<"*">"* ]]; then
+                    log_error "Tên Datastore không được để trống hoặc chứa ký tự mẫu."
+                    return 1
+                fi
+                datastore="${input_ds}"
+            fi
         fi
         return 0
     }
@@ -284,7 +328,7 @@ run_iso_menu() {
     while true; do
         echo ""
         echo "Phương thức thiết lập ISO cài đặt hệ điều hành:"
-        echo "  1) Tải ISO tự động từ Internet (Ubuntu 24.04 LTS Live Server) & upload lên Datastore"
+        echo "  1) Tải ISO tự động từ Internet & upload lên Datastore"
         echo "  2) Chọn tệp ISO từ đĩa cục bộ & upload lên Datastore"
         echo "  3) Chọn tệp ISO đã có sẵn trên Datastore vCenter"
         echo "  4) Chọn tệp ISO từ vSphere Content Library"
@@ -304,26 +348,37 @@ run_iso_menu() {
                 ;;
             1)
                 ensure_target_datastore || continue
-                log_info "Bắt đầu tải ISO từ nguồn phát hành Ubuntu..."
+                local tmpl_os=""
+                if [[ -n "${pkr_file}" ]]; then
+                    tmpl_os="$(basename "$(dirname "${pkr_file}")")"
+                fi
+
+                local download_flag="--ubuntu"
+                local iso_filename="ubuntu-24.04.5-live-server-amd64.iso"
+                if [[ "${tmpl_os}" == *"rocky"* ]]; then
+                    download_flag="--rocky"
+                    iso_filename="Rocky-9-latest-x86_64-minimal.iso"
+                fi
+
+                log_info "Bắt đầu tải ISO từ Internet cho hệ điều hành [${tmpl_os:-generic}]..."
                 if [[ -x "${seed_dir}/download_iso.sh" ]]; then
-                    (cd "${seed_dir}" && ./download_iso.sh --ubuntu)
+                    (cd "${seed_dir}" && ./download_iso.sh "${download_flag}")
                 else
                     log_error "Không tìm thấy script ${seed_dir}/download_iso.sh."
                     return 1
                 fi
 
-                local iso_local="${seed_dir}/iso_cache/ubuntu-24.04.5-live-server-amd64.iso"
+                local iso_local="${seed_dir}/iso_cache/${iso_filename}"
                 if [[ ! -f "${iso_local}" ]]; then
-                    # Kiểm tra thư mục ./iso_cache nếu download vào thư mục làm việc
-                    if [[ -f "iso_cache/ubuntu-24.04.5-live-server-amd64.iso" ]]; then
-                        iso_local="iso_cache/ubuntu-24.04.5-live-server-amd64.iso"
+                    if [[ -f "iso_cache/${iso_filename}" ]]; then
+                        iso_local="iso_cache/${iso_filename}"
                     else
                         log_error "Tệp ISO không tồn tại sau khi tải: ${iso_local}"
                         return 1
                     fi
                 fi
 
-                local iso_remote="iso/ubuntu-24.04.5-live-server-amd64.iso"
+                local iso_remote="iso/${iso_filename}"
                 upload_iso_to_datastore "${datastore}" "${iso_local}" "${iso_remote}"
                 update_iso_in_packer "${pkr_file}" "${datastore}" "${iso_remote}"
                 save_last_used_iso "${config_file}" "${iso_remote}"
