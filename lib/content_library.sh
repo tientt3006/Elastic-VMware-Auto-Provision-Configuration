@@ -455,7 +455,7 @@ copy_or_move_iso_datastore_to_content_library() {
 
     # 2. Chọn Datastore nguồn
     local ds_candidates=()
-    mapfile -t ds_candidates < <(govc find -type d 2>/dev/null | sed 's|.*/||' | sort -u || true)
+    mapfile -t ds_candidates < <(govc find -type s 2>/dev/null | sed 's|.*/||' | sort -u || true)
     local src_ds=""
     if [[ ${#ds_candidates[@]} -gt 0 ]]; then
         echo ""
@@ -483,15 +483,8 @@ copy_or_move_iso_datastore_to_content_library() {
     fi
 
     log_info "Đang quét danh sách tệp .iso trên Datastore [${src_ds}]..."
-    local raw_isos
-    if ! raw_isos=$(govc datastore.ls -R -ds="${src_ds}" 2>&1); then
-        log_error "Không thể truy vấn Datastore [${src_ds}]:"
-        echo "${raw_isos}"
-        return 1
-    fi
-
     local ds_iso_list=()
-    mapfile -t ds_iso_list < <(echo "${raw_isos}" | grep -i "\.iso$" || true)
+    mapfile -t ds_iso_list < <(get_datastore_iso_files "${src_ds}")
     if [[ ${#ds_iso_list[@]} -eq 0 ]]; then
         log_warn "Không tìm thấy tệp .iso nào trên Datastore [${src_ds}]."
         return 1
@@ -654,12 +647,12 @@ run_content_library_menu() {
         echo ""
         echo "Thao tác quản trị Content Library và kho ISO:"
         echo "  1) Liệt kê Content Library và các tệp ISO bên trong"
-        echo "  2) Tạo Content Library mới trên Datastore"
+        echo "  2) Liệt kê các tệp ISO đang có trên Datastore vCenter"
         echo "  3) Tải tệp ISO từ Internet vào Content Library (URL - pull)"
         echo "  4) Upload tệp ISO từ máy cục bộ vào Content Library"
-        echo "  5) Di chuyển / Sao chép tệp ISO từ Datastore sang Content Library"
-        echo "  6) Liệt kê các tệp ISO đang có trên Datastore vCenter"
-        echo "  7) Upload tệp ISO từ máy cục bộ lên Datastore vCenter"
+        echo "  5) Upload tệp ISO từ máy cục bộ lên Datastore vCenter"
+        echo "  6) Di chuyển / Sao chép tệp ISO từ Datastore sang Content Library"
+        echo "  7) Tạo Content Library mới trên Datastore"
         echo "  0) Quay lại"
 
         local choice=""
@@ -698,47 +691,44 @@ run_content_library_menu() {
                 fi
                 ;;
             2)
-                local new_name=""
-                read -r -p "Nhập tên Content Library mới: " new_name
-                new_name="${new_name%$'\r'}"
-                if [[ -z "${new_name}" ]]; then
-                    log_error "Tên Content Library không được để trống."
-                    continue
-                fi
-
+                local ds_list=()
+                mapfile -t ds_list < <(govc find -type s 2>/dev/null | sed 's|.*/||' | sort -u || true)
                 local target_ds=""
-                local ds_candidates=()
-                mapfile -t ds_candidates < <(govc find -type d 2>/dev/null | sed 's|.*/||' | sort -u || true)
-                if [[ ${#ds_candidates[@]} -gt 0 ]]; then
-                    echo "Danh sách Datastore lưu trữ thư viện:"
-                    for idx in "${!ds_candidates[@]}"; do
-                        echo "  $((idx+1))) ${ds_candidates[$idx]}"
+                if [[ ${#ds_list[@]} -gt 0 ]]; then
+                    echo "Chọn Datastore cần xem danh sách ISO:"
+                    for idx in "${!ds_list[@]}"; do
+                        echo "  $((idx+1))) ${ds_list[$idx]}"
                     done
                     local sel_ds=""
-                    if read -r -p "Chọn Datastore (1-${#ds_candidates[@]}) [1]: " sel_ds; then
+                    if read -r -p "Vui lòng chọn (1-${#ds_list[@]}) [1]: " sel_ds; then
                         sel_ds="${sel_ds%$'\r'}"
                         sel_ds="${sel_ds:-1}"
-                        if [[ "${sel_ds}" =~ ^[0-9]+$ ]] && [ "${sel_ds}" -ge 1 ] && [ "${sel_ds}" -le "${#ds_candidates[@]}" ]; then
-                            target_ds="${ds_candidates[$((sel_ds-1))]}"
+                        if [[ "${sel_ds}" =~ ^[0-9]+$ ]] && [ "${sel_ds}" -ge 1 ] && [ "${sel_ds}" -le "${#ds_list[@]}" ]; then
+                            target_ds="${ds_list[$((sel_ds-1))]}"
                         fi
                     fi
                 fi
-
                 if [[ -z "${target_ds}" ]]; then
-                    read -r -p "Nhập tên Datastore lưu trữ thư viện: " target_ds
+                    read -r -p "Nhập tên Datastore: " target_ds
                     target_ds="${target_ds%$'\r'}"
-                    if [[ -z "${target_ds}" ]]; then
-                        log_error "Tên Datastore không được để trống."
-                        continue
+                fi
+                if [[ -n "${target_ds}" ]]; then
+                    log_info "Đang quét danh sách tệp .iso trên Datastore [${target_ds}]..."
+                    local isos=()
+                    mapfile -t isos < <(get_datastore_iso_files "${target_ds}")
+                    if [[ ${#isos[@]} -gt 0 ]]; then
+                        echo ""
+                        echo "=============================================================================="
+                        echo "Danh sách tệp ISO trên Datastore [${target_ds}]:"
+                        echo "------------------------------------------------------------------------------"
+                        for idx in "${!isos[@]}"; do
+                            echo "  $((idx+1))) ${isos[$idx]}"
+                        done
+                        echo "=============================================================================="
+                    else
+                        log_warn "Không tìm thấy tệp .iso nào trên Datastore [${target_ds}]."
                     fi
                 fi
-
-                local desc=""
-                read -r -p "Nhập mô tả [ISO and VM Templates]: " desc
-                desc="${desc%$'\r'}"
-                desc="${desc:-ISO and VM Templates}"
-
-                create_content_library "${new_name}" "${target_ds}" "${desc}"
                 ;;
             3)
                 local libs=()
@@ -799,53 +789,8 @@ run_content_library_menu() {
                 fi
                 ;;
             5)
-                copy_or_move_iso_datastore_to_content_library
-                ;;
-            6)
                 local ds_list=()
-                mapfile -t ds_list < <(govc find -type d 2>/dev/null | sed 's|.*/||' | sort -u || true)
-                local target_ds=""
-                if [[ ${#ds_list[@]} -gt 0 ]]; then
-                    echo "Chọn Datastore cần xem danh sách ISO:"
-                    for idx in "${!ds_list[@]}"; do
-                        echo "  $((idx+1))) ${ds_list[$idx]}"
-                    done
-                    local sel_ds=""
-                    if read -r -p "Vui lòng chọn (1-${#ds_list[@]}) [1]: " sel_ds; then
-                        sel_ds="${sel_ds%$'\r'}"
-                        sel_ds="${sel_ds:-1}"
-                        if [[ "${sel_ds}" =~ ^[0-9]+$ ]] && [ "${sel_ds}" -ge 1 ] && [ "${sel_ds}" -le "${#ds_list[@]}" ]; then
-                            target_ds="${ds_list[$((sel_ds-1))]}"
-                        fi
-                    fi
-                fi
-                if [[ -z "${target_ds}" ]]; then
-                    read -r -p "Nhập tên Datastore: " target_ds
-                    target_ds="${target_ds%$'\r'}"
-                fi
-                if [[ -n "${target_ds}" ]]; then
-                    log_info "Đang quét danh sách tệp .iso trên Datastore [${target_ds}]..."
-                    local raw_isos
-                    if raw_isos=$(govc datastore.ls -R -ds="${target_ds}" 2>&1); then
-                        local isos=()
-                        mapfile -t isos < <(echo "${raw_isos}" | grep -i "\.iso$" || true)
-                        if [[ ${#isos[@]} -gt 0 ]]; then
-                            echo "Danh sách tệp ISO trên [${target_ds}]:"
-                            for idx in "${!isos[@]}"; do
-                                echo "  $((idx+1))) ${isos[$idx]}"
-                            done
-                        else
-                            log_warn "Không tìm thấy tệp .iso nào trên Datastore [${target_ds}]."
-                        fi
-                    else
-                        log_error "Lỗi truy vấn Datastore [${target_ds}]:"
-                        echo "${raw_isos}"
-                    fi
-                fi
-                ;;
-            7)
-                local ds_list=()
-                mapfile -t ds_list < <(govc find -type d 2>/dev/null | sed 's|.*/||' | sort -u || true)
+                mapfile -t ds_list < <(govc find -type s 2>/dev/null | sed 's|.*/||' | sort -u || true)
                 local target_ds=""
                 if [[ ${#ds_list[@]} -gt 0 ]]; then
                     echo "Chọn Datastore đích để upload ISO:"
@@ -880,6 +825,52 @@ run_content_library_menu() {
                 local iso_base
                 iso_base=$(basename "${local_iso}")
                 upload_iso_to_datastore "${target_ds}" "${local_iso}" "iso/${iso_base}"
+                ;;
+            6)
+                copy_or_move_iso_datastore_to_content_library
+                ;;
+            7)
+                local new_name=""
+                read -r -p "Nhập tên Content Library mới: " new_name
+                new_name="${new_name%$'\r'}"
+                if [[ -z "${new_name}" ]]; then
+                    log_error "Tên Content Library không được để trống."
+                    continue
+                fi
+
+                local target_ds=""
+                local ds_candidates=()
+                mapfile -t ds_candidates < <(govc find -type s 2>/dev/null | sed 's|.*/||' | sort -u || true)
+                if [[ ${#ds_candidates[@]} -gt 0 ]]; then
+                    echo "Danh sách Datastore lưu trữ thư viện:"
+                    for idx in "${!ds_candidates[@]}"; do
+                        echo "  $((idx+1))) ${ds_candidates[$idx]}"
+                    done
+                    local sel_ds=""
+                    if read -r -p "Chọn Datastore (1-${#ds_candidates[@]}) [1]: " sel_ds; then
+                        sel_ds="${sel_ds%$'\r'}"
+                        sel_ds="${sel_ds:-1}"
+                        if [[ "${sel_ds}" =~ ^[0-9]+$ ]] && [ "${sel_ds}" -ge 1 ] && [ "${sel_ds}" -le "${#ds_candidates[@]}" ]; then
+                            target_ds="${ds_candidates[$((sel_ds-1))]}"
+                        fi
+                    fi
+                fi
+
+                if [[ -z "${target_ds}" ]]; then
+                    read -r -p "Nhập tên Datastore lưu trữ thư viện: " target_ds
+                    target_ds="${target_ds%$'\r'}"
+                    if [[ -z "${target_ds}" ]]; then
+                        log_error "Tên Datastore không được để trống."
+                        continue
+                    fi
+                fi
+
+                local desc=""
+                read -r -p "Nhập mô tả [ISO and VM Templates]: " desc
+                desc="${desc%$'\r'}"
+                desc="${desc:-ISO and VM Templates}"
+
+                create_content_library "${new_name}" "${target_ds}" "${desc}"
                 ;;
             *)
                 log_warn "Lựa chọn không hợp lệ."

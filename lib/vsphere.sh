@@ -437,7 +437,7 @@ run_iso_menu() {
     ensure_target_datastore() {
         if [[ -z "${datastore}" || "${datastore}" == *"<"*">"* ]]; then
             local ds_candidates=()
-            mapfile -t ds_candidates < <(govc find -type d 2>/dev/null | sed 's|.*/||' | sort -u || true)
+            mapfile -t ds_candidates < <(govc find -type s 2>/dev/null | sed 's|.*/||' | sort -u || true)
             if [[ ${#ds_candidates[@]} -gt 0 ]]; then
                 echo ""
                 echo "Danh sách Datastore khả dụng trên vCenter:"

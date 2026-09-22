@@ -57,3 +57,4 @@ state/
 
 # Execution and deploy logs
 *.log
+/tmp/
