@@ -260,6 +260,44 @@ iso_paths = [\
     fi
 }
 
+# Liệt kê toàn bộ các tệp ISO trên Datastore kèm đường dẫn tương đối (loại bỏ thư mục tạm/nội bộ)
+get_datastore_iso_files() {
+    local ds="$1"
+    [[ -z "${ds}" ]] && return 0
+
+    local json_output=""
+    if json_output=$(govc datastore.ls -json -R -ds="${ds}" 2>/dev/null) && [[ -n "${json_output}" ]]; then
+        python3 -c "
+import json, re, sys
+try:
+    data = json.loads(sys.stdin.read())
+except Exception:
+    sys.exit(0)
+if isinstance(data, dict):
+    data = [data]
+for item in data:
+    raw_folder = item.get('folderPath', '')
+    folder = re.sub(r'^\[[^\]]+\]\s*', '', raw_folder).strip('/')
+    # Loại trừ thư mục tạm packer và thư mục raw của Content Library
+    if folder.startswith('packer_cache') or folder.startswith('.packer') or folder.startswith('contentlib-'):
+        continue
+    for f in item.get('file', []):
+        fname = f.get('path', '')
+        if fname.lower().endswith('.iso') and not fname.startswith('packer'):
+            full_path = f'{folder}/{fname}' if folder else fname
+            print(full_path)
+" <<< "${json_output}"
+        return 0
+    fi
+
+    # Phương án dự phòng phân tích văn bản thuần nếu không parse được JSON
+    local raw_ls
+    raw_ls=$(govc datastore.ls -R -ds="${ds}" 2>/dev/null || true)
+    if [[ -n "${raw_ls}" ]]; then
+        echo "${raw_ls}" | grep -i "\.iso$" | grep -v -E '^(packer[0-9]+|\.packer)' || true
+    fi
+}
+
 # Xác minh sự tồn tại của tệp ISO (Datastore hoặc Content Library) trước khi Packer build
 validate_packer_iso_path() {
     local pkr_file="$1"
@@ -295,9 +333,9 @@ validate_packer_iso_path() {
 
         log_info "Đang quét tìm kiếm tệp '${iso_base}' trên Datastore [${target_ds}]..."
         local found_match=""
-        found_match=$(govc datastore.ls -R -ds="${target_ds}" 2>/dev/null | tr -d '\r' | grep -i "/${iso_base}$" | head -n 1 || true)
+        found_match=$(get_datastore_iso_files "${target_ds}" | grep -i -E "(^|/)${iso_base}$" | head -n 1 || true)
         if [[ -z "${found_match}" ]]; then
-            found_match=$(govc datastore.ls -R -ds="${target_ds}" 2>/dev/null | tr -d '\r' | grep -i "${iso_base}" | head -n 1 || true)
+            found_match=$(get_datastore_iso_files "${target_ds}" | grep -i "${iso_base}" | head -n 1 || true)
         fi
 
         if [[ -n "${found_match}" ]]; then
@@ -535,20 +573,14 @@ run_iso_menu() {
             3)
                 ensure_target_datastore || continue
                 log_info "Đang quét danh sách tệp .iso trên Datastore [${datastore}]..."
-                local raw_ls
-                if ! raw_ls=$(govc datastore.ls -R -ds="${datastore}" 2>&1); then
-                    log_error "Lỗi khi truy vấn danh sách tệp trên Datastore [${datastore}]:"
-                    echo "${raw_ls}"
-                    continue
-                fi
-
-                mapfile -t REMOTE_ISOS < <(echo "${raw_ls}" | grep -i "\.iso$" || true)
+                mapfile -t REMOTE_ISOS < <(get_datastore_iso_files "${datastore}")
                 if [[ ${#REMOTE_ISOS[@]} -eq 0 ]]; then
                     log_warn "Không tìm thấy tệp .iso nào trên Datastore [${datastore}]."
                     continue
                 fi
 
-                echo "Danh sách ISO có sẵn trên Datastore:"
+                echo ""
+                echo "Danh sách ISO có sẵn trên Datastore [${datastore}]:"
                 for idx in "${!REMOTE_ISOS[@]}"; do
                     echo "  $((idx+1))) ${REMOTE_ISOS[$idx]}"
                 done

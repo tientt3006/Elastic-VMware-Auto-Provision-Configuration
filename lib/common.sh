@@ -146,8 +146,16 @@ prompt_password() {
 confirm_action() {
     local prompt_msg="$1"
     local default_val="${2:-Y}"
+    local opt_display=""
+    if [[ "${default_val}" =~ ^[yY]$ ]]; then
+        opt_display="[Y/n]"
+        default_val="Y"
+    else
+        opt_display="[y/N]"
+        default_val="N"
+    fi
     local reply=""
-    read -r -p "${prompt_msg} [${default_val}]: " reply || true
+    read -r -p "${prompt_msg} ${opt_display}: " reply || true
     reply="${reply%$'\r'}"
     reply="${reply:-${default_val}}"
     if [[ "${reply}" =~ ^[yY]([eE][sS])?$ ]]; then
