@@ -10,6 +10,7 @@
 set -euo pipefail
 
 cleanup() {
+    [[ -t 0 ]] && stty echo icanon 2>/dev/null || true
     unset VM_TARGET_PASS || true
     unset GOVC_PASSWORD || true
 }

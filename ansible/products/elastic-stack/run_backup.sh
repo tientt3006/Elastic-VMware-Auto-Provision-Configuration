@@ -13,6 +13,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 cleanup() {
+    [[ -t 0 ]] && stty echo icanon 2>/dev/null || true
     echo ""
     echo "Don dep thong tin bi mat Backup/Restore khoi bo nho RAM..."
     unset SSH_PASS || true
@@ -27,22 +28,37 @@ echo "He thong dieu phoi Sao luu va Phuc hoi tham hoa Elastic Stack (In-Memory)"
 echo "=============================================================================="
 
 # 1. Nhap mat khau an tu terminal
-read -s -p "Nhap mat khau SSH: " SSH_PASS
+read -s -p "Nhap mat khau SSH (hoac 'q' de huy): " SSH_PASS
+[[ -t 0 ]] && stty echo icanon 2>/dev/null || true
 echo ""
+if [[ "${SSH_PASS}" == "q" || "${SSH_PASS}" == "Q" ]]; then
+    echo "Huy thuc thi theo yeu cau."
+    exit 1
+fi
 if [[ -z "${SSH_PASS}" ]]; then
     echo "Loi: Mat khau SSH khong duoc de trong." >&2
     exit 1
 fi
 
-read -s -p "Nhap mat khau sudo (become): " SUDO_PASS
+read -s -p "Nhap mat khau sudo (become, hoac 'q' de huy): " SUDO_PASS
+[[ -t 0 ]] && stty echo icanon 2>/dev/null || true
 echo ""
+if [[ "${SUDO_PASS}" == "q" || "${SUDO_PASS}" == "Q" ]]; then
+    echo "Huy thuc thi theo yeu cau."
+    exit 1
+fi
 if [[ -z "${SUDO_PASS}" ]]; then
     echo "Loi: Mat khau sudo khong duoc de trong." >&2
     exit 1
 fi
 
-read -s -p "Nhap mat khau quan tri Elasticsearch (elastic): " ELASTIC_PASS
+read -s -p "Nhap mat khau quan tri Elasticsearch (elastic, hoac 'q' de huy): " ELASTIC_PASS
+[[ -t 0 ]] && stty echo icanon 2>/dev/null || true
 echo ""
+if [[ "${ELASTIC_PASS}" == "q" || "${ELASTIC_PASS}" == "Q" ]]; then
+    echo "Huy thuc thi theo yeu cau."
+    exit 1
+fi
 if [[ -z "${ELASTIC_PASS}" ]]; then
     echo "Loi: Mat khau elastic khong duoc de trong." >&2
     exit 1

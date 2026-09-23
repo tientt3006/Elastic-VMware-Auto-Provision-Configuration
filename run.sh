@@ -80,13 +80,18 @@ run_platform_tools_menu() {
                     for idx in "${!os_templates[@]}"; do
                         echo "  $((idx+1))) ${os_templates[$idx]}"
                     done
+                    echo "  0) Hủy và quay lại"
                     local sel=""
-                    if ! read -r -p "Vui lòng chọn hệ điều hành cần tạo template (1-${#os_templates[@]}) [${#os_templates[@]}]: " sel; then
+                    if ! read -r -p "Vui lòng chọn hệ điều hành cần tạo template (0-${#os_templates[@]}) [${#os_templates[@]}]: " sel; then
                         echo ""
                         return 0
                     fi
                     sel="${sel%$'\r'}"
                     sel="${sel:-${#os_templates[@]}}"
+                    if [[ "${sel}" == "0" || "${sel}" == "q" || "${sel}" == "Q" ]]; then
+                        log_info "Hủy tạo template theo yêu cầu."
+                        continue
+                    fi
                     if ! [[ "${sel}" =~ ^[0-9]+$ ]] || [ "${sel}" -lt 1 ] || [ "${sel}" -gt "${#os_templates[@]}" ]; then
                         log_error "Lựa chọn không hợp lệ."
                         continue
@@ -126,11 +131,15 @@ run_platform_tools_menu() {
                 echo ""
                 echo "Thiết lập định danh máy ảo VM Template trên vCenter:"
                 local input_vm_name=""
-                if ! read -r -p "Nhập tên máy ảo trên vCenter [${current_vm_name}]: " input_vm_name; then
+                if ! read -r -p "Nhập tên máy ảo trên vCenter [${current_vm_name}] (hoặc 'q' để hủy): " input_vm_name; then
                     echo ""
                     return 0
                 fi
                 input_vm_name="${input_vm_name%$'\r'}"
+                if [[ "${input_vm_name}" == "q" || "${input_vm_name}" == "Q" ]]; then
+                    log_info "Hủy tạo template theo yêu cầu."
+                    continue
+                fi
                 input_vm_name="${input_vm_name:-${current_vm_name}}"
 
                 if [[ -n "${input_vm_name}" && -f "${pkr_file}" ]]; then
@@ -176,12 +185,30 @@ run_platform_tools_menu() {
 
                 if [[ ${need_select_iso} -eq 1 ]]; then
                     if ! run_iso_menu "${default_ds}" "${pkr_file}" "${REPO_ROOT}/products/elastic-stack/product.conf" "${REPO_ROOT}/seed"; then
-                        log_warn "Chưa hoàn tất chọn ISO. Quy trình đóng gói có thể bị gián đoạn nếu thiếu ISO."
+                        local check_iso=""
+                        if [[ -f "${pkr_file}" ]]; then
+                            check_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${pkr_file}" | grep -E '"[^"]+"' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
+                        fi
+                        if [[ -z "${check_iso}" || "${check_iso}" == *"<"*">"* ]]; then
+                            log_error "Chưa thiết lập tệp ISO hợp lệ. Dừng quy trình đóng gói template."
+                            continue
+                        fi
+                        if ! confirm_action "Bạn đã hủy thay đổi ISO. Tiếp tục đóng gói với ISO hiện tại [${check_iso}]?" "N"; then
+                            log_info "Đã hủy đóng gói template theo yêu cầu."
+                            continue
+                        fi
                     fi
                 fi
 
+                if ! confirm_action "Xác nhận bắt đầu quy trình đóng gói Golden Template '${chosen_os}'?" "Y"; then
+                    log_info "Đã hủy đóng gói template theo yêu cầu."
+                    continue
+                fi
+
                 log_info "Khởi chạy quy trình đóng gói Golden Template cho: ${chosen_os}..."
-                (cd "${REPO_ROOT}/packer" && ./build.sh --template "${chosen_os}")
+                if ! (cd "${REPO_ROOT}/packer" && ./build.sh --template "${chosen_os}"); then
+                    log_warn "Tiến trình đóng gói Packer đã bị dừng hoặc không thành công."
+                fi
                 ;;
             2)
                 log_banner "CẤP PHÁT HẠ TẦNG (TERRAFORM)"
@@ -210,14 +237,24 @@ run_platform_tools_menu() {
                     continue
                 fi
                 local selected_profile="${profiles[$((PROF_IDX-1))]}"
+                if ! confirm_action "Xác nhận khởi chạy Terraform profile '${selected_profile}'?" "Y"; then
+                    log_info "Đã hủy khởi chạy Terraform theo yêu cầu."
+                    continue
+                fi
                 log_info "Khởi chạy profile: ${selected_profile}..."
-                (cd "${REPO_ROOT}/terraform/profiles/${selected_profile}" && ./run.sh)
+                if ! (cd "${REPO_ROOT}/terraform/profiles/${selected_profile}" && ./run.sh); then
+                    log_warn "Tiến trình Terraform đã bị dừng hoặc không thành công."
+                fi
                 ;;
             3)
                 run_content_library_menu "${REPO_ROOT}/products/elastic-stack/product.conf"
                 ;;
             4)
                 log_banner "CÀI ĐẶT MÔI TRƯỜNG CÔNG CỤ (SEED SETUP)"
+                if ! confirm_action "Xác nhận cài đặt môi trường công cụ tự động hóa (Seed Setup)?" "Y"; then
+                    log_info "Đã hủy cài đặt môi trường theo yêu cầu."
+                    continue
+                fi
                 if [[ -x "${REPO_ROOT}/seed/setup_env.sh" ]]; then
                     (cd "${REPO_ROOT}/seed" && sudo ./setup_env.sh)
                 else

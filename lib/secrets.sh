@@ -57,6 +57,7 @@ export_govc_env() {
 }
 
 cleanup_secrets() {
+    restore_terminal
     echo ""
     log_info "Xóa thông tin bí mật và mật khẩu khỏi bộ nhớ RAM..."
     unset VCENTER_PASS || true

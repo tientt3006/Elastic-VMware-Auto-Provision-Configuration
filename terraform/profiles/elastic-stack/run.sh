@@ -60,7 +60,7 @@ while true; do
         WAIT_INPUT="${WAIT_INPUT%$'\r'}"
         if [[ "${WAIT_INPUT}" == "q" || "${WAIT_INPUT}" == "Q" || "${WAIT_INPUT}" == "0" ]]; then
             log_info "Hủy tiến trình theo yêu cầu của người dùng."
-            exit 0
+            exit 1
         fi
     else
         log_success "Đã xác nhận cấu hình ${TFVARS} hợp lệ (không còn biến placeholder)."

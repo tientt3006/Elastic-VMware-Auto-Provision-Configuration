@@ -14,12 +14,48 @@ source "${PRODUCT_DIR}/configure.sh"
 run_elastic_packer() {
     log_banner "TIẾN TRÌNH: ĐÓNG GÓI GOLDEN TEMPLATE (PACKER)"
 
-    if ! run_iso_menu "${ISO_DATASTORE}" "${PKR_FILE}" "${PRODUCT_CONF}" "${REPO_ROOT}/seed"; then
-        log_warn "Đã dừng tiến trình chọn ISO."
+    local current_iso=""
+    if [[ -f "${PKR_FILE}" ]]; then
+        current_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${PKR_FILE}" | grep -E '"[^"]+"' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
+    fi
+
+    local need_iso=0
+    if [[ -z "${current_iso}" || "${current_iso}" == *"<"*">"* ]]; then
+        need_iso=1
+    else
+        echo ""
+        echo "Cấu hình tệp ISO hiện tại: ${current_iso}"
+        if confirm_action "Xác nhận thay đổi cấu hình tệp ISO này?" "N"; then
+            need_iso=1
+        fi
+    fi
+
+    if [[ ${need_iso} -eq 1 ]]; then
+        if ! run_iso_menu "${ISO_DATASTORE}" "${PKR_FILE}" "${PRODUCT_CONF}" "${REPO_ROOT}/seed"; then
+            local check_iso=""
+            if [[ -f "${PKR_FILE}" ]]; then
+                check_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${PKR_FILE}" | grep -E '"[^"]+"' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
+            fi
+            if [[ -z "${check_iso}" || "${check_iso}" == *"<"*">"* ]]; then
+                log_error "Chưa thiết lập tệp ISO hợp lệ. Dừng quy trình đóng gói Packer."
+                return 1
+            fi
+            if ! confirm_action "Bạn đã hủy thay đổi ISO. Tiếp tục đóng gói với ISO hiện tại [${check_iso}]?" "N"; then
+                log_info "Đã hủy đóng gói template theo yêu cầu."
+                return 1
+            fi
+        fi
+    fi
+
+    if ! confirm_action "Xác nhận bắt đầu đóng gói Golden Template Elastic Stack (ubuntu-24.04)?" "Y"; then
+        log_info "Đã hủy tiến trình Packer theo yêu cầu."
         return 1
     fi
 
-    (cd "${REPO_ROOT}/packer" && ./build.sh --template ubuntu-24.04)
+    if ! (cd "${REPO_ROOT}/packer" && ./build.sh --template ubuntu-24.04); then
+        log_warn "Tiến trình đóng gói Packer không thành công hoặc bị hủy."
+        return 1
+    fi
 
     # Đồng bộ tên template sang Terraform
     local template_name
@@ -29,6 +65,7 @@ run_elastic_packer() {
         sed -i -E "s/(content_library_item_name\s*=\s*\")[^\"]+(\")/\1${template_name}\2/" "${TF_FILE}"
         log_success "Đã đồng bộ tên template '${template_name}' sang cấu hình Terraform."
     fi
+    return 0
 }
 
 run_elastic_terraform() {
@@ -54,7 +91,11 @@ run_elastic_terraform() {
     fi
 
     log_banner "TIẾN TRÌNH: KHỞI TẠO HẠ TẦNG VSPHERE (TERRAFORM)"
-    (cd "${REPO_ROOT}/terraform/profiles/elastic-stack" && ./run.sh)
+    if ! (cd "${REPO_ROOT}/terraform/profiles/elastic-stack" && ./run.sh); then
+        log_warn "Tiến trình Terraform không thành công hoặc bị hủy."
+        return 1
+    fi
+    return 0
 }
 
 run_elastic_ansible() {
@@ -80,10 +121,17 @@ run_elastic_ansible() {
     fi
 
     log_banner "TIẾN TRÌNH: CẤU HÌNH CỤM ELASTICSEARCH VÀ KIBANA (ANSIBLE)"
-    (cd "${REPO_ROOT}/ansible/products/elastic-stack" && ./run_deploy.sh)
+    if ! (cd "${REPO_ROOT}/ansible/products/elastic-stack" && ./run_deploy.sh); then
+        log_warn "Tiến trình cấu hình Ansible không thành công hoặc bị hủy."
+        return 1
+    fi
 
     log_banner "TIẾN TRÌNH: KÍCH HOẠT QUAN SÁT TẬP TRUNG (OBSERVABILITY)"
-    (cd "${REPO_ROOT}/ansible/products/elastic-stack" && ./run_observability.sh)
+    if ! (cd "${REPO_ROOT}/ansible/products/elastic-stack" && ./run_observability.sh); then
+        log_warn "Tiến trình thiết lập Observability không thành công hoặc bị hủy."
+        return 1
+    fi
+    return 0
 }
 
 run_elastic_vsphere_observability() {

@@ -40,6 +40,7 @@ source "${CONFIG_FILE}"
 
 # Ham don dep an toan
 cleanup() {
+    [[ -t 0 ]] && stty echo icanon 2>/dev/null || true
     echo ""
     echo "=============================================================================="
     echo "Tien hanh don dep tai nguyen va xoa thong tin bi mat..."

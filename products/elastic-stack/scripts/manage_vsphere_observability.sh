@@ -18,6 +18,12 @@ fi
 
 ACTION="${1:-apply}"
 
+cleanup() {
+    [[ -t 0 ]] && stty echo icanon 2>/dev/null || true
+    unset VCENTER_PASS SVC_PASS SVC_PASS_CONFIRM ELASTIC_PASS 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
 # ==============================================================================
 # HÀM BỔ TRỢ & NHẬP THAM SỐ TƯƠNG TÁC
 # ==============================================================================

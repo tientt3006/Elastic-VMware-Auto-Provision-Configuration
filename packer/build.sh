@@ -110,7 +110,8 @@ if [[ ! -d "${TEMPLATE_DIR}" ]]; then
         read -r confirm || true
         confirm="${confirm%$'\r'}"
         if [[ "${confirm}" == "q" || "${confirm}" == "Q" ]]; then
-            exit 0
+            log_info "Hủy tiến trình theo yêu cầu."
+            exit 1
         fi
         local original_name="${TEMPLATE_NAME}"
         TEMPLATE_NAME="${default_os}"
@@ -293,12 +294,12 @@ while true; do
         WAIT_INPUT=""
         if ! read -r -p "Nhấn Enter để kiểm tra lại (hoặc 'q' để hủy): " WAIT_INPUT; then
             echo ""
-            exit 0
+            exit 1
         fi
         WAIT_INPUT="${WAIT_INPUT%$'\r'}"
         if [[ "${WAIT_INPUT}" == "q" || "${WAIT_INPUT}" == "Q" || "${WAIT_INPUT}" == "0" ]]; then
             log_info "Hủy tiến trình theo yêu cầu của người dùng."
-            exit 0
+            exit 1
         fi
     else
         log_success "Đã xác nhận cấu hình ${PKRVARS} hợp lệ (không còn biến placeholder)."
@@ -317,11 +318,17 @@ log_info "Tên VM Template: ${VM_NAME}"
 
 # 5. Thu thập mật khẩu an toàn vào bộ nhớ RAM
 if [[ -z "${VCENTER_PASS:-}" ]]; then
-    prompt_password "VCENTER_PASS" "Nhập mật khẩu quản trị vCenter" || exit 1
+    if ! prompt_password "VCENTER_PASS" "Nhập mật khẩu quản trị vCenter"; then
+        log_info "Hủy quy trình đóng gói Packer."
+        exit 1
+    fi
 fi
 
 if [[ -z "${SSH_PASS:-}" ]]; then
-    prompt_password "SSH_PASS" "Nhập mật khẩu SSH khởi tạo máy ảo" || exit 1
+    if ! prompt_password "SSH_PASS" "Nhập mật khẩu SSH khởi tạo máy ảo"; then
+        log_info "Hủy quy trình đóng gói Packer."
+        exit 1
+    fi
 fi
 
 export PKR_VAR_vcenter_password="${VCENTER_PASS}"
@@ -402,7 +409,7 @@ if command -v govc &>/dev/null; then
             fi
         else
             log_info "Dừng tiến trình. Vui lòng đổi tên 'vm_name' trong ${PKRVARS} để đóng gói bản mới."
-            exit 0
+            exit 1
         fi
     fi
 fi
@@ -419,7 +426,7 @@ log_success "Cấu hình Packer hợp lệ."
 # 7. Xác nhận trước khi bắt đầu build
 if ! confirm_action "Xác nhận bắt đầu đóng gói VM Template '${VM_NAME}' (Hệ điều hành: ${TEMPLATE_NAME}) bằng Packer?" "Y"; then
     log_info "Hủy tiến trình theo yêu cầu của người dùng."
-    exit 0
+    exit 1
 fi
 
 # 8. Thực thi đóng gói template

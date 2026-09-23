@@ -11,6 +11,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 cleanup() {
+    [[ -t 0 ]] && stty echo icanon 2>/dev/null || true
     echo ""
     echo "Dọn dẹp thông tin bí mật khỏi bộ nhớ RAM..."
     unset SSH_PASS SUDO_PASS ELASTIC_PASS KIBANA_PASS || true
@@ -27,8 +28,13 @@ if [[ -n "${SSH_PASS:-}" ]]; then
     echo "Mat khau SSH da duoc nap tu bien moi truong."
 else
     while [[ -z "${SSH_PASS:-}" ]]; do
-        read -s -p "Nhap mat khau SSH: " SSH_PASS
+        read -s -p "Nhap mat khau SSH (hoac 'q' de huy): " SSH_PASS
+        [[ -t 0 ]] && stty echo icanon 2>/dev/null || true
         echo ""
+        if [[ "${SSH_PASS:-}" == "q" || "${SSH_PASS:-}" == "Q" ]]; then
+            echo "Huy thuc thi theo yeu cau."
+            exit 1
+        fi
         [[ -z "${SSH_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
     done
 fi
@@ -37,8 +43,13 @@ if [[ -n "${SUDO_PASS:-}" ]]; then
     echo "Mat khau sudo da duoc nap tu bien moi truong."
 else
     while [[ -z "${SUDO_PASS:-}" ]]; do
-        read -s -p "Nhap mat khau sudo (sudo/become): " SUDO_PASS
+        read -s -p "Nhap mat khau sudo (sudo/become, hoac 'q' de huy): " SUDO_PASS
+        [[ -t 0 ]] && stty echo icanon 2>/dev/null || true
         echo ""
+        if [[ "${SUDO_PASS:-}" == "q" || "${SUDO_PASS:-}" == "Q" ]]; then
+            echo "Huy thuc thi theo yeu cau."
+            exit 1
+        fi
         [[ -z "${SUDO_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
     done
 fi
@@ -47,8 +58,13 @@ if [[ -n "${ELASTIC_PASS:-}" ]]; then
     echo "Mat khau elastic da duoc nap tu bien moi truong."
 else
     while [[ -z "${ELASTIC_PASS:-}" ]]; do
-        read -s -p "Nhap mat khau sieu quan tri (elastic): " ELASTIC_PASS
+        read -s -p "Nhap mat khau sieu quan tri (elastic, hoac 'q' de huy): " ELASTIC_PASS
+        [[ -t 0 ]] && stty echo icanon 2>/dev/null || true
         echo ""
+        if [[ "${ELASTIC_PASS:-}" == "q" || "${ELASTIC_PASS:-}" == "Q" ]]; then
+            echo "Huy thuc thi theo yeu cau."
+            exit 1
+        fi
         [[ -z "${ELASTIC_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
     done
 fi
@@ -57,8 +73,13 @@ if [[ -n "${KIBANA_PASS:-}" ]]; then
     echo "Mat khau kibana_system da duoc nap tu bien moi truong."
 else
     while [[ -z "${KIBANA_PASS:-}" ]]; do
-        read -s -p "Nhap mat khau he thong Kibana (kibana_system): " KIBANA_PASS
+        read -s -p "Nhap mat khau he thong Kibana (kibana_system, hoac 'q' de huy): " KIBANA_PASS
+        [[ -t 0 ]] && stty echo icanon 2>/dev/null || true
         echo ""
+        if [[ "${KIBANA_PASS:-}" == "q" || "${KIBANA_PASS:-}" == "Q" ]]; then
+            echo "Huy thuc thi theo yeu cau."
+            exit 1
+        fi
         [[ -z "${KIBANA_PASS:-}" ]] && echo "Loi: Khong duoc de trong." >&2
     done
 fi

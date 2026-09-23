@@ -421,10 +421,15 @@ run_iso_menu() {
         echo "  1) Chọn tệp ISO từ vSphere Content Library (Khuyên dùng)"
         echo "  2) Chọn tệp ISO có sẵn trên Datastore vCenter"
         echo "  3) Quản lý kho Content Library & Datastore ISO (Tải, Upload, Copy, Tạo thư viện...)"
-        echo "  0) Hoàn tất / Giữ nguyên cấu hình và quay lại"
+        if [[ -n "${cur_iso}" && "${cur_iso}" != *"<"*">"* ]]; then
+            echo "  8) Giữ nguyên cấu hình ISO hiện tại và tiếp tục"
+        fi
+        echo "  0) Hủy và quay lại menu chính"
 
+        local prompt_range="0-3"
+        [[ -n "${cur_iso}" && "${cur_iso}" != *"<"*">"* ]] && prompt_range="0-3/8"
         local choice=""
-        if ! read -r -p "Vui lòng chọn (0-3) [1]: " choice; then
+        if ! read -r -p "Vui lòng chọn (${prompt_range}) [1]: " choice; then
             echo ""
             return 1
         fi
@@ -432,8 +437,17 @@ run_iso_menu() {
         choice="${choice:-1}"
 
         case "${choice}" in
-            0)
-                return 0
+            0|q|Q)
+                log_info "Hủy thao tác chọn ISO."
+                return 1
+                ;;
+            8)
+                if [[ -n "${cur_iso}" && "${cur_iso}" != *"<"*">"* ]]; then
+                    log_info "Giữ nguyên cấu hình ISO: ${cur_iso}"
+                    return 0
+                else
+                    log_warn "Chưa có cấu hình ISO hợp lệ để giữ nguyên."
+                fi
                 ;;
             1)
                 if select_iso_from_content_library "${pkr_file}" "${config_file}"; then

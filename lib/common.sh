@@ -24,6 +24,15 @@ else
     CLR_BOLD=""
 fi
 
+# --- Terminal State Governance ---
+restore_terminal() {
+    if [[ -t 0 ]]; then
+        stty echo icanon 2>/dev/null || true
+    fi
+}
+# Đảm bảo thiết bị đầu cuối luôn khôi phục echo khi thoát hoặc nhận tín hiệu ngắt
+trap 'restore_terminal' EXIT INT TERM
+
 log_info() {
     echo -e "${CLR_BLUE}[INFO]${CLR_RESET} $*"
 }
@@ -95,12 +104,16 @@ prompt_if_placeholder() {
     if [[ -z "${current_val}" || "${current_val}" == *"<"*">"* ]]; then
         local new_val=""
         while [[ -z "${new_val}" || "${new_val}" == *"<"*">"* ]]; do
-            if ! read -r -p "${prompt_msg} [hiện tại: ${current_val}]: " new_val; then
+            if ! read -r -p "${prompt_msg} [hiện tại: ${current_val}] (hoặc 'q' để hủy): " new_val; then
                 echo ""
                 log_warn "Không thể đọc đầu vào (EOF hoặc luồng đã đóng)."
                 return 1
             fi
             new_val="${new_val%$'\r'}"
+            if [[ "${new_val}" == "q" || "${new_val}" == "Q" ]]; then
+                log_info "Hủy thao tác nhập thông số."
+                return 1
+            fi
             if [[ -z "${new_val}" ]]; then
                 if [[ "${current_val}" == *"<"*">"* || -z "${current_val}" ]]; then
                     log_warn "Giá trị không được để trống hoặc chứa <PLACEHOLDER>!"
@@ -125,18 +138,25 @@ prompt_password() {
 
     if [[ -n "${current_val}" ]]; then
         read -r -s -p "${prompt_msg} [Đã lưu trong phiên, Enter để giữ nguyên]: " new_val || true
+        restore_terminal
         echo ""
         new_val="${new_val%$'\r'}"
         [[ -n "${new_val}" ]] && printf -v "${var_name}" "%s" "${new_val}"
     else
         while [[ -z "${new_val}" ]]; do
-            if ! read -r -s -p "${prompt_msg}: " new_val; then
+            if ! read -r -s -p "${prompt_msg} (hoặc 'q' để hủy): " new_val; then
+                restore_terminal
                 echo ""
                 log_warn "Không thể đọc mật khẩu (EOF hoặc luồng đã đóng)."
                 return 1
             fi
+            restore_terminal
             echo ""
             new_val="${new_val%$'\r'}"
+            if [[ "${new_val}" == "q" || "${new_val}" == "Q" ]]; then
+                log_info "Hủy thao tác nhập mật khẩu."
+                return 1
+            fi
             [[ -z "${new_val}" ]] && log_warn "Mật khẩu không được để trống!"
         done
         printf -v "${var_name}" "%s" "${new_val}"
