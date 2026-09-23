@@ -22,7 +22,7 @@ locals {
     lang en_US.UTF-8
     keyboard us
     timezone UTC --utc
-    network --bootproto=dhcp --device=link --activate
+    network --bootproto=dhcp --device=link --activate --nameserver=8.8.8.8,1.1.1.1
     rootpw --lock
     user --name=${var.ssh_username} --groups=wheel --iscrypted --password=${var.ssh_password_hash}
     firewall --enabled --ssh
@@ -60,10 +60,13 @@ locals {
     %end
 
     %post --nochroot --log=/mnt/sysimage/root/ks-post-nochroot.log
-    cp -f /etc/resolv.conf /mnt/sysimage/etc/resolv.conf 2>/dev/null || true
+    printf "nameserver 8.8.8.8\nnameserver 1.1.1.1\n" > /mnt/sysimage/etc/resolv.conf
     %end
 
     %post --log=/root/ks-post.log
+    if ! grep -q "nameserver" /etc/resolv.conf 2>/dev/null; then
+      printf "nameserver 8.8.8.8\nnameserver 1.1.1.1\n" > /etc/resolv.conf
+    fi
     dnf -y install sudo open-vm-tools perl
     echo "${var.ssh_username} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/${var.ssh_username}
     chmod 0440 /etc/sudoers.d/${var.ssh_username}
