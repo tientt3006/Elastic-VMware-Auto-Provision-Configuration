@@ -82,6 +82,13 @@ prompt_credentials() {
         export ELASTIC_PASS
     fi
 
+    # 3. Mật khẩu sudo cho máy ảo (phục vụ cấu hình firewall trên srv-kibana-gw)
+    if [[ -z "${SUDO_PASS:-}" ]]; then
+        read -s -p "Mật khẩu sudo máy ảo Gateway (${SSH_USER:-sysop}): " SUDO_PASS
+        echo ""
+        export SUDO_PASS
+    fi
+
     export SVC_USER SVC_PASS
 }
 
@@ -290,8 +297,12 @@ run_fleet_ansible_integration() {
     cd "${REPO_ROOT}/ansible/products/elastic-stack"
     export ANSIBLE_CONFIG="${REPO_ROOT}/ansible/ansible.cfg"
 
+    local extra_vars="vcenter_server=${SITE_VCSA_IP} vcenter_readonly_user=${SVC_USER} vcenter_readonly_password=${SVC_PASS} elastic_password=${ELASTIC_PASS}"
+    [[ -n "${SSH_PASS:-}" ]] && extra_vars="${extra_vars} ansible_password=${SSH_PASS}"
+    [[ -n "${SUDO_PASS:-}" ]] && extra_vars="${extra_vars} ansible_become_password=${SUDO_PASS}"
+
     ansible-playbook -i inventories/lab/hosts.yml playbooks/configure_vsphere_observability.yml \
-        -e "vcenter_server=${SITE_VCSA_IP} vcenter_readonly_user=${SVC_USER} vcenter_readonly_password=${SVC_PASS} elastic_password=${ELASTIC_PASS}"
+        -e "${extra_vars}"
 
     echo ""
     echo "=============================================================================="
@@ -409,8 +420,12 @@ PYEOF
     cd "${REPO_ROOT}/ansible/products/elastic-stack"
     export ANSIBLE_CONFIG="${REPO_ROOT}/ansible/ansible.cfg"
 
-    ansible-playbook playbooks/rollback_vsphere_observability.yml \
-        -e "elastic_password=${ELASTIC_PASS}" || true
+    local extra_vars="elastic_password=${ELASTIC_PASS}"
+    [[ -n "${SSH_PASS:-}" ]] && extra_vars="${extra_vars} ansible_password=${SSH_PASS}"
+    [[ -n "${SUDO_PASS:-}" ]] && extra_vars="${extra_vars} ansible_become_password=${SUDO_PASS}"
+
+    ansible-playbook -i inventories/lab/hosts.yml playbooks/rollback_vsphere_observability.yml \
+        -e "${extra_vars}" || true
 
     echo ""
     echo "=============================================================================="
