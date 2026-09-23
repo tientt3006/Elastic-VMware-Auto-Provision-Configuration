@@ -134,7 +134,7 @@ run_elastic_ansible() {
         return 1
     fi
 
-    log_banner "TIẾN TRÌNH: KÍCH HOẠT QUAN SÁT TẬP TRUNG (OBSERVABILITY)"
+    log_banner "TIẾN TRÌNH: KÍCH HOẠT QUAN SÁT NỘI BỘ CỤM ELASTIC (FLEET & ELASTIC AGENT)"
     if ! (cd "${REPO_ROOT}/ansible/products/elastic-stack" && ./run_observability.sh); then
         log_warn "Tiến trình thiết lập Observability không thành công hoặc bị hủy."
         return 1

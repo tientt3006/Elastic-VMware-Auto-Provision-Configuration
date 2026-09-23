@@ -1,0 +1,60 @@
+# ==============================================================================
+# Variables Definition File: Windows Server 2025 Template Pipeline
+# ==============================================================================
+
+# --- vCenter Server Credentials & Target Host ---
+# Mật khẩu vcenter_password được nạp an toàn từ RAM qua biến PKR_VAR_vcenter_password
+vcenter_server              = "<VCENTER_IP>"
+vcenter_user                = "<VCENTER_USER>"
+vcenter_insecure_connection = true
+
+# --- vSphere Topology Placement ---
+vcenter_datacenter    = "<DATACENTER_NAME>"
+vcenter_cluster       = "<CLUSTER_NAME>"
+vcenter_datastore     = "<DATASTORE_NAME>"
+vcenter_network       = "<NETWORK>"
+vcenter_folder        = "<FOLDER>"
+vcenter_resource_pool = ""
+
+# --- Removable Media Configuration ---
+# Item 1: Đường dẫn tệp ISO Windows Server 2025 (Content Library hoặc Datastore)
+# Item 2: Đĩa VMware Tools ISO có sẵn trên ESXi host để nạp driver PVSCSI
+iso_paths = [
+  "Content Lib DS_100_3_1/Windows_Server_2025_Eval_x64/Windows_Server_2025_Eval_x64.iso",
+  "[] /vmimages/tools-isoimages/windows.iso"
+]
+
+# --- Target Virtual Machine Specifications ---
+vm_name       = "template-windows-server-2025"
+guest_os_type = "windows2022srvNext_64Guest"
+vm_firmware   = "efi-secure"
+vm_cdrom_type = "sata"
+boot_order    = "disk,cdrom"
+
+# --- Compute Sizing ---
+vm_cpu_sockets = 1
+vm_cpu_cores   = 2
+vm_mem_size    = 4096
+vm_disk_size   = 61440
+vm_disk_thin   = true
+
+# --- Windows Unattended Installation Settings ---
+# vm_inst_os_image:
+# - "Windows Server 2025 SERVERSTANDARD" (Standard Desktop Experience GUI)
+# - "Windows Server 2025 SERVERSTANDARDCORE" (Standard Server Core)
+# - "Windows Server 2025 SERVERDATACENTER" (Datacenter Desktop Experience GUI)
+# - "Windows Server 2025 SERVERDATACENTERCORE" (Datacenter Server Core)
+vm_inst_os_image     = "Windows Server 2025 SERVERSTANDARD"
+vm_inst_os_eval      = true
+vm_guest_os_language = "en-US"
+vm_guest_os_keyboard = "en-US"
+vm_guest_os_timezone = "UTC"
+
+# --- WinRM Communicator Configuration ---
+# Mật khẩu winrm_password sẽ được nạp an toàn từ RAM qua biến PKR_VAR_winrm_password
+winrm_username = "Administrator"
+winrm_port     = 5985
+winrm_timeout  = "4h"
+
+# --- Post-Build Action ---
+convert_to_template = true
