@@ -118,6 +118,7 @@ configure_esxi_syslog_with_backup() {
     local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     local BACKUP_FILE="${STATE_DIR}/esxi_syslog_backup_${TIMESTAMP}.json"
     local LATEST_LINK="${STATE_DIR}/esxi_syslog_backup_latest.json"
+    CURRENT_BACKUP_FILE="${BACKUP_FILE}"
 
     local HOST_PATHS
     HOST_PATHS=$(govc find -type h)
@@ -152,10 +153,27 @@ PYEOF
         echo "Xử lý máy chủ: ${host_name}"
 
         # 1. Đọc cấu hình hiện tại để lưu backup
-        local CUR_LOGHOST
-        CUR_LOGHOST=$(govc host.esxcli -host "${host_name}" system syslog config get 2>/dev/null | grep -E "Remote Host:" | sed 's/.*Remote Host:[ ]*//' || echo "")
-        local CUR_FW
-        CUR_FW=$(govc host.esxcli -host "${host_name}" network firewall ruleset get --ruleset-id=syslog 2>/dev/null | grep -E "Enabled:" | awk '{print $2}' || echo "false")
+        local CUR_LOGHOST=""
+        local RAW_CFG
+        RAW_CFG=$(govc host.esxcli -host "${host_name}" -hints=false system syslog config get 2>/dev/null || govc host.esxcli -host "${host_name}" system syslog config get 2>/dev/null || true)
+        local PARSED_URI
+        PARSED_URI=$(echo "${RAW_CFG}" | grep -oE "(udp|tcp|ssl)://[^[:space:]]+" | head -n 1 || true)
+        if [[ -n "${PARSED_URI}" ]]; then
+            CUR_LOGHOST="${PARSED_URI}"
+        else
+            local FALLBACK_HOST
+            FALLBACK_HOST=$(echo "${RAW_CFG}" | grep -iE "(Remote|Log)[[:space:]]*Host" | head -n 1 | sed -E 's/^[[:space:]]*(Remote|Log)[[:space:]]*Host:[[:space:]]*//I' | tr -d '\r\n ' || true)
+            if [[ -n "${FALLBACK_HOST}" && "${FALLBACK_HOST}" != "<none>" && "${FALLBACK_HOST}" != *"Host"* ]]; then
+                CUR_LOGHOST="${FALLBACK_HOST}"
+            fi
+        fi
+
+        local CUR_FW="false"
+        local RAW_FW
+        RAW_FW=$(govc host.esxcli -host "${host_name}" network firewall ruleset list --ruleset-id=syslog 2>/dev/null || true)
+        if echo "${RAW_FW}" | grep -qiE "(syslog[[:space:]]+true|Enabled:[[:space:]]*true)"; then
+            CUR_FW="true"
+        fi
 
         python3 - "${BACKUP_FILE}" "${host_name}" "${CUR_LOGHOST}" "${CUR_FW}" << 'PYEOF'
 import sys, json
@@ -222,8 +240,11 @@ configure_vcsa_syslog() {
         CUR_FWD=$(curl -s -k -H "vmware-api-session-id: ${SESSION_TOKEN}" "https://${SITE_VCSA_IP}/api/appliance/logging/forwarding" 2>/dev/null || echo "[]")
         
         local LATEST_LINK="${STATE_DIR}/esxi_syslog_backup_latest.json"
-        if [[ -f "${LATEST_LINK}" ]]; then
-            python3 - "${LATEST_LINK}" "${CUR_FWD}" << 'PYEOF'
+        local TARGET_FILES=("${LATEST_LINK}")
+        [[ -n "${CURRENT_BACKUP_FILE:-}" && -f "${CURRENT_BACKUP_FILE}" ]] && TARGET_FILES+=("${CURRENT_BACKUP_FILE}")
+
+        for bfile in "${TARGET_FILES[@]}"; do
+            python3 - "${bfile}" "${CUR_FWD}" << 'PYEOF'
 import sys, json
 backup_file, cur_fwd_str = sys.argv[1], sys.argv[2]
 try:
@@ -238,7 +259,7 @@ try:
 except Exception:
     pass
 PYEOF
-        fi
+        done
 
         # 3. Kiểm tra Idempotent: nếu đã chứa target gateway thì bỏ qua
         if echo "${CUR_FWD}" | grep -q "${GATEWAY_IP}"; then
