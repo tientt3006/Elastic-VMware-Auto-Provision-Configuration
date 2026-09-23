@@ -425,6 +425,92 @@ iso_paths = [\
     return 0
 }
 
+# Chọn tệp ISO trực tiếp từ Datastore cho Packer
+select_iso_from_datastore() {
+    local pkr_file="$1"
+    local datastore="${2:-}"
+    local config_file="${3:-}"
+
+    log_banner "CHỌN TỆP ISO TỪ VSPHERE DATASTORE CHO PACKER"
+
+    # Đảm bảo phiên xác thực govc sẵn sàng
+    if ! ensure_govc_session "${pkr_file}" "${config_file}"; then
+        log_error "Không thể thiết lập phiên kết nối vCenter cho govc."
+        return 1
+    fi
+
+    # Xác định Datastore mục tiêu nếu chưa có hoặc đang là placeholder
+    if [[ -z "${datastore}" || "${datastore}" == *"<"*">"* ]]; then
+        local ds_candidates=()
+        mapfile -t ds_candidates < <(govc find -type s 2>/dev/null | sed 's|.*/||' | sort -u || true)
+        if [[ ${#ds_candidates[@]} -gt 0 ]]; then
+            echo ""
+            echo "Danh sách Datastore khả dụng trên vCenter:"
+            for idx in "${!ds_candidates[@]}"; do
+                echo "  $((idx+1))) ${ds_candidates[$idx]}"
+            done
+            local sel_ds=""
+            if read -r -p "Vui lòng chọn Datastore (1-${#ds_candidates[@]}) [1]: " sel_ds; then
+                sel_ds="${sel_ds%$'\r'}"
+                sel_ds="${sel_ds:-1}"
+                if [[ "${sel_ds}" =~ ^[0-9]+$ ]] && [ "${sel_ds}" -ge 1 ] && [ "${sel_ds}" -le "${#ds_candidates[@]}" ]; then
+                    datastore="${ds_candidates[$((sel_ds-1))]}"
+                fi
+            fi
+        fi
+
+        if [[ -z "${datastore}" || "${datastore}" == *"<"*">"* ]]; then
+            local input_ds=""
+            read -r -p "Nhập tên Datastore đích trên vCenter: " input_ds
+            input_ds="${input_ds%$'\r'}"
+            if [[ -z "${input_ds}" || "${input_ds}" == *"<"*">"* ]]; then
+                log_error "Tên Datastore không được để trống hoặc chứa ký tự mẫu."
+                return 1
+            fi
+            datastore="${input_ds}"
+        fi
+    fi
+
+    log_info "Đang quét danh sách tệp .iso trên Datastore [${datastore}]..."
+    local remote_isos=()
+    mapfile -t remote_isos < <(get_datastore_iso_files "${datastore}")
+    if [[ ${#remote_isos[@]} -eq 0 ]]; then
+        log_warn "Không tìm thấy tệp .iso nào trên Datastore [${datastore}]."
+        log_info "Vui lòng dùng mục 'Quản trị kho Content Library & Datastore ISO' để upload hoặc tải tệp lên trước."
+        return 1
+    fi
+
+    echo ""
+    echo "Danh sách tệp ISO có sẵn trên Datastore [${datastore}]:"
+    for idx in "${!remote_isos[@]}"; do
+        echo "  $((idx+1))) ${remote_isos[$idx]}"
+    done
+    echo "  0) Hủy"
+
+    local sel_index=""
+    if ! read -r -p "Nhập số thứ tự tệp ISO: " sel_index; then
+        echo ""
+        return 1
+    fi
+    sel_index="${sel_index%$'\r'}"
+    if [[ "${sel_index}" == "0" ]]; then
+        log_info "Hủy thao tác."
+        return 1
+    fi
+    if ! [[ "${sel_index}" =~ ^[0-9]+$ ]] || [ "${sel_index}" -lt 1 ] || [ "${sel_index}" -gt "${#remote_isos[@]}" ]; then
+        log_error "Lựa chọn số thứ tự không hợp lệ."
+        return 1
+    fi
+
+    local chosen_remote="${remote_isos[$((sel_index-1))]}"
+    log_success "Đã chọn: ${chosen_remote}"
+    update_iso_in_packer "${pkr_file}" "${datastore}" "${chosen_remote}"
+    if [[ -n "${config_file}" ]] && declare -f save_last_used_iso &>/dev/null; then
+        save_last_used_iso "${config_file}" "[${datastore}] ${chosen_remote}"
+    fi
+    return 0
+}
+
 # Sao chép hoặc di chuyển tệp ISO từ Datastore sang Content Library
 copy_or_move_iso_datastore_to_content_library() {
     log_banner "SAO CHÉP / DI CHUYỂN TỆP ISO TỪ DATASTORE SANG CONTENT LIBRARY"

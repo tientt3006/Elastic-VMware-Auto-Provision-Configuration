@@ -398,7 +398,7 @@ run_iso_menu() {
     local config_file="$3"
     local seed_dir="${4:-seed}"
 
-    log_banner "QUẢN LÝ TỆP TIN ISO HỆ ĐIỀU HÀNH CHO PACKER"
+    log_banner "QUẢN LÝ VÀ CHỌN TỆP TIN ISO CHO PACKER"
 
     # Đảm bảo phiên xác thực govc sẵn sàng
     if ! ensure_govc_session "${pkr_file}" "${config_file}"; then
@@ -406,206 +406,47 @@ run_iso_menu() {
         return 1
     fi
 
-    # Kiểm tra ISO đã lưu lần trước
-    local last_iso=""
-    if [[ -f "${config_file}" ]]; then
-        last_iso=$(grep -E '^LAST_USED_ISO=' "${config_file}" | cut -d'"' -f2 || true)
-    fi
-
-    if [[ -n "${last_iso}" ]]; then
-        if [[ "${last_iso}" =~ ^\[.*\] ]]; then
-            log_info "Phát hiện tệp ISO đã dùng gần nhất trên Datastore: ${last_iso}"
-            if confirm_action "Tiếp tục sử dụng tệp ISO này cho Packer?" "Y"; then
-                update_iso_in_packer "${pkr_file}" "" "${last_iso}"
-                return 0
-            fi
-        elif [[ "${last_iso}" == *"/"* && "${last_iso}" != "iso/"* ]]; then
-            log_info "Phát hiện tệp ISO đã dùng gần nhất từ Content Library: ${last_iso}"
-            if confirm_action "Tiếp tục sử dụng tệp ISO Content Library này cho Packer?" "Y"; then
-                update_iso_in_packer "${pkr_file}" "" "${last_iso}"
-                return 0
-            fi
-        elif [[ -n "${datastore}" && "${datastore}" != *"<"*">"* ]]; then
-            log_info "Phát hiện tệp ISO đã dùng trong cấu hình gần nhất: ${last_iso}"
-            if confirm_action "Tiếp tục sử dụng tệp ISO này trên Datastore [${datastore}]?" "Y"; then
-                update_iso_in_packer "${pkr_file}" "${datastore}" "${last_iso}"
-                return 0
-            fi
-        fi
-    fi
-
-    ensure_target_datastore() {
-        if [[ -z "${datastore}" || "${datastore}" == *"<"*">"* ]]; then
-            local ds_candidates=()
-            mapfile -t ds_candidates < <(govc find -type s 2>/dev/null | sed 's|.*/||' | sort -u || true)
-            if [[ ${#ds_candidates[@]} -gt 0 ]]; then
-                echo ""
-                echo "Danh sách Datastore khả dụng trên vCenter:"
-                for idx in "${!ds_candidates[@]}"; do
-                    echo "  $((idx+1))) ${ds_candidates[$idx]}"
-                done
-                local sel_ds=""
-                if read -r -p "Vui lòng chọn Datastore (1-${#ds_candidates[@]}) [1]: " sel_ds; then
-                    sel_ds="${sel_ds%$'\r'}"
-                    sel_ds="${sel_ds:-1}"
-                    if [[ "${sel_ds}" =~ ^[0-9]+$ ]] && [ "${sel_ds}" -ge 1 ] && [ "${sel_ds}" -le "${#ds_candidates[@]}" ]; then
-                        datastore="${ds_candidates[$((sel_ds-1))]}"
-                    fi
-                fi
-            fi
-
-            if [[ -z "${datastore}" || "${datastore}" == *"<"*">"* ]]; then
-                local input_ds=""
-                read -r -p "Nhập tên Datastore đích trên vCenter: " input_ds
-                input_ds="${input_ds%$'\r'}"
-                if [[ -z "${input_ds}" || "${input_ds}" == *"<"*">"* ]]; then
-                    log_error "Tên Datastore không được để trống hoặc chứa ký tự mẫu."
-                    return 1
-                fi
-                datastore="${input_ds}"
-            fi
-        fi
-        return 0
-    }
-
     while true; do
+        local cur_iso=""
+        if [[ -f "${pkr_file}" ]]; then
+            cur_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${pkr_file}" | grep -E '"[^"]+"' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
+        fi
+        if [[ -n "${cur_iso}" && "${cur_iso}" != *"<"*">"* ]]; then
+            echo ""
+            echo "Cấu hình tệp ISO hiện tại của Packer: ${cur_iso}"
+        fi
+
         echo ""
         echo "Phương thức thiết lập ISO cài đặt hệ điều hành:"
-        echo "  1) Tải ISO tự động từ Internet & upload lên Datastore"
-        echo "  2) Chọn tệp ISO từ đĩa cục bộ & upload lên Datastore"
-        echo "  3) Chọn tệp ISO đã có sẵn trên Datastore vCenter"
-        echo "  4) Chọn tệp ISO từ vSphere Content Library"
-        echo "  5) Quản lý kho vSphere Content Library (Tạo thư viện, nạp ISO)"
-        echo "  0) Hủy và quay lại"
-        if ! read -r -p "Nhập lựa chọn (0-5) [1]: " ISO_CHOICE; then
+        echo "  1) Chọn tệp ISO từ vSphere Content Library (Khuyên dùng)"
+        echo "  2) Chọn tệp ISO có sẵn trên Datastore vCenter"
+        echo "  3) Quản lý kho Content Library & Datastore ISO (Tải, Upload, Copy, Tạo thư viện...)"
+        echo "  0) Hoàn tất / Giữ nguyên cấu hình và quay lại"
+
+        local choice=""
+        if ! read -r -p "Vui lòng chọn (0-3) [1]: " choice; then
             echo ""
             return 1
         fi
-        ISO_CHOICE="${ISO_CHOICE%$'\r'}"
-        ISO_CHOICE=${ISO_CHOICE:-1}
+        choice="${choice%$'\r'}"
+        choice="${choice:-1}"
 
-        case "${ISO_CHOICE}" in
+        case "${choice}" in
             0)
-                log_info "Đã hủy thao tác chọn ISO."
-                return 1
+                return 0
                 ;;
             1)
-                ensure_target_datastore || continue
-                local tmpl_os=""
-                if [[ -n "${pkr_file}" ]]; then
-                    tmpl_os="$(basename "$(dirname "${pkr_file}")")"
+                if select_iso_from_content_library "${pkr_file}" "${config_file}"; then
+                    return 0
                 fi
-
-                local download_flag="--ubuntu"
-                local iso_filename="ubuntu-24.04.5-live-server-amd64.iso"
-                if [[ "${tmpl_os}" == *"rocky"* ]]; then
-                    download_flag="--rocky"
-                    iso_filename="Rocky-9-latest-x86_64-minimal.iso"
-                fi
-
-                log_info "Bắt đầu tải ISO từ Internet cho hệ điều hành [${tmpl_os:-generic}]..."
-                if [[ -x "${seed_dir}/download_iso.sh" ]]; then
-                    (cd "${seed_dir}" && ./download_iso.sh "${download_flag}")
-                else
-                    log_error "Không tìm thấy script ${seed_dir}/download_iso.sh."
-                    return 1
-                fi
-
-                local iso_local="${seed_dir}/iso_cache/${iso_filename}"
-                if [[ ! -f "${iso_local}" ]]; then
-                    if [[ -f "iso_cache/${iso_filename}" ]]; then
-                        iso_local="iso_cache/${iso_filename}"
-                    else
-                        log_error "Tệp ISO không tồn tại sau khi tải: ${iso_local}"
-                        return 1
-                    fi
-                fi
-
-                local iso_remote="iso/${iso_filename}"
-                upload_iso_to_datastore "${datastore}" "${iso_local}" "${iso_remote}"
-                update_iso_in_packer "${pkr_file}" "${datastore}" "${iso_remote}"
-                save_last_used_iso "${config_file}" "${iso_remote}"
-                break
                 ;;
             2)
-                ensure_target_datastore || continue
-                if ! read -r -p "Nhập đường dẫn thư mục chứa ISO cục bộ (ví dụ: /mnt/d/ISO hoặc .): " LOCAL_DIR; then
-                    echo ""
-                    return 1
+                if select_iso_from_datastore "${pkr_file}" "${datastore}" "${config_file}"; then
+                    return 0
                 fi
-                LOCAL_DIR="${LOCAL_DIR%$'\r'}"
-                if [[ ! -d "${LOCAL_DIR}" ]]; then
-                    log_error "Thư mục '${LOCAL_DIR}' không tồn tại."
-                    continue
-                fi
-
-                log_info "Đang quét các tệp .iso trong ${LOCAL_DIR}..."
-                mapfile -t ISO_FILES < <(find "${LOCAL_DIR}" -maxdepth 2 -type f -name "*.iso")
-                if [[ ${#ISO_FILES[@]} -eq 0 ]]; then
-                    log_warn "Không tìm thấy tệp .iso nào trong ${LOCAL_DIR}."
-                    continue
-                fi
-
-                echo "Danh sách tệp ISO tìm thấy:"
-                for idx in "${!ISO_FILES[@]}"; do
-                    echo "  $((idx+1))) ${ISO_FILES[$idx]}"
-                done
-                if ! read -r -p "Nhập số thứ tự tệp ISO muốn chọn: " SEL_INDEX; then
-                    echo ""
-                    return 1
-                fi
-                SEL_INDEX="${SEL_INDEX%$'\r'}"
-                if ! [[ "${SEL_INDEX}" =~ ^[0-9]+$ ]] || [ "${SEL_INDEX}" -lt 1 ] || [ "${SEL_INDEX}" -gt "${#ISO_FILES[@]}" ]; then
-                    log_error "Lựa chọn số thứ tự không hợp lệ."
-                    continue
-                fi
-
-                local chosen_iso="${ISO_FILES[$((SEL_INDEX-1))]}"
-                local base_iso_name
-                base_iso_name=$(basename "${chosen_iso}")
-                local target_remote_iso="iso/${base_iso_name}"
-
-                upload_iso_to_datastore "${datastore}" "${chosen_iso}" "${target_remote_iso}"
-                update_iso_in_packer "${pkr_file}" "${datastore}" "${target_remote_iso}"
-                save_last_used_iso "${config_file}" "${target_remote_iso}"
-                break
                 ;;
             3)
-                ensure_target_datastore || continue
-                log_info "Đang quét danh sách tệp .iso trên Datastore [${datastore}]..."
-                mapfile -t REMOTE_ISOS < <(get_datastore_iso_files "${datastore}")
-                if [[ ${#REMOTE_ISOS[@]} -eq 0 ]]; then
-                    log_warn "Không tìm thấy tệp .iso nào trên Datastore [${datastore}]."
-                    continue
-                fi
-
-                echo ""
-                echo "Danh sách ISO có sẵn trên Datastore [${datastore}]:"
-                for idx in "${!REMOTE_ISOS[@]}"; do
-                    echo "  $((idx+1))) ${REMOTE_ISOS[$idx]}"
-                done
-                if ! read -r -p "Nhập số thứ tự tệp ISO: " SEL_INDEX; then
-                    echo ""
-                    return 1
-                fi
-                SEL_INDEX="${SEL_INDEX%$'\r'}"
-                if ! [[ "${SEL_INDEX}" =~ ^[0-9]+$ ]] || [ "${SEL_INDEX}" -lt 1 ] || [ "${SEL_INDEX}" -gt "${#REMOTE_ISOS[@]}" ]; then
-                    log_error "Lựa chọn số thứ tự không hợp lệ."
-                    continue
-                fi
-
-                local chosen_remote="${REMOTE_ISOS[$((SEL_INDEX-1))]}"
-                log_success "Đã chọn: ${chosen_remote}"
-                update_iso_in_packer "${pkr_file}" "${datastore}" "${chosen_remote}"
-                save_last_used_iso "${config_file}" "${chosen_remote}"
-                break
-                ;;
-            4)
-                if select_iso_from_content_library "${pkr_file}" "${config_file}"; then
-                    break
-                fi
-                ;;
-            5)
+                # Tái sử dụng trực tiếp menu quản lý kho Content Library & Datastore ISO chuẩn
                 run_content_library_menu "${config_file}"
                 ;;
             *)
@@ -613,6 +454,4 @@ run_iso_menu() {
                 ;;
         esac
     done
-
-    return 0
 }

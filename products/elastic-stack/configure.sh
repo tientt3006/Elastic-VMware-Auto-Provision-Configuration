@@ -23,24 +23,46 @@ USER_DATA_FILE="${REPO_ROOT}/packer/templates/ubuntu-24.04/http/user-data"
 PRODUCT_CONF="${PRODUCT_DIR}/product.conf"
 
 init_elastic_config_files() {
+    [[ -n "${_ELASTIC_CONFIG_FILES_INITED:-}" ]] && return 0
+    _ELASTIC_CONFIG_FILES_INITED=1
+
     log_banner "KIỂM TRA VÀ KHỞI TẠO TỆP CẤU HÌNH ELASTIC STACK"
 
+    local created_any=0
     # Di chuyển hoặc khởi tạo product.conf
     if [[ ! -f "${PRODUCT_CONF}" ]]; then
         if [[ -f "${REPO_ROOT}/vars.conf" ]]; then
             log_info "Di chuyển tệp cấu hình cũ vars.conf -> ${PRODUCT_CONF}..."
             cp "${REPO_ROOT}/vars.conf" "${PRODUCT_CONF}"
+            created_any=1
         elif [[ -f "${PRODUCT_CONF}.example" ]]; then
             cp "${PRODUCT_CONF}.example" "${PRODUCT_CONF}"
-            log_info "Đã tạo: ${PRODUCT_CONF}"
+            log_info "Đã khởi tạo: ${PRODUCT_CONF}"
+            created_any=1
         fi
     fi
 
-    [[ ! -f "${PKR_FILE}" && -f "${PKR_FILE}.example" ]] && cp "${PKR_FILE}.example" "${PKR_FILE}" && log_info "Đã tạo: ${PKR_FILE}"
-    [[ ! -f "${TF_FILE}" && -f "${TF_FILE}.example" ]] && cp "${TF_FILE}.example" "${TF_FILE}" && log_info "Đã tạo: ${TF_FILE}"
-    [[ ! -f "${ANS_FILE}" && -f "${ANS_FILE}.example" ]] && cp "${ANS_FILE}.example" "${ANS_FILE}" && log_info "Đã tạo: ${ANS_FILE}"
-    [[ ! -f "${ANS_VARS_FILE}" && -f "${ANS_VARS_FILE}.example" ]] && cp "${ANS_VARS_FILE}.example" "${ANS_VARS_FILE}" && log_info "Đã tạo: ${ANS_VARS_FILE}"
-    [[ ! -f "${USER_DATA_FILE}" && -f "${USER_DATA_FILE}.example" ]] && cp "${USER_DATA_FILE}.example" "${USER_DATA_FILE}" && log_info "Đã tạo: ${USER_DATA_FILE}"
+    [[ ! -f "${PKR_FILE}" && -f "${PKR_FILE}.example" ]] && cp "${PKR_FILE}.example" "${PKR_FILE}" && log_info "Đã khởi tạo: ${PKR_FILE}" && created_any=1
+    [[ ! -f "${TF_FILE}" && -f "${TF_FILE}.example" ]] && cp "${TF_FILE}.example" "${TF_FILE}" && log_info "Đã khởi tạo: ${TF_FILE}" && created_any=1
+    [[ ! -f "${ANS_FILE}" && -f "${ANS_FILE}.example" ]] && cp "${ANS_FILE}.example" "${ANS_FILE}" && log_info "Đã khởi tạo: ${ANS_FILE}" && created_any=1
+    [[ ! -f "${ANS_VARS_FILE}" && -f "${ANS_VARS_FILE}.example" ]] && cp "${ANS_VARS_FILE}.example" "${ANS_VARS_FILE}" && log_info "Đã khởi tạo: ${ANS_VARS_FILE}" && created_any=1
+    [[ ! -f "${USER_DATA_FILE}" && -f "${USER_DATA_FILE}.example" ]] && cp "${USER_DATA_FILE}.example" "${USER_DATA_FILE}" && log_info "Đã khởi tạo: ${USER_DATA_FILE}" && created_any=1
+
+    echo ""
+    echo "=============================================================================="
+    echo "HỆ THỐNG CẤU HÌNH SẢN PHẨM ELASTIC STACK"
+    echo "=============================================================================="
+    echo "  [TỆP THÔNG SỐ TẬP TRUNG]"
+    echo "  -> ${PRODUCT_CONF}"
+    echo "     (Lưu ý: Chỉ cần điền thông số vào DUY NHẤT tệp này, hệ thống sẽ tự động đồng bộ sang tất cả các tệp bên dưới)"
+    echo ""
+    echo "  [CÁC TỆP THÀNH PHẦN TỰ ĐỘNG ĐỒNG BỘ]"
+    echo "  -> Packer:    ${PKR_FILE}"
+    echo "  -> Terraform: ${TF_FILE}"
+    echo "  -> Ansible:   ${ANS_FILE}"
+    echo "  -> Ansible:   ${ANS_VARS_FILE}"
+    echo "  -> Cloud-Init:${USER_DATA_FILE}"
+    echo "=============================================================================="
 
     return 0
 }
@@ -50,24 +72,111 @@ gather_elastic_vars() {
 
     if [[ ! -f "${PRODUCT_CONF}" ]]; then
         log_error "Không tìm thấy tệp cấu hình: ${PRODUCT_CONF}"
-        exit 1
+        return 1
     fi
 
-    # Nạp các biến cấu hình sản phẩm
+    log_banner "THIẾT LẬP VÀ KIỂM TRA THÔNG SỐ HẠ TẦNG ELASTIC STACK"
+
+    # Vòng lặp kiểm tra đã điền đủ thông số trong product.conf chưa
+    while true; do
+        local placeholders=()
+        mapfile -t placeholders < <(grep -v '^\s*#' "${PRODUCT_CONF}" | grep -o -E '<[A-Z0-9_]+>' | sort -u || true)
+
+        # Nạp biến để kiểm tra giá trị rỗng
+        # shellcheck source=/dev/null
+        source "${PRODUCT_CONF}"
+        local empty_vars=()
+        for v in SITE_VCSA_IP VCENTER_USER ISO_DATASTORE SSH_USER IP_E01 IP_E02 IP_E03 IP_KBN GW DNS_SERVER; do
+            local val="${!v:-}"
+            if [[ -z "${val}" ]]; then
+                empty_vars+=("${v}")
+            fi
+        done
+
+        if [[ ${#placeholders[@]} -eq 0 && ${#empty_vars[@]} -eq 0 ]]; then
+            log_success "Đã xác nhận tệp cấu hình ${PRODUCT_CONF} hợp lệ (đã điền đủ thông số)."
+            break
+        fi
+
+        echo ""
+        log_warn "Tệp cấu hình tập trung ${PRODUCT_CONF} vẫn còn thông số chưa điền:"
+        if [[ ${#placeholders[@]} -gt 0 ]]; then
+            echo "  Các trường mẫu (placeholder) cần thay thế:"
+            for p in "${placeholders[@]}"; do
+                echo "    - ${p}"
+            done
+        fi
+        if [[ ${#empty_vars[@]} -gt 0 ]]; then
+            echo "  Các biến bắt buộc đang bị để trống:"
+            for ev in "${empty_vars[@]}"; do
+                echo "    - ${ev}"
+            done
+        fi
+
+        echo ""
+        echo "Lựa chọn phương thức cập nhật thông số:"
+        echo "  1) Mở tệp ${PRODUCT_CONF} bằng trình soạn thảo (nano/vim/vi) để điền ngay"
+        echo "  2) Tôi đã tự sửa tệp này ở cửa sổ khác, nhấn Enter để kiểm tra lại"
+        echo "  3) Nhập lần lượt từng thông số qua dòng lệnh terminal (Interactive prompt)"
+        echo "  0) Hủy và quay lại menu trước"
+
+        local edit_choice=""
+        if ! read -r -p "Vui lòng chọn (0-3) [1]: " edit_choice; then
+            echo ""
+            return 1
+        fi
+        edit_choice="${edit_choice%$'\r'}"
+        edit_choice="${edit_choice:-1}"
+
+        case "${edit_choice}" in
+            0)
+                log_info "Hủy thiết lập thông số."
+                return 1
+                ;;
+            1)
+                local editor="${EDITOR:-}"
+                if [[ -z "${editor}" ]]; then
+                    if command -v nano &>/dev/null; then
+                        editor="nano"
+                    elif command -v vim &>/dev/null; then
+                        editor="vim"
+                    elif command -v vi &>/dev/null; then
+                        editor="vi"
+                    fi
+                fi
+                if [[ -n "${editor}" ]]; then
+                    "${editor}" "${PRODUCT_CONF}"
+                else
+                    log_warn "Không tìm thấy trình soạn thảo nano/vim/vi trong môi trường."
+                    echo "Vui lòng mở tệp sau ở cửa sổ khác để chỉnh sửa: ${PRODUCT_CONF}"
+                    read -r -p "Nhấn [Enter] sau khi đã lưu tệp để kiểm tra lại..." || true
+                fi
+                ;;
+            2)
+                # Tiếp tục vòng lặp để kiểm tra lại
+                ;;
+            3)
+                log_banner "NHẬP THÔNG SỐ QUA DÒNG LỆNH (INTERACTIVE PROMPT)"
+                prompt_if_placeholder "SITE_VCSA_IP" "Nhập IP của vCenter Server" "${PRODUCT_CONF}" || return 1
+                prompt_if_placeholder "VCENTER_USER" "Nhập tài khoản đăng nhập vCenter (vd: administrator@vsphere.local)" "${PRODUCT_CONF}" || return 1
+                prompt_if_placeholder "ISO_DATASTORE" "Nhập tên Datastore lưu ISO" "${PRODUCT_CONF}" || return 1
+                prompt_if_placeholder "SSH_USER" "Nhập tài khoản SSH cho máy ảo (vd: ubuntu, sysops)" "${PRODUCT_CONF}" || return 1
+                prompt_if_placeholder "IP_E01" "Nhập IP tĩnh cho Elasticsearch Node 1 (srv-elastic-01)" "${PRODUCT_CONF}" || return 1
+                prompt_if_placeholder "IP_E02" "Nhập IP tĩnh cho Elasticsearch Node 2 (srv-elastic-02)" "${PRODUCT_CONF}" || return 1
+                prompt_if_placeholder "IP_E03" "Nhập IP tĩnh cho Elasticsearch Node 3 (srv-elastic-03)" "${PRODUCT_CONF}" || return 1
+                prompt_if_placeholder "IP_KBN" "Nhập IP tĩnh cho Kibana/Fleet Server (srv-kibana-gw)" "${PRODUCT_CONF}" || return 1
+                prompt_if_placeholder "GW" "Nhập Default Gateway (vd: 10.0.6.1)" "${PRODUCT_CONF}" || return 1
+                prompt_if_placeholder "DNS_SERVER" "Nhập IP của DNS Server (cách nhau dấu phẩy nếu nhiều hơn 1)" "${PRODUCT_CONF}" || return 1
+                ;;
+            *)
+                log_warn "Lựa chọn không hợp lệ."
+                ;;
+        esac
+    done
+
+    # Nạp lại các biến sau khi đã hoàn thiện
     # shellcheck source=/dev/null
     source "${PRODUCT_CONF}"
-
-    log_banner "THIẾT LẬP THÔNG SỐ HẠ TẦNG ELASTIC STACK"
-    prompt_if_placeholder "SITE_VCSA_IP" "Nhập IP của vCenter Server" "${PRODUCT_CONF}" || return 1
-    prompt_if_placeholder "VCENTER_USER" "Nhập tài khoản đăng nhập vCenter (vd: administrator@vsphere.local)" "${PRODUCT_CONF}" || return 1
-    prompt_if_placeholder "ISO_DATASTORE" "Nhập tên Datastore lưu ISO" "${PRODUCT_CONF}" || return 1
-    prompt_if_placeholder "SSH_USER" "Nhập tài khoản SSH cho máy ảo (vd: ubuntu, sysops)" "${PRODUCT_CONF}" || return 1
-    prompt_if_placeholder "IP_E01" "Nhập IP tĩnh cho Elasticsearch Node 1 (srv-elastic-01)" "${PRODUCT_CONF}" || return 1
-    prompt_if_placeholder "IP_E02" "Nhập IP tĩnh cho Elasticsearch Node 2 (srv-elastic-02)" "${PRODUCT_CONF}" || return 1
-    prompt_if_placeholder "IP_E03" "Nhập IP tĩnh cho Elasticsearch Node 3 (srv-elastic-03)" "${PRODUCT_CONF}" || return 1
-    prompt_if_placeholder "IP_KBN" "Nhập IP tĩnh cho Kibana/Fleet Server (srv-kibana-gw)" "${PRODUCT_CONF}" || return 1
-    prompt_if_placeholder "GW" "Nhập Default Gateway (vd: 10.0.6.1)" "${PRODUCT_CONF}" || return 1
-    prompt_if_placeholder "DNS_SERVER" "Nhập IP của DNS Server (cách nhau dấu phẩy nếu nhiều hơn 1)" "${PRODUCT_CONF}" || return 1
 
     log_banner "THU THẬP MẬT KHẨU BẢO MẬT (LƯU TRONG BỘ NHỚ RAM)"
     prompt_password "VCENTER_PASS" "Mật khẩu quản trị vCenter" || return 1
