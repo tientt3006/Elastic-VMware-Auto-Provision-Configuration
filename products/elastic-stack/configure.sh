@@ -23,7 +23,7 @@ USER_DATA_FILE="${REPO_ROOT}/packer/templates/ubuntu-24.04/http/user-data"
 PRODUCT_CONF="${PRODUCT_DIR}/product.conf"
 
 init_elastic_config_files() {
-    [[ -n "${_ELASTIC_CONFIG_FILES_INITED:-}" ]] && return 0
+    [[ -n "${_ELASTIC_CONFIG_FILES_INITED:-}" && "${1:-}" != "force" ]] && return 0
     _ELASTIC_CONFIG_FILES_INITED=1
 
     log_banner "KIỂM TRA VÀ KHỞI TẠO TỆP CẤU HÌNH ELASTIC STACK"

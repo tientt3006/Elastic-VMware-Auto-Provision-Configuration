@@ -47,7 +47,14 @@ run_elastic_packer() {
         fi
     fi
 
-    if ! confirm_action "Xác nhận bắt đầu đóng gói Golden Template Elastic Stack (ubuntu-24.04)?" "Y"; then
+    local template_name
+    template_name=$(grep -E '^\s*vm_name\s*=' "${PKR_FILE}" 2>/dev/null | head -n 1 | cut -d'"' -f2 || true)
+    if [[ -z "${template_name}" && -f "${PRODUCT_CONF}" ]]; then
+        template_name=$(grep -E '^\s*TPL_NAME\s*=' "${PRODUCT_CONF}" 2>/dev/null | head -n 1 | cut -d'"' -f2 || true)
+    fi
+    [[ -z "${template_name}" ]] && template_name="ubuntu-24.04"
+
+    if ! confirm_action "Xác nhận bắt đầu đóng gói VM Template '${template_name}' (ubuntu-24.04)?" "Y"; then
         log_info "Đã hủy tiến trình Packer theo yêu cầu."
         return 1
     fi
@@ -58,8 +65,9 @@ run_elastic_packer() {
     fi
 
     # Đồng bộ tên template sang Terraform
-    local template_name
-    template_name=$(grep -E '^\s*vm_name\s*=' "${PKR_FILE}" | head -n 1 | cut -d'"' -f2 || true)
+    if [[ -z "${template_name}" || "${template_name}" == "ubuntu-24.04" ]]; then
+        template_name=$(grep -E '^\s*vm_name\s*=' "${PKR_FILE}" 2>/dev/null | head -n 1 | cut -d'"' -f2 || true)
+    fi
     if [[ -n "${template_name}" && -f "${TF_FILE}" ]]; then
         sed -i -E "s/(vsphere_template_name\s*=\s*\")[^\"]+(\")/\1${template_name}\2/" "${TF_FILE}"
         sed -i -E "s/(content_library_item_name\s*=\s*\")[^\"]+(\")/\1${template_name}\2/" "${TF_FILE}"
@@ -240,6 +248,7 @@ run_elastic_menu() {
                 fi
                 ;;
             7)
+                init_elastic_config_files force
                 if gather_elastic_vars; then
                     configure_elastic_templates
                     log_success "Đã cập nhật và đồng bộ cấu hình Elastic Stack thành công."

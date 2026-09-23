@@ -200,7 +200,13 @@ run_platform_tools_menu() {
                     fi
                 fi
 
-                if ! confirm_action "Xác nhận bắt đầu quy trình đóng gói Golden Template '${chosen_os}'?" "Y"; then
+                local tpl_name=""
+                if [[ -f "${pkr_file}" ]]; then
+                    tpl_name=$(grep -E '^\s*vm_name\s*=' "${pkr_file}" 2>/dev/null | head -n 1 | cut -d'"' -f2 || true)
+                fi
+                [[ -z "${tpl_name}" ]] && tpl_name="${chosen_os}"
+
+                if ! confirm_action "Xác nhận bắt đầu đóng gói VM Template '${tpl_name}' (Hệ điều hành: ${chosen_os})?" "Y"; then
                     log_info "Đã hủy đóng gói template theo yêu cầu."
                     continue
                 fi

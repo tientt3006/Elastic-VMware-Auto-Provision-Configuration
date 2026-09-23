@@ -137,11 +137,23 @@ prompt_password() {
     local new_val=""
 
     if [[ -n "${current_val}" ]]; then
-        read -r -s -p "${prompt_msg} [Đã lưu trong phiên, Enter để giữ nguyên]: " new_val || true
+        if ! read -r -s -p "${prompt_msg} [Đã lưu trong phiên, Enter để giữ nguyên, 'q' để hủy]: " new_val; then
+            restore_terminal
+            echo ""
+            log_warn "Không thể đọc mật khẩu (EOF hoặc luồng đã đóng)."
+            return 1
+        fi
         restore_terminal
         echo ""
         new_val="${new_val%$'\r'}"
-        [[ -n "${new_val}" ]] && printf -v "${var_name}" "%s" "${new_val}"
+        if [[ "${new_val}" == "q" || "${new_val}" == "Q" ]]; then
+            log_info "Hủy thao tác nhập mật khẩu."
+            return 1
+        fi
+        if [[ -n "${new_val}" ]]; then
+            printf -v "${var_name}" "%s" "${new_val}"
+        fi
+        return 0
     else
         while [[ -z "${new_val}" ]]; do
             if ! read -r -s -p "${prompt_msg} (hoặc 'q' để hủy): " new_val; then
@@ -160,6 +172,7 @@ prompt_password() {
             [[ -z "${new_val}" ]] && log_warn "Mật khẩu không được để trống!"
         done
         printf -v "${var_name}" "%s" "${new_val}"
+        return 0
     fi
 }
 
