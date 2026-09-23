@@ -102,18 +102,18 @@ fi
 TEMPLATE_DIR="${SCRIPT_DIR}/templates/${TEMPLATE_NAME}"
 if [[ ! -d "${TEMPLATE_DIR}" ]]; then
     log_warn "Thư mục template '${TEMPLATE_NAME}' không tồn tại trong packer/templates/."
-    local default_os="ubuntu-24.04"
+    default_os="ubuntu-24.04"
     if [[ -d "${SCRIPT_DIR}/templates/${default_os}" ]]; then
         log_info "Tự động sử dụng thư mục template mặc định: ${default_os}."
         echo "Nhấn [Enter] để đồng ý sử dụng [${default_os}] (hoặc nhập 'q' để hủy)..."
-        local confirm=""
+        confirm=""
         read -r confirm || true
         confirm="${confirm%$'\r'}"
         if [[ "${confirm}" == "q" || "${confirm}" == "Q" ]]; then
             log_info "Hủy tiến trình theo yêu cầu."
             exit 1
         fi
-        local original_name="${TEMPLATE_NAME}"
+        original_name="${TEMPLATE_NAME}"
         TEMPLATE_NAME="${default_os}"
         TEMPLATE_DIR="${SCRIPT_DIR}/templates/${TEMPLATE_NAME}"
         PKRVARS="${TEMPLATE_DIR}/packer.pkrvars.hcl"
@@ -261,8 +261,8 @@ while true; do
     
     if [[ ${#placeholders[@]} -gt 0 ]]; then
         # Kiểm tra nếu các biến chưa điền là ISO hoặc Datastore -> cung cấp bảng chọn trực tiếp
-        local has_iso=0
-        local has_ds=0
+        has_iso=0
+        has_ds=0
         for p in "${placeholders[@]}"; do
             [[ "${p}" == "<PATH_TO_ISO>" ]] && has_iso=1
             [[ "${p}" == "<VCENTER_DATASTORE>" ]] && has_ds=1
@@ -325,7 +325,7 @@ if [[ -z "${VCENTER_PASS:-}" ]]; then
 fi
 
 if [[ -z "${SSH_PASS:-}" ]]; then
-    local prompt_msg="Nhập mật khẩu SSH khởi tạo máy ảo"
+    prompt_msg="Nhập mật khẩu SSH khởi tạo máy ảo"
     [[ "${TEMPLATE_NAME}" == *"win"* ]] && prompt_msg="Nhập mật khẩu Administrator cho Windows"
     if ! prompt_password "SSH_PASS" "${prompt_msg}"; then
         log_info "Hủy quy trình đóng gói Packer."
