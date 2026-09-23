@@ -205,20 +205,49 @@ gather_elastic_vars() {
 configure_elastic_templates() {
     log_info "Bắt đầu điền thông số động vào các tệp cấu hình..."
 
-    # Khởi tạo hoặc tái sử dụng SSH Key tiêu chuẩn (~/.ssh/id_ed25519)
-    mkdir -p "${HOME}/.ssh"
-    chmod 700 "${HOME}/.ssh"
-    local SSH_KEY_PATH="${HOME}/.ssh/id_ed25519"
-    if [[ ! -f "${SSH_KEY_PATH}" ]]; then
-        log_info "Tự động tạo SSH key mới: ${SSH_KEY_PATH}..."
-        ssh-keygen -t ed25519 -N "" -f "${SSH_KEY_PATH}" -C ""
-        chmod 600 "${SSH_KEY_PATH}"
-        chmod 644 "${SSH_KEY_PATH}.pub"
-    else
-        log_info "Sử dụng SSH key hiện có: ${SSH_KEY_PATH}"
+    # Xác định khóa công khai SSH (SSH Public Key)
+    local SSH_PUB_KEY=""
+    local custom_key="${SSH_PUBLIC_KEY:-}"
+    custom_key="${custom_key/#\~/$HOME}"
+
+    if [[ -n "${custom_key}" && "${custom_key}" != *"<"*">"* ]]; then
+        if [[ -f "${custom_key}" ]]; then
+            log_info "Sử dụng tệp SSH public key được chỉ định: ${custom_key}"
+            SSH_PUB_KEY=$(cat "${custom_key}")
+        elif [[ "${custom_key}" =~ ^ssh-(ed25519|rsa|dss)|ecdsa-sha2 ]]; then
+            log_info "Sử dụng chuỗi SSH public key cấu hình trực tiếp từ product.conf."
+            SSH_PUB_KEY="${custom_key}"
+        else
+            log_warn "Giá trị SSH_PUBLIC_KEY không phải tệp hợp lệ hoặc chuỗi SSH key chuẩn. Chuyển sang tự động phát hiện."
+        fi
     fi
-    local SSH_PUB_KEY
-    SSH_PUB_KEY=$(cat "${SSH_KEY_PATH}.pub")
+
+    # Nếu chưa có khóa công khai từ cấu hình, tự động phát hiện trên máy điều phối hoặc sinh mới
+    local used_priv_key="~/.ssh/id_ed25519"
+    if [[ -z "${SSH_PUB_KEY}" ]]; then
+        mkdir -p "${HOME}/.ssh"
+        chmod 700 "${HOME}/.ssh"
+        local default_ed25519="${HOME}/.ssh/id_ed25519"
+        local default_rsa="${HOME}/.ssh/id_rsa"
+
+        if [[ -f "${default_ed25519}.pub" ]]; then
+            log_info "Tự động phát hiện SSH key hiện có: ${default_ed25519}.pub"
+            SSH_PUB_KEY=$(cat "${default_ed25519}.pub")
+            used_priv_key="~/.ssh/id_ed25519"
+        elif [[ -f "${default_rsa}.pub" ]]; then
+            log_info "Tự động phát hiện SSH key hiện có: ${default_rsa}.pub"
+            SSH_PUB_KEY=$(cat "${default_rsa}.pub")
+            used_priv_key="~/.ssh/id_rsa"
+        else
+            log_info "Chưa tìm thấy SSH key trong ~/.ssh/. Tự động tạo SSH key mới: ${default_ed25519}..."
+            ssh-keygen -t ed25519 -N "" -f "${default_ed25519}" -C "${SSH_USER}@$(hostname)"
+            chmod 600 "${default_ed25519}"
+            chmod 644 "${default_ed25519}.pub"
+            SSH_PUB_KEY=$(cat "${default_ed25519}.pub")
+            used_priv_key="~/.ssh/id_ed25519"
+        fi
+    fi
+    export PKR_VAR_ssh_public_key="${SSH_PUB_KEY}"
 
     # Cập nhật Packer HCL Variables
     if [[ -f "${PKR_FILE}" ]]; then
@@ -307,7 +336,9 @@ PYEOF
         sed -i "s|<IP_KIBANA>|${IP_KBN}|g" "${ANS_FILE}"
         sed -i "s|<SSH_USER>|${SSH_USER}|g" "${ANS_FILE}"
         if ! grep -q "ansible_ssh_private_key_file" "${ANS_FILE}"; then
-            sed -i "/ansible_user:/a \    ansible_ssh_private_key_file: ~/.ssh/id_ed25519" "${ANS_FILE}"
+            sed -i "/ansible_user:/a \    ansible_ssh_private_key_file: ${used_priv_key}" "${ANS_FILE}"
+        else
+            sed -i -E "s|(ansible_ssh_private_key_file:\s*).*|\1${used_priv_key}|" "${ANS_FILE}"
         fi
     fi
 
@@ -329,7 +360,11 @@ PYEOF
         sed -i -E "s|(password:\s*\").*(\")|\1${ssh_hash}\2|" "${USER_DATA_FILE}"
         sed -i -E "s/(username:\s*).*/\1${SSH_USER}/" "${USER_DATA_FILE}"
         sed -i "s|<SSH_USER>|${SSH_USER}|g" "${USER_DATA_FILE}"
-        sed -i "s|<SSH_PUB_KEY>|${SSH_PUB_KEY}|g" "${USER_DATA_FILE}"
+        if grep -q "<SSH_PUB_KEY>" "${USER_DATA_FILE}"; then
+            sed -i "s|<SSH_PUB_KEY>|${SSH_PUB_KEY}|g" "${USER_DATA_FILE}"
+        elif grep -q -E '^\s*-\s*"ssh-' "${USER_DATA_FILE}"; then
+            sed -i -E "s|(-\s*\")(ssh-[^\"]+)(\")|\1${SSH_PUB_KEY}\3|" "${USER_DATA_FILE}"
+        fi
     fi
 
     log_success "Hoàn tất điền cấu hình đồng bộ cho Packer, Terraform và Ansible."

@@ -8,16 +8,16 @@ vsphere_insecure_connection = true
 # ==============================================================================
 # vSphere Infrastructure Targets
 # ==============================================================================
-vsphere_datacenter    = "Datacenter"
-vsphere_cluster       = "Cluster1"
-vsphere_datastore     = "DS_100_3"
-vsphere_template_name = "tpl-ubuntu-2404-golden"
+vsphere_datacenter    = "<DATACENTER_NAME>"
+vsphere_cluster       = "<CLUSTER_NAME>"
+vsphere_datastore     = "<DATASTORE_NAME>"
+vsphere_template_name = "<TEMPLATE_NAME>"
 
 # ==============================================================================
 # Content Library Configuration
 # ==============================================================================
-#content_library_name      = "Content Lib DS_100_3_1"
-#content_library_item_name = "tpl-ubuntu-2404-golden"
+#content_library_name      = "<CONTENT_LIBRARY_NAME>"
+#content_library_item_name = "<CONTENT_LIBRARY_ITEM_NAME_TEMPLATE>"
 
 # ==============================================================================
 # Inventory Folder Configuration (Bulk Creation)

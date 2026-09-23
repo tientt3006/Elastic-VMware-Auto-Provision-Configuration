@@ -15,8 +15,14 @@ PKR_NETWORK="VM Network"
 VM_FOLDER="Load_Balancers"
 TPL_NAME="tpl-ubuntu-2404-golden"
 
-# --- Guest OS Administrative Account ---
+# --- Guest OS Administrative Account & SSH Access ---
 SSH_USER="<SSH_USER>"
+# Khóa công khai SSH (SSH Public Key) cấp quyền truy cập máy ảo:
+# - Để trống ("") để hệ thống TỰ ĐỘNG nhận diện key có sẵn (~/.ssh/id_ed25519.pub hoặc ~/.ssh/id_rsa.pub)
+#   hoặc tự động sinh mới ~/.ssh/id_ed25519 nếu máy chưa có SSH key.
+# - Hoặc điền đường dẫn tới tệp public key (vd: "~/.ssh/id_ed25519.pub")
+# - Hoặc dán trực tiếp chuỗi khóa công khai (vd: "ssh-ed25519 AAAAC3NzaC1... user@host")
+SSH_PUBLIC_KEY=""
 
 # --- Static Network Topology (HA Cluster) ---
 IP_HAPROXY_01="<IP_HAPROXY_NODE_01>"
@@ -24,4 +30,7 @@ IP_HAPROXY_02="<IP_HAPROXY_NODE_02>"
 VIP_HAPROXY="<VIRTUAL_IP_KEEPALIVED>"
 GW="<GATEWAY>"
 NETMASK="24"
+# Địa chỉ IP của DNS Server. Nếu có nhiều DNS, phân tách bằng dấu phẩy.
+# Ví dụ 1 DNS: DNS_SERVER="10.255.242.1" hoặc DNS_SERVER="8.8.8.8"
+# Ví dụ nhiều DNS: DNS_SERVER="10.255.242.1, 8.8.8.8"
 DNS_SERVER="<DNS_SERVER>"
