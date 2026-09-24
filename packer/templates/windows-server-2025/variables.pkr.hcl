@@ -86,13 +86,13 @@ variable "vm_cpu_sockets" {
 variable "vm_cpu_cores" {
   type        = number
   description = "Number of virtual CPU cores allocated per socket."
-  default     = 2
+  default     = 4
 }
 
 variable "vm_mem_size" {
   type        = number
   description = "Size of system memory allocated to the virtual machine in megabytes."
-  default     = 4096
+  default     = 6144
 }
 
 variable "vm_disk_size" {

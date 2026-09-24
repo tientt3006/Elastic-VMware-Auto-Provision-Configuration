@@ -158,6 +158,7 @@
                <Value>${winrm_password}</Value>
                <PlainText>true</PlainText>
             </AdministratorPassword>
+            %{if lower(winrm_username) != "administrator" ~}
             <LocalAccounts>
                <LocalAccount wcm:action="add">
                   <Password>
@@ -170,6 +171,7 @@
                   <Description>Packer Provisioning Account</Description>
                </LocalAccount>
             </LocalAccounts>
+            %{ endif ~}
          </UserAccounts>
          <FirstLogonCommands>
             <!-- 1. Allow PowerShell Execution (64-Bit) -->

@@ -4,20 +4,22 @@
 # ==============================================================================
 param (
     [string]$SetupPath = "E:",
-    [int]$MaxRetries = 15,
+    [int]$MaxRetries = 20,
     [int]$RetryInterval = 3
 )
+
+Start-Transcript -Path "C:\Windows\Temp\windows-vmtools.log" -Append -ErrorAction SilentlyContinue
 
 $ErrorActionPreference = "Stop"
 $VMToolsName = "VMware Tools"
 $VMToolsServiceName = "VMTools"
 
-# 1. Resolve SetupPath: If E:\ does not contain setup64.exe, scan drives D: to Z:
-if (-not (Test-Path "$SetupPath\setup64.exe")) {
-    Write-Output "setup64.exe not found on default drive $SetupPath. Searching drives D: to Z:..."
+# 1. Resolve SetupPath: If E:\ does not contain setup64.exe or setup.exe, scan drives D: to Z:
+if ((-not (Test-Path "$SetupPath\setup64.exe")) -and (-not (Test-Path "$SetupPath\setup.exe"))) {
+    Write-Output "VMware Tools installer not found on default drive $SetupPath. Searching drives D: to Z:..."
     foreach ($letter in [char[]](68..90)) {
         $candidate = "$([string]$letter):"
-        if (Test-Path "$candidate\setup64.exe") {
+        if ((Test-Path "$candidate\setup64.exe") -or (Test-Path "$candidate\setup.exe")) {
             $SetupPath = $candidate
             Write-Output "Found VMware Tools installer on drive: $SetupPath"
             break
@@ -73,10 +75,10 @@ Function Install-VMTools {
     $setupFile = ""
     if (Test-Path "$SetupPath\setup64.exe") {
         $setupFile = "$SetupPath\setup64.exe"
-    } elseif ((Test-Path "$SetupPath\setup.exe") -and (Test-Path "$SetupPath\VMware")) {
+    } elseif (Test-Path "$SetupPath\setup.exe") {
         $setupFile = "$SetupPath\setup.exe"
     } else {
-        Write-Error "Neither setup64.exe nor VMware Tools setup.exe found in $SetupPath"
+        Write-Error "Neither setup64.exe nor setup.exe found in $SetupPath"
         return $false
     }
 
@@ -96,13 +98,16 @@ $vmToolsInstalled = Get-VMToolsInstall
 if ($vmToolsInstalled) {
     if (Get-VMToolsService -MaxRetries $MaxRetries -RetryInterval $RetryInterval) {
         Write-Output "$VMToolsName is already installed and running."
+        Stop-Transcript -ErrorAction SilentlyContinue
         exit 0
     }
 }
 
 Write-Output "Proceeding with VMware Tools installation from $SetupPath..."
-if (-not (Install-VMTools -SetupPath $SetupPath -Arguments '/s /v "/qb REBOOT=R"')) {
-    Write-Warning "Failed to install $VMToolsName from $SetupPath"
+$installerArgs = '/s /v "/qn REBOOT=R ADDLOCAL=ALL /l*v C:\Windows\Temp\vmtools-msi.log"'
+if (-not (Install-VMTools -SetupPath $SetupPath -Arguments $installerArgs)) {
+    Write-Warning "Failed to install $VMToolsName with silent args. Retrying with basic UI..."
+    Install-VMTools -SetupPath $SetupPath -Arguments '/s /v "/qb REBOOT=R"'
 } else {
     Write-Output "$VMToolsName installer completed."
 }
@@ -112,3 +117,5 @@ if (-not (Get-VMToolsService -MaxRetries $MaxRetries -RetryInterval $RetryInterv
 } else {
     Write-Output "$VMToolsName service is running and active."
 }
+
+Stop-Transcript -ErrorAction SilentlyContinue

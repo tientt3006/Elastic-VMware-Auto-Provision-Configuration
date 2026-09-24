@@ -252,6 +252,34 @@ if [[ -f "${PKRVARS}" ]]; then
         sed -i -E 's/(vm_cdrom_type\s*=\s*)"sata"/\1"ide"/' "${PKRVARS}"
         log_info "Đã tự động chuẩn hóa vm_cdrom_type thành 'ide' cho Rocky Linux trong ${PKRVARS}."
     fi
+    if [[ "${TEMPLATE_NAME}" == *"win"* ]]; then
+        # Chuẩn hóa tài nguyên tính toán (tối thiểu 4 vCPU và 6144 MB RAM theo yêu cầu)
+        local cur_cores cur_mem
+        cur_cores=$(grep -E '^\s*vm_cpu_cores\s*=' "${PKRVARS}" | head -n 1 | awk -F'=' '{print $2}' | tr -d ' ",' || true)
+        cur_mem=$(grep -E '^\s*vm_mem_size\s*=' "${PKRVARS}" | head -n 1 | awk -F'=' '{print $2}' | tr -d ' ",' || true)
+        if [[ -n "${cur_cores}" && "${cur_cores}" =~ ^[0-9]+$ ]] && [ "${cur_cores}" -lt 4 ]; then
+            sed -i -E 's/^\s*vm_cpu_cores\s*=.*/vm_cpu_cores   = 4/' "${PKRVARS}"
+            log_info "Đã tự động nâng vm_cpu_cores lên 4 trong ${PKRVARS}."
+        fi
+        if [[ -n "${cur_mem}" && "${cur_mem}" =~ ^[0-9]+$ ]] && [ "${cur_mem}" -lt 6144 ]; then
+            sed -i -E 's/^\s*vm_mem_size\s*=.*/vm_mem_size    = 6144/' "${PKRVARS}"
+            log_info "Đã tự động nâng vm_mem_size lên 6144 MB trong ${PKRVARS}."
+        fi
+
+        # Tự động kiểm tra và chèn VMware Tools ISO vào iso_paths nếu chưa tồn tại
+        if ! grep -q "tools-isoimages/windows.iso" "${PKRVARS}"; then
+            local first_iso
+            first_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${PKRVARS}" | grep -E '"[^"]+"' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
+            if [[ -n "${first_iso}" ]]; then
+                sed -i -e '/^iso_paths[[:space:]]*=[[:space:]]*\[/,/^[[:space:]]*\]/c\
+iso_paths = [\
+  "'"${first_iso}"'",\
+  "[] /vmimages/tools-isoimages/windows.iso"\
+]' "${PKRVARS}"
+                log_success "Đã tự động bổ sung '[] /vmimages/tools-isoimages/windows.iso' vào iso_paths trong ${PKRVARS}."
+            fi
+        fi
+    fi
 fi
 
 # 3. Kiểm tra liên tục các thông số chưa điền (placeholder) trong packer.pkrvars.hcl
