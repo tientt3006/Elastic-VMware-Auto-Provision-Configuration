@@ -89,18 +89,6 @@ fi
 export TF_VAR_vsphere_password="${VSPHERE_PASSWORD}"
 export_govc_env "${VSPHERE_SERVER}" "${VSPHERE_USER}" "${VSPHERE_PASSWORD}"
 
-# Thu thập mật khẩu Administrator cho Windows (nếu có máy ảo Windows trong tfvars)
-if grep -i -E '(windows|win-)' "${TFVARS}" 2>/dev/null; then
-    if [[ -z "${WINDOWS_ADMIN_PASS:-}" && -z "${TF_VAR_windows_admin_password:-}" ]]; then
-        echo ""
-        log_info "Phát hiện cấu hình máy ảo Windows trong ${TFVARS}."
-        if confirm_action "Bạn có muốn chỉ định mật khẩu Administrator mới cho máy ảo Windows qua Sysprep không?" "N"; then
-            prompt_password "WINDOWS_ADMIN_PASS" "Nhập mật khẩu Administrator cho máy ảo Windows" || exit 1
-            export TF_VAR_windows_admin_password="${WINDOWS_ADMIN_PASS}"
-        fi
-    fi
-fi
-
 # 4. Pre-flight check kiểm tra kết nối vCenter
 if command -v govc &>/dev/null; then
     log_info "Đang kiểm tra kết nối tới vCenter qua govc API..."
