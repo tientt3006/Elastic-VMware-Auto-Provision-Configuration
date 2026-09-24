@@ -35,12 +35,12 @@ foreach ($proto in $protocols) {
 Write-Output "--- [5/5] Cleaning Up Temporary Files and Setup Logs ---"
 $cleanupPaths = @(
     "$env:TEMP\*",
-    "$env:WINDIR\Temp\*",
     "$env:WINDIR\Panther\*",
     "$env:WINDIR\SoftwareDistribution\Download\*"
 )
 foreach ($path in $cleanupPaths) {
     Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
 }
+Get-ChildItem -Path "$env:WINDIR\Temp" -Exclude "packer-*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Output "Windows Server 2025 Golden Template preparation complete."
