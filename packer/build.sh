@@ -242,45 +242,53 @@ sync_packer_vars_from_terraform() {
 }
 sync_packer_vars_from_terraform "${PKRVARS}"
 
-# Tự động tối ưu boot_order và chuẩn hóa CD-ROM controller để tránh lỗi lặp boot / mất IP
-if [[ -f "${PKRVARS}" ]]; then
-    if grep -q -E '^\s*boot_order\s*=\s*"cdrom,disk"' "${PKRVARS}"; then
-        sed -i -E 's/(boot_order\s*=\s*)"cdrom,disk"/\1"disk,cdrom"/' "${PKRVARS}"
-        log_info "Đã tự động cập nhật boot_order thành 'disk,cdrom' trong ${PKRVARS}."
+# Tự động tối ưu boot_order, sizing và chuẩn hóa cấu hình tránh lỗi treo build
+optimize_and_heal_packer_vars() {
+    local pkr_file="$1"
+    local tmpl_name="$2"
+
+    [[ ! -f "${pkr_file}" ]] && return 0
+
+    if grep -q -E '^\s*boot_order\s*=\s*"cdrom,disk"' "${pkr_file}"; then
+        sed -i -E 's/(boot_order\s*=\s*)"cdrom,disk"/\1"disk,cdrom"/' "${pkr_file}"
+        log_info "Đã tự động cập nhật boot_order thành 'disk,cdrom' trong ${pkr_file}."
     fi
-    if grep -q -E '^\s*vm_cdrom_type\s*=\s*"sata"' "${PKRVARS}" && [[ "${TEMPLATE_NAME}" == "rocky-9"* ]]; then
-        sed -i -E 's/(vm_cdrom_type\s*=\s*)"sata"/\1"ide"/' "${PKRVARS}"
-        log_info "Đã tự động chuẩn hóa vm_cdrom_type thành 'ide' cho Rocky Linux trong ${PKRVARS}."
+
+    if grep -q -E '^\s*vm_cdrom_type\s*=\s*"sata"' "${pkr_file}" && [[ "${tmpl_name}" == "rocky-9"* ]]; then
+        sed -i -E 's/(vm_cdrom_type\s*=\s*)"sata"/\1"ide"/' "${pkr_file}"
+        log_info "Đã tự động chuẩn hóa vm_cdrom_type thành 'ide' cho Rocky Linux trong ${pkr_file}."
     fi
-    if [[ "${TEMPLATE_NAME}" == *"win"* ]]; then
+
+    if [[ "${tmpl_name}" == *"win"* ]]; then
         # Chuẩn hóa tài nguyên tính toán (tối thiểu 4 vCPU và 6144 MB RAM theo yêu cầu)
         local cur_cores cur_mem
-        cur_cores=$(grep -E '^\s*vm_cpu_cores\s*=' "${PKRVARS}" | head -n 1 | awk -F'=' '{print $2}' | tr -d ' ",' || true)
-        cur_mem=$(grep -E '^\s*vm_mem_size\s*=' "${PKRVARS}" | head -n 1 | awk -F'=' '{print $2}' | tr -d ' ",' || true)
+        cur_cores=$(grep -E '^\s*vm_cpu_cores\s*=' "${pkr_file}" | head -n 1 | awk -F'=' '{print $2}' | tr -d ' ",' || true)
+        cur_mem=$(grep -E '^\s*vm_mem_size\s*=' "${pkr_file}" | head -n 1 | awk -F'=' '{print $2}' | tr -d ' ",' || true)
         if [[ -n "${cur_cores}" && "${cur_cores}" =~ ^[0-9]+$ ]] && [ "${cur_cores}" -lt 4 ]; then
-            sed -i -E 's/^\s*vm_cpu_cores\s*=.*/vm_cpu_cores   = 4/' "${PKRVARS}"
-            log_info "Đã tự động nâng vm_cpu_cores lên 4 trong ${PKRVARS}."
+            sed -i -E 's/^\s*vm_cpu_cores\s*=.*/vm_cpu_cores   = 4/' "${pkr_file}"
+            log_info "Đã tự động nâng vm_cpu_cores lên 4 trong ${pkr_file}."
         fi
         if [[ -n "${cur_mem}" && "${cur_mem}" =~ ^[0-9]+$ ]] && [ "${cur_mem}" -lt 6144 ]; then
-            sed -i -E 's/^\s*vm_mem_size\s*=.*/vm_mem_size    = 6144/' "${PKRVARS}"
-            log_info "Đã tự động nâng vm_mem_size lên 6144 MB trong ${PKRVARS}."
+            sed -i -E 's/^\s*vm_mem_size\s*=.*/vm_mem_size    = 6144/' "${pkr_file}"
+            log_info "Đã tự động nâng vm_mem_size lên 6144 MB trong ${pkr_file}."
         fi
 
         # Tự động kiểm tra và chèn VMware Tools ISO vào iso_paths nếu chưa tồn tại
-        if ! grep -q "tools-isoimages/windows.iso" "${PKRVARS}"; then
+        if ! grep -q "tools-isoimages/windows.iso" "${pkr_file}"; then
             local first_iso
-            first_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${PKRVARS}" | grep -E '"[^"]+"' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
+            first_iso=$(grep -A 2 -E '^\s*iso_paths\s*=' "${pkr_file}" | grep -E '"[^"]+"' | head -n 1 | sed -E 's/^\s*"([^"]+)".*/\1/' || true)
             if [[ -n "${first_iso}" ]]; then
                 sed -i -e '/^iso_paths[[:space:]]*=[[:space:]]*\[/,/^[[:space:]]*\]/c\
 iso_paths = [\
   "'"${first_iso}"'",\
   "[] /vmimages/tools-isoimages/windows.iso"\
-]' "${PKRVARS}"
-                log_success "Đã tự động bổ sung '[] /vmimages/tools-isoimages/windows.iso' vào iso_paths trong ${PKRVARS}."
+]' "${pkr_file}"
+                log_success "Đã tự động bổ sung '[] /vmimages/tools-isoimages/windows.iso' vào iso_paths trong ${pkr_file}."
             fi
         fi
     fi
-fi
+}
+optimize_and_heal_packer_vars "${PKRVARS}" "${TEMPLATE_NAME}"
 
 # 3. Kiểm tra liên tục các thông số chưa điền (placeholder) trong packer.pkrvars.hcl
 while true; do
