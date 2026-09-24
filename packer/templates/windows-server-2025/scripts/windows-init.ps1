@@ -17,6 +17,11 @@ for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
     Start-Sleep -Seconds 5
 }
 
+# Ensure all connection profiles are Private to allow WinRM quickconfig
+Get-NetConnectionProfile -ErrorAction SilentlyContinue | ForEach-Object {
+    Set-NetConnectionProfile -Name $_.Name -NetworkCategory Private -ErrorAction SilentlyContinue
+}
+
 Write-Output "Configuring Windows Remote Management (WinRM)..."
 winrm quickconfig -quiet
 winrm set winrm/config/service '@{AllowUnencrypted="true"}'

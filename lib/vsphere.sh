@@ -244,11 +244,25 @@ update_iso_in_packer() {
 
     # Cập nhật danh sách iso_paths trong file HCL/pkrvars
     if grep -q "^iso_paths" "${pkr_file}"; then
-        sed -i -e '/^iso_paths[[:space:]]*=[[:space:]]*\[/,/^[[:space:]]*\]/c\
+        local is_windows=0
+        if [[ "${pkr_file}" =~ (win|windows) ]] || grep -q -E '(tools-isoimages/windows\.iso|guest_os_type.*windows)' "${pkr_file}" 2>/dev/null || ( [[ -f "${pkr_file}.example" ]] && grep -q -E 'tools-isoimages/windows\.iso' "${pkr_file}.example" 2>/dev/null ); then
+            is_windows=1
+        fi
+
+        if [[ ${is_windows} -eq 1 ]]; then
+            sed -i -e '/^iso_paths[[:space:]]*=[[:space:]]*\[/,/^[[:space:]]*\]/c\
+iso_paths = [\
+  "'"${formatted_iso_path}"'",\
+  "[] /vmimages/tools-isoimages/windows.iso"\
+]' "${pkr_file}"
+            log_success "Đã cập nhật iso_paths trong ${pkr_file} (kèm VMware Tools ISO): ${formatted_iso_path}"
+        else
+            sed -i -e '/^iso_paths[[:space:]]*=[[:space:]]*\[/,/^[[:space:]]*\]/c\
 iso_paths = [\
   "'"${formatted_iso_path}"'"\
 ]' "${pkr_file}"
-        log_success "Đã cập nhật iso_paths trong ${pkr_file} thành: ${formatted_iso_path}"
+            log_success "Đã cập nhật iso_paths trong ${pkr_file} thành: ${formatted_iso_path}"
+        fi
     else
         log_warn "Cấu trúc iso_paths không tìm thấy trong ${pkr_file} để cập nhật."
     fi
