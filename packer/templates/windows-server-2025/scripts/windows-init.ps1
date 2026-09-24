@@ -4,17 +4,13 @@
 # ==============================================================================
 $ErrorActionPreference = "Stop"
 
-Write-Output "Configuring Network Connection Profile to Private..."
-$maxAttempts = 12
-for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-    $profiles = Get-NetConnectionProfile -ErrorAction SilentlyContinue
-    if ($profiles -and ($profiles | Where-Object { $_.IPv4Connectivity -ne "NoTraffic" })) {
-        foreach ($p in $profiles) {
-            Set-NetConnectionProfile -Name $p.Name -NetworkCategory Private -ErrorAction SilentlyContinue
-        }
-        break
-    }
+Write-Output "Setting the network connection profiles to Private..."
+$connectionProfile = Get-NetConnectionProfile -ErrorAction SilentlyContinue
+$attempts = 0
+While (($null -eq $connectionProfile -or $connectionProfile.Name -eq 'Identifying...') -and $attempts -lt 12) {
     Start-Sleep -Seconds 5
+    $connectionProfile = Get-NetConnectionProfile -ErrorAction SilentlyContinue
+    $attempts++
 }
 
 # Ensure all connection profiles are Private to allow WinRM quickconfig

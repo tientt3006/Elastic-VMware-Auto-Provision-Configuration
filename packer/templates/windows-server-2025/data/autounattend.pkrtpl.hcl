@@ -172,25 +172,32 @@
             </LocalAccounts>
          </UserAccounts>
          <FirstLogonCommands>
-            <!-- 1. Allow PowerShell Execution -->
+            <!-- 1. Allow PowerShell Execution (64-Bit) -->
             <SynchronousCommand wcm:action="add">
                <CommandLine>%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Force"</CommandLine>
-               <Description>Set Execution Policy</Description>
+               <Description>Set Execution Policy 64-Bit</Description>
                <Order>1</Order>
                <RequiresUserInput>false</RequiresUserInput>
             </SynchronousCommand>
-            <!-- 2. Locate Scripts Media and Install VMware Tools -->
+            <!-- 2. Allow PowerShell Execution (32-Bit) -->
             <SynchronousCommand wcm:action="add">
-               <CommandLine>%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -Command "$d=(Get-Volume | Where-Object { Test-Path ($_.DriveLetter + ':\windows-vmtools.ps1') } | Select-Object -First 1).DriveLetter; if ($d) { &amp; ($d + ':\windows-vmtools.ps1') }"</CommandLine>
-               <Description>Install VMware Tools</Description>
+               <CommandLine>%SystemRoot%\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Force"</CommandLine>
+               <Description>Set Execution Policy 32-Bit</Description>
                <Order>2</Order>
                <RequiresUserInput>false</RequiresUserInput>
             </SynchronousCommand>
-            <!-- 3. Locate Scripts Media and Configure WinRM -->
+            <!-- 3. Install VMware Tools (Supports F: or E: or D: drive) -->
             <SynchronousCommand wcm:action="add">
-               <CommandLine>%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -Command "$d=(Get-Volume | Where-Object { Test-Path ($_.DriveLetter + ':\windows-init.ps1') } | Select-Object -First 1).DriveLetter; if ($d) { &amp; ($d + ':\windows-init.ps1') }"</CommandLine>
-               <Description>Initial WinRM Configuration</Description>
+               <CommandLine>cmd.exe /c "if exist F:\windows-vmtools.ps1 (powershell.exe -ExecutionPolicy Bypass -File F:\windows-vmtools.ps1) else if exist E:\windows-vmtools.ps1 (powershell.exe -ExecutionPolicy Bypass -File E:\windows-vmtools.ps1) else (powershell.exe -ExecutionPolicy Bypass -File D:\windows-vmtools.ps1)"</CommandLine>
+               <Description>Install VMware Tools</Description>
                <Order>3</Order>
+               <RequiresUserInput>false</RequiresUserInput>
+            </SynchronousCommand>
+            <!-- 4. Initial WinRM Configuration (Supports F: or E: or D: drive) -->
+            <SynchronousCommand wcm:action="add">
+               <CommandLine>cmd.exe /c "if exist F:\windows-init.ps1 (powershell.exe -ExecutionPolicy Bypass -File F:\windows-init.ps1) else if exist E:\windows-init.ps1 (powershell.exe -ExecutionPolicy Bypass -File E:\windows-init.ps1) else (powershell.exe -ExecutionPolicy Bypass -File D:\windows-init.ps1)"</CommandLine>
+               <Description>Initial WinRM Configuration</Description>
+               <Order>4</Order>
                <RequiresUserInput>false</RequiresUserInput>
             </SynchronousCommand>
          </FirstLogonCommands>
