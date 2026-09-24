@@ -6,7 +6,21 @@ Dự án này là kho mã nguồn tự động hóa hạ tầng dưới dạng m
 
 ## 1. Mục lục tài liệu kỹ thuật
 
-Toàn bộ tài liệu kiến trúc, hướng dẫn vận hành và sổ tay kỹ thuật được tổ chức trực tiếp tại thư mục gốc:
+Hệ thống tài liệu kỹ thuật được phân chia thành tài liệu vận hành trực tiếp trong kho mã nguồn (`docs/`) và bộ tài liệu kiến trúc chuyên sâu trong kho tri thức Obsidian:
+
+### 1.1. Tài liệu vận hành kỹ thuật (`docs/`)
+
+| Tài liệu | Nội dung và trọng tâm kỹ thuật |
+| :--- | :--- |
+| [00_seed_and_iso_management_guide.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/docs/00_seed_and_iso_management_guide.md) | Thiết lập môi trường trạm điều khiển Automation Seed và quản lý tệp ISO trên hạ tầng vSphere. |
+| [01_packer_golden_image_guide.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/docs/01_packer_golden_image_guide.md) | Quy trình đóng gói bản mẫu máy ảo Ubuntu 24.04 LTS tự động qua Subiquity autoinstall và cidata. |
+| [01_packer_troubleshooting_runbook.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/docs/01_packer_troubleshooting_runbook.md) | Sổ tay điều tra và xử lý 11 tình huống sự cố thực tế khi đóng gói template Packer trên vSphere. |
+| [02_terraform_infrastructure_guide.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/docs/02_terraform_infrastructure_guide.md) | Cung ứng hạ tầng vSphere: Port Group, Folder, DRS Anti-Affinity, nhân bản VM và sinh inventory. |
+| [03_ansible_configuration_guide.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/docs/03_ansible_configuration_guide.md) | Cấu hình cụm Elastic Stack HA, Fleet Server, tích hợp quan sát Observability và sao lưu SLM. |
+| [04_system_deployment_checklist.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/docs/04_system_deployment_checklist.md) | Kế hoạch triển khai toàn trình, ma trận cổng tường lửa, checklist nghiệm thu và xử lý sự cố. |
+| [01_vcsa_unattended_deployment_runbook.md](file:///d:/neit_ng/prjs_i/auto_provision_configuration/vcsa_deploy/01_vcsa_unattended_deployment_runbook.md) | Quy trình cài đặt vCenter Server Appliance (VCSA) tự động không giám sát qua vcsa-deploy. |
+
+### 1.2. Bộ tài liệu thiết kế và tiêu chuẩn kiến trúc (Kho tri thức Obsidian)
 
 | Tài liệu | Nội dung và trọng tâm kỹ thuật |
 | :--- | :--- |
@@ -27,53 +41,77 @@ Toàn bộ tài liệu kiến trúc, hướng dẫn vận hành và sổ tay k�
 
 ```text
 auto_provision_configuration/
-├── automation_seed/                            # Bộ công cụ khởi tạo trạm điều khiển Ubuntu và quản lý ISO
-│   ├── setup_automation_env.sh                 # Cài đặt tự động Packer, Terraform, Ansible, govc
-│   ├── download_iso.sh                         # Tự động tải ISO Ubuntu/VCSA kèm kiểm tra SHA256
-│   └── upload_iso_to_vcenter.sh                # Đẩy ISO lên Datastore hoặc vCenter Content Library
-├── vcsa_deploy/                                # Bộ tự động hóa cài đặt vCenter Server Appliance (VCSA)
-│   ├── deploy_vcsa_unattended.sh               # Kịch bản điều phối cài đặt VCSA qua vcsa-deploy
+├── run.sh                                  # Kịch bản điều phối chính (Main Orchestrator)
+├── run_all_onclick.sh                      # Kịch bản điều phối tương thích ngược
+├── lib/                                    # Thư viện hàm shell dùng chung (common, secrets, vsphere)
+├── seed/                                   # Bộ công cụ khởi tạo trạm điều khiển Ubuntu và quản lý ISO
+│   ├── setup_env.sh                        # Cài đặt tự động Packer, Terraform, Ansible, govc
+│   ├── download_iso.sh                     # Tự động tải ISO Ubuntu/VCSA kèm kiểm tra SHA256
+│   └── upload_iso.sh                       # Đẩy ISO lên Datastore hoặc VMware Content Library
+├── vcsa_deploy/                            # Bộ tự động hóa cài đặt vCenter Server Appliance (VCSA)
+│   ├── deploy_vcsa_unattended.sh           # Kịch bản điều phối cài đặt VCSA qua vcsa-deploy
 │   ├── templates/embedded_vcs_on_esxi.json.tpl # Bản mẫu đặc tả cấu hình JSON cho VCSA
-│   ├── vcsa_vars.env.example                   # Tệp khai báo biến hạ tầng mẫu cho VCSA
+│   ├── vcsa_vars.env.example               # Tệp khai báo biến hạ tầng mẫu cho VCSA
 │   └── 01_vcsa_unattended_deployment_runbook.md# Sổ tay quy trình kỹ thuật cài đặt VCSA không giám sát
-├── packer_test/                                # Bộ mã nguồn đóng gói mẫu máy ảo Ubuntu 24.04 Golden Image
-│   ├── ubuntu-24.04.pkr.hcl                    # Định nghĩa Packer HCL template cho vSphere
-│   ├── build_packer_secure.sh                  # Kịch bản khởi tạo template an toàn
-│   └── http/user-data                          # Tệp cấu hình tự động cài đặt Cloud-Init / Autoinstall
-├── terraform_test/                             # Bộ mã nguồn Terraform khởi tạo hạ tầng vSphere
-│   ├── main.tf, variables.tf, outputs.tf       # Khối khai báo tài nguyên trung tâm
-│   ├── terraform.tfvars                        # Khai báo thông số cụm máy ảo và mạng
-│   ├── run_provision_secure.sh                 # Kịch bản triển khai hạ tầng với cơ chế tiêm mật khẩu RAM
-│   └── modules/                                # Các module: folder, content_library, network, compute, cluster_rules
-└── ansible_test/                               # Bộ mã nguồn Ansible cấu hình dịch vụ
-    ├── ansible.cfg, inventories/lab/           # Cấu hình môi trường và định nghĩa danh sách host
-    ├── run_ansible_secure.sh                   # Kịch bản cài đặt cụm Elasticsearch HA và Kibana Gateway
-    ├── run_observability_setup.sh              # Kịch bản tự động hóa 100% hệ thống quan sát tập trung Observability
-    ├── run_backup_restore.sh                   # Kịch bản quản lý sao lưu và phục hồi thảm họa
-    ├── playbooks/                              # Các playbook triển khai, cấu hình policy và teardown
-    └── roles/                                  # Các role: elastic_cluster, kibana_fleet_gateway, elastic_stack_config, fleet_server, elastic_agent, elastic_backup_restore
-
+├── packer/                                 # Tầng nền tảng: Golden Image Templates
+│   ├── build.sh                            # Kịch bản khởi tạo template an toàn (tham số --template)
+│   ├── templates/ubuntu-24.04/             # Template Ubuntu 24.04 LTS (HCL, user-data, scripts)
+│   └── ansible/                            # Playbook provisioner cho Packer
+├── terraform/                              # Tầng nền tảng: IaC Modules & Profiles
+│   ├── modules/                            # Các module dùng chung: compute, network, folder, cluster_rules, content_library
+│   └── profiles/
+│       ├── elastic-stack/                  # Hồ sơ triển khai cụm Elastic Stack HA
+│       └── generic-vms/                    # Hồ sơ cấp phát máy ảo tùy biến đa mục đích
+├── ansible/                                # Tầng nền tảng: Ansible Configuration
+│   ├── ansible.cfg                         # Cấu hình Ansible nền tảng hỗ trợ đa sản phẩm
+│   ├── requirements.yml                    # Collection và phụ thuộc
+│   └── products/
+│       ├── elastic-stack/                  # Triển khai Elastic Stack (roles, playbooks, scripts)
+│       ├── zabbix/                         # Khung triển khai Zabbix Monitoring
+│       ├── haproxy/                        # Khung triển khai HAProxy & Keepalived
+│       └── infra-services/                 # Khung triển khai dịch vụ hạ tầng mạng (DNS/NTP)
+├── products/                               # Tầng sản phẩm: Cấu hình điều phối sản phẩm
+│   ├── elastic-stack/                      # Cấu hình, menu và script của Elastic Stack
+│   │   ├── configure.sh                    # Thu thập tham số và đồng bộ tệp cấu hình
+│   │   ├── menu.sh                         # Menu điều phối chuyên biệt Elastic Stack
+│   │   └── scripts/
+│   │       └── manage_vsphere_observability.sh # Tích hợp giám sát vSphere & Syslog ESXi
+│   ├── zabbix/                             # Cấu hình và menu Zabbix
+│   ├── haproxy/                            # Cấu hình và menu HAProxy
+│   └── infra-services/                     # Cấu hình và menu dịch vụ hạ tầng mạng
+└── docs/                                   # Tài liệu kỹ thuật vận hành tập trung
+    ├── 00_seed_and_iso_management_guide.md
+    ├── 01_packer_golden_image_guide.md
+    ├── 01_packer_troubleshooting_runbook.md
+    ├── 02_terraform_infrastructure_guide.md
+    ├── 03_ansible_configuration_guide.md
+    └── 04_system_deployment_checklist.md
 ```
 
 ---
 
 ## 3. Quy trình thực thi nhanh đầu-cuối (End-to-end workflow)
 
-Toàn bộ quy trình được thực hiện từ môi trường WSL Ubuntu:
+Toàn bộ quy trình có thể chạy qua kịch bản điều phối trung tâm:
+```bash
+./run.sh
+```
+
+Hoặc thực thi độc lập từng giai đoạn:
 
 ### Giai đoạn 1: Đóng gói mẫu máy ảo chuẩn (Golden Image)
 
 ```bash
-cd /mnt/d/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/packer_test
-./build_packer_secure.sh
+cd packer
+./build.sh --template ubuntu-24.04
 ```
 Tiến trình tự động cài đặt hệ điều hành Ubuntu 24.04 LTS, cấu hình mạng Netplan, kích hoạt `open-vm-tools` và chuyển đổi máy ảo thành template `tpl-ubuntu-2404-golden` trên vCenter.
 
 ### Giai đoạn 2: Khởi tạo hạ tầng máy ảo và mạng (Terraform)
 
 ```bash
-cd /mnt/d/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/terraform_test
-./run_provision_secure.sh
+cd terraform/profiles/elastic-stack
+./run.sh
 ```
 Tiến trình thực hiện:
 - Tạo thư mục đối tượng `App_Workloads`, `Infra_Services`.
@@ -85,15 +123,16 @@ Tiến trình thực hiện:
 ### Giai đoạn 3: Cài đặt cụm Elastic Stack HA (Ansible)
 
 ```bash
-cd /mnt/d/neit_ng/obsidian_vault_neit/IUNI/auto_provision_configuration/ansible_test
-./run_ansible_secure.sh
+cd ansible/products/elastic-stack
+./run_deploy.sh
 ```
 Tiến trình tự động cài đặt Elasticsearch Native trên 3 node, thiết lập mã hóa liên node mTLS, cấu hình mật khẩu quản trị và khởi chạy Kibana Gateway.
 
 ### Giai đoạn 4: Kích hoạt hệ thống quan sát tập trung (Ansible)
 
 ```bash
-./run_observability_setup.sh
+cd ansible/products/elastic-stack
+./run_observability.sh
 ```
 Tiến trình tự động kích hoạt:
 - Chính sách vòng đời chỉ mục ILM 15 ngày.

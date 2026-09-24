@@ -1,0 +1,86 @@
+# ==============================================================================
+# vCenter Server Connection Configuration
+# ==============================================================================
+vsphere_server              = "<VCENTER_IP>"
+vsphere_user                = "<VCENTER_USER>"
+vsphere_insecure_connection = true
+
+# ==============================================================================
+# vSphere Infrastructure Targets
+# ==============================================================================
+vsphere_datacenter    = "<VCENTER_DATACENTER>"
+vsphere_cluster       = "<VCENTER_CLUSTER>"
+vsphere_datastore     = "<VCENTER_DATASTORE>"
+vsphere_template_name = "<VM_TEMPLATE_NAME>"
+
+# ==============================================================================
+# Inventory Folder Configuration
+# ==============================================================================
+vm_folders       = ["<VCENTER_FOLDER>"]
+vm_target_folder = "<VCENTER_FOLDER>"
+
+# ==============================================================================
+# ESXi Host & Standard Switch Configuration (Optional port groups)
+# ==============================================================================
+esxi_hosts          = []
+virtual_switch_name = "vSwitch0"
+port_groups         = {}
+
+default_domain_name = "lab.local"
+default_dns_servers = ["8.8.8.8", "1.1.1.1"]
+
+# ==============================================================================
+# OS Credentials (Ansible Integration)
+# ==============================================================================
+ssh_username   = "<SSH_USER>"
+ssh_public_key = "<YOUR_SSH_PUBLIC_KEY>"
+
+# ==============================================================================
+# DRS Cluster Rules Configuration
+# ==============================================================================
+enable_drs_rule    = false
+drs_rule_mandatory = false
+
+# ==============================================================================
+# Virtual Machine Workloads (Customizable Map of N Virtual Machines)
+# ==============================================================================
+vms = {
+  "web_01" = {
+    name         = "<VM_NAME_1>"
+    hostname     = "web-01"
+    cpu_count    = 2
+    memory_mb    = 4096
+    disk_size_gb = 40
+    network_name = "<VCENTER_NETWORK>"
+    ip_address   = "<VM_IP_1>"
+    netmask      = 24
+    gateway      = "<GATEWAY_IP>"
+    # [TÙY CHỌN] Tên nhóm trong Ansible inventory (nếu không khai báo, mặc định là "generic")
+    role         = "web_server"
+
+    # [TÙY CHỌN - GHI ĐÈ] Ghi đè cấu hình hạ tầng cho từng máy ảo riêng biệt
+    # host_name      = "<ESXI_HOST_01>"
+    # datastore_name = "<DS_LOCAL_1>"
+    # folder_name    = "<CUSTOM_FOLDER_NAME>"
+    # dns_servers    = ["1.1.1.1", "8.8.8.8"]
+    # domain_name    = "custom.local"
+  },
+  "db_01" = {
+    name         = "<VM_NAME_2>"
+    hostname     = "db-01"
+    cpu_count    = 4
+    memory_mb    = 8192
+    disk_size_gb = 80
+    network_name = "<VCENTER_NETWORK>"
+    ip_address   = "<VM_IP_2>"
+    netmask      = 24
+    gateway      = "<GATEWAY_IP>"
+    role         = "database"
+  }
+}
+
+# ==============================================================================
+# Ansible Inventory Generation Options
+# ==============================================================================
+generate_ansible_inventory = true
+# ansible_inventory_path   = "./hosts.yml"

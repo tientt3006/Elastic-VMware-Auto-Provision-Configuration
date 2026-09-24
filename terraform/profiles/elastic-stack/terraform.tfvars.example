@@ -1,0 +1,136 @@
+# ==============================================================================
+# vCenter Server Connection Configuration (Example)
+# ==============================================================================
+vsphere_server              = "<VCENTER_IP>"
+vsphere_user                = "<VCENTER_USER>"
+vsphere_insecure_connection = true
+
+# ==============================================================================
+# vSphere Infrastructure Targets
+# ==============================================================================
+vsphere_datacenter    = "<DATACENTER_NAME>"
+vsphere_cluster       = "<CLUSTER_NAME>"
+vsphere_datastore     = "<DATASTORE_NAME>"
+vsphere_template_name = "<TEMPLATE_NAME>"
+
+# ==============================================================================
+# Content Library Configuration
+# ==============================================================================
+#content_library_name      = "<CONTENT_LIBRARY_NAME>"
+#content_library_item_name = "<CONTENT_LIBRARY_ITEM_NAME_TEMPLATE>"
+
+# ==============================================================================
+# Inventory Folder Configuration (Bulk Creation)
+# ==============================================================================
+vm_folders       = []
+vm_target_folder = ""
+
+# ==============================================================================
+# ESXi Host & Standard Switch Configuration
+# ==============================================================================
+esxi_hosts          = []
+virtual_switch_name = "vSwitch0"
+
+port_groups = {
+  #"VM Network 3" = { vlan_id = 0 }
+}
+
+default_domain_name = "int"
+default_dns_servers = [<DNS_SERVERS_LIST>]
+
+# ==============================================================================
+# OS Credentials (Ansible Integration)
+# ==============================================================================
+ssh_username   = "<SSH_USER>"
+ssh_public_key = "<YOUR_SSH_PUBLIC_KEY>"
+
+# ==============================================================================
+# DRS Anti-Affinity Configuration
+# false: Preferential / Soft Rule (allows running on 2 physical hosts in Lab)
+# true:  Mandatory / Hard Rule (enforced when >= 3 physical hosts in Prod)
+# ==============================================================================
+drs_rule_mandatory = false
+
+# ==============================================================================
+# Virtual Machine Workloads (Elastic Stack 3-Node Cluster + Kibana Gateway)
+# ==============================================================================
+vms = {
+  "elastic_01" = {
+    name         = "srv-elastic-01"
+    hostname     = "elastic-01"
+    vm_id        = 101
+    cpu_count    = 2
+    memory_mb    = 6144
+    disk_size_gb = 50
+    network_name = "VM Network"
+    ip_address   = "<IP_NODE_01>"
+    
+    # [TÙY CHỌN - GHI ĐÈ] Kế thừa và Ghi đè (Inheritance and Override)
+    # Bỏ comment các dòng dưới đây nếu bạn muốn máy ảo này chạy trên Host/Datastore cục bộ,
+    # nằm trong một Folder riêng biệt, hoặc dùng DNS Server / Domain riêng biệt.
+    # host_name      = "<ESXI_HOST_01>"
+    # datastore_name = "<DS_LOCAL_1>"
+    # folder_name    = "<CUSTOM_FOLDER_NAME>"
+    # dns_servers    = ["1.1.1.1", "8.8.8.8"]
+    # domain_name    = "custom.local"
+    
+    netmask      = 24
+    gateway      = "<GATEWAY>"
+    role         = "master_data_ingest"
+    extra_config = {
+      "guestinfo.node.role" = "master_data_ingest"
+      "guestinfo.force_poweron" = "true"
+    }
+  },
+  "elastic_02" = {
+    name         = "srv-elastic-02"
+    hostname     = "elastic-02"
+    vm_id        = 102
+    cpu_count    = 2
+    memory_mb    = 6144
+    disk_size_gb = 50
+    network_name = "VM Network"
+    ip_address   = "<IP_NODE_02>"
+    netmask      = 24
+    gateway      = "<GATEWAY>"
+    role         = "master_data_ingest"
+    extra_config = {
+      "guestinfo.node.role" = "master_data_ingest"
+      "guestinfo.force_poweron" = "true"
+    }
+  },
+  "elastic_03" = {
+    name         = "srv-elastic-03"
+    hostname     = "elastic-03"
+    vm_id        = 103
+    cpu_count    = 2
+    memory_mb    = 6144
+    disk_size_gb = 50
+    network_name = "VM Network"
+    ip_address   = "<IP_NODE_03>"
+    netmask      = 24
+    gateway      = "<GATEWAY>"
+    role         = "master_data_ingest"
+    extra_config = {
+      "guestinfo.node.role" = "master_data_ingest"
+      "guestinfo.force_poweron" = "true"
+    }
+  },
+  "kibana_gw" = {
+    name         = "srv-kibana-gw"
+    hostname     = "kibana-gw"
+    vm_id        = 104
+    cpu_count    = 2
+    memory_mb    = 4096
+    disk_size_gb = 40
+    network_name = "VM Network"
+    ip_address   = "<IP_KIBANA>"
+    netmask      = 24
+    gateway      = "<GATEWAY>"
+    role         = "kibana_fleet_gateway"
+    extra_config = {
+      "guestinfo.node.role" = "kibana_fleet_gateway"
+      "guestinfo.force_poweron" = "true"
+    }
+  }
+}

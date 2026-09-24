@@ -1,0 +1,15 @@
+---
+# ==============================================================================
+# Playbook: Deploy Zabbix Monitoring Server & Web Frontend (Scaffold)
+# ==============================================================================
+- name: Deploy Zabbix Server and Database
+  hosts: zabbix_server
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Ping target host
+      ansible.builtin.ping:
+
+    - name: Display deployment readiness status
+      ansible.builtin.debug:
+        msg: "Zabbix host {{ inventory_hostname }} is reachable and ready for role deployment."

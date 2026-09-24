@@ -1,0 +1,26 @@
+# ==============================================================================
+# Network Infrastructure Services (DNS / DHCP / NTP) Configuration Example
+# Multi-Product VMware Automation Platform
+# ==============================================================================
+
+# --- vCenter Server Connection ---
+SITE_VCSA_IP="<VCENTER_IP>"
+VCENTER_USER="<VCENTER_USER>"
+
+# --- vSphere Infrastructure Placement ---
+VCENTER_DC="Datacenter"
+VCENTER_CLUSTER="Cluster1"
+ISO_DATASTORE="<DATASTORE_NAME>"
+PKR_NETWORK="VM Network"
+VM_FOLDER="Infra_Services"
+TPL_NAME="tpl-ubuntu-2404-golden"
+
+# --- Guest OS Administrative Account ---
+SSH_USER="<SSH_USER>"
+
+# --- Static Network Topology ---
+IP_INFRA_01="<IP_INFRA_SERVER>"
+GW="<GATEWAY>"
+NETMASK="24"
+DNS_UPSTREAM="8.8.8.8,1.1.1.1"
+NTP_UPSTREAM="pool.ntp.org"

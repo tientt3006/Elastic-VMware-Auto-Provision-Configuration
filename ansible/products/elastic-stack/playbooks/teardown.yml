@@ -1,0 +1,63 @@
+---
+- name: Teardown Elastic Stack, Fleet Server, and Elastic Agent
+  hosts: all
+  become: true
+  tasks:
+    - name: Check if Elastic Agent is installed
+      ansible.builtin.stat:
+        path: /usr/bin/elastic-agent
+      register: elastic_agent_bin
+
+    - name: Uninstall Elastic Agent if present
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/elastic-agent
+          - uninstall
+          - --force
+      when: elastic_agent_bin.stat.exists
+      ignore_errors: true
+
+    - name: Remove Elastic Agent leftover directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /opt/Elastic
+        - /etc/elastic-agent
+        - /var/tmp/elastic-agent
+
+    - name: Stop and disable Kibana service if present
+      ansible.builtin.systemd:
+        name: kibana
+        state: stopped
+        enabled: false
+      ignore_errors: true
+
+    - name: Stop and disable Elasticsearch service if present
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: stopped
+        enabled: false
+      ignore_errors: true
+
+    - name: Remove native Elastic Stack packages and configuration
+      ansible.builtin.apt:
+        name:
+          - kibana
+          - elasticsearch
+        state: absent
+        purge: true
+      ignore_errors: true
+
+    - name: Remove Elastic Stack data and logs directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/elasticsearch
+        - /var/log/elasticsearch
+        - /etc/elasticsearch
+        - /etc/kibana
+        - /etc/systemd/system/elasticsearch.service.d
+        - /usr/local/bin/elastic-disk-pruner.sh
+        - /etc/cron.d/elastic-disk-pruner

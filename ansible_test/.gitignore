@@ -1,6 +1,0 @@
-inventories/*/group_vars/all/main.yml
-inventories/lab/group_vars/all/main.yml
-*.retry
-.vault_pass*
-.vault-password-file
-

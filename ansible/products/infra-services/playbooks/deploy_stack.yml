@@ -1,0 +1,15 @@
+---
+# ==============================================================================
+# Playbook: Deploy Infrastructure Services (DNS / NTP) (Scaffold)
+# ==============================================================================
+- name: Deploy DNS and NTP Services
+  hosts: dns_servers:ntp_servers
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Ping target host
+      ansible.builtin.ping:
+
+    - name: Display deployment readiness status
+      ansible.builtin.debug:
+        msg: "Infrastructure host {{ inventory_hostname }} is reachable and ready for service deployment."

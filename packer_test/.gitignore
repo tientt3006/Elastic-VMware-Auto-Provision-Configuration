@@ -1,2 +1,0 @@
-# Ignore packer variable files (contains sensitive data)
-*.pkrvars.hcl
