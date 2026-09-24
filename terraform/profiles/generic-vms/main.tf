@@ -18,6 +18,7 @@ data "vsphere_compute_cluster" "cluster" {
 }
 
 data "vsphere_datastore" "datastore" {
+  count         = var.vsphere_datastore != "" && var.vsphere_datastore != null ? 1 : 0
   name          = var.vsphere_datastore
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
@@ -109,7 +110,7 @@ module "compute" {
 
   datacenter_id    = data.vsphere_datacenter.datacenter.id
   resource_pool_id = data.vsphere_compute_cluster.cluster.resource_pool_id
-  datastore_id     = data.vsphere_datastore.datastore.id
+  datastore_id     = try(data.vsphere_datastore.datastore[0].id, length(local.all_custom_datastores) > 0 ? data.vsphere_datastore.vm_datastores[tolist(local.all_custom_datastores)[0]].id : "")
 
   # Global fallbacks (used if a VM does not override)
   template_id                     = length(local.required_template_names) > 0 ? data.vsphere_virtual_machine.source_templates[tolist(local.required_template_names)[0]].id : ""

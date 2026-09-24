@@ -10,12 +10,17 @@ vsphere_insecure_connection = true
 # ==============================================================================
 vsphere_datacenter    = "<VCENTER_DATACENTER>"
 vsphere_cluster       = "<VCENTER_CLUSTER>"
+
+# Datastore lưu trữ mặc định cho toàn bộ máy ảo.
+# TÙY CHỌN: Có thể để trống ("") nếu TẤT CẢ các máy ảo trong 'vms' đều đã tự khai báo 'datastore_name' riêng.
 vsphere_datastore     = "<VCENTER_DATASTORE>"
 
 # Template mặc định cấp phát khi một máy ảo trong 'vms' không chỉ định riêng 'template_name'
+# TÙY CHỌN: Có thể để trống ("") nếu TẤT CẢ các máy ảo trong 'vms' đều đã chỉ định 'template_name' riêng.
 vsphere_template_name = "<DEFAULT_VM_TEMPLATE_NAME>"
 
-# [TÙY CHỌN] Mật khẩu Administrator cho máy ảo Windows qua Sysprep (bỏ qua nếu muốn giữ mật khẩu gốc của template)
+# [TÙY CHỌN] Mật khẩu Administrator chung cho các máy ảo Windows qua Sysprep
+# Bỏ qua (comment) nếu muốn giữ mật khẩu gốc của template hoặc muốn cấu hình mật khẩu riêng cho từng máy trong 'vms'
 # windows_admin_password = "<WINDOWS_ADMIN_PASSWORD>"
 # windows_workgroup      = "WORKGROUP"
 
@@ -38,6 +43,7 @@ default_dns_servers = ["8.8.8.8", "1.1.1.1"]
 # ==============================================================================
 # OS Credentials (Ansible Integration for Linux VMs)
 # ==============================================================================
+# Bỏ trống nếu không dùng Ansible hoặc không muốn inject SSH key vào máy ảo
 ssh_username   = "<SSH_USER>"
 ssh_public_key = "<YOUR_SSH_PUBLIC_KEY>"
 
@@ -85,6 +91,16 @@ vms = {
     # Tên thư mục trong vCenter Inventory muốn đặt máy ảo vào.
     # Mặc định khi không điền (comment): Kế thừa từ biến toàn cục 'vm_target_folder'.
     # folder_name = "<SPECIFIC_FOLDER_NAME>"
+
+    # [TÙY CHỌN] Datastore lưu trữ riêng cho máy ảo này:
+    # Tên Datastore trên vCenter muốn đặt máy ảo vào (ví dụ: "datastore1", "SAN-Storage-01").
+    # Mặc định khi không điền (comment): Kế thừa từ biến toàn cục 'vsphere_datastore'.
+    # datastore_name = "<SPECIFIC_DATASTORE_NAME>"
+
+    # [TÙY CHỌN] Máy chủ ESXi vật lý chỉ định để đặt máy ảo (Host Pinning):
+    # Địa chỉ IP hoặc FQDN của ESXi Host trong cụm Cluster muốn chạy máy ảo này.
+    # Mặc định khi không điền (comment): vCenter DRS tự động phân bổ máy ảo lên ESXi host phù hợp nhất trong Cluster.
+    # host_name = "<ESXI_HOST_IP_OR_FQDN>"
 
     # [TÙY CHỌN] Danh sách máy chủ DNS resolver riêng:
     # Danh sách địa chỉ IP máy chủ phân giải tên miền riêng cho máy ảo này.
@@ -142,6 +158,9 @@ vms = {
     # Thư mục riêng cho cụm database
     # folder_name = "<DB_FOLDER_NAME>"
 
+    # Datastore riêng cho cụm database
+    # datastore_name = "<DB_DATASTORE_NAME>"
+
     # Cấu hình 2 ổ đĩa phụ: 1 ổ cho dữ liệu DB, 1 ổ cho transaction log
     # extra_disks = [
     #   {
@@ -175,8 +194,18 @@ vms = {
     # Ví dụ khai báo role cho máy chủ Windows
     # role = "windows_server"
 
+    # [TÙY CHỌN] Mật khẩu Administrator riêng biệt cho máy ảo Windows này:
+    # Ghi đè mật khẩu riêng cho máy ảo này trong quá trình Sysprep.
+    # Mặc định khi không điền (comment): Kế thừa từ biến toàn cục 'windows_admin_password',
+    # hoặc giữ nguyên mật khẩu gốc của template nếu cả hai đều bỏ qua.
+    # admin_password = "<WINDOWS_VM_SPECIFIC_PASSWORD>"
+
     # [TÙY CHỌN] Tên Workgroup riêng cho máy ảo Windows này (mặc định: "WORKGROUP")
     # workgroup = "WORKGROUP"
+
+    # [TÙY CHỌN] Datastore và Host ESXi riêng
+    # datastore_name = "<SPECIFIC_DATASTORE_NAME>"
+    # host_name      = "<ESXI_HOST_IP_OR_FQDN>"
 
     # cpu_hot_add_enabled    = true
     # memory_hot_add_enabled = true

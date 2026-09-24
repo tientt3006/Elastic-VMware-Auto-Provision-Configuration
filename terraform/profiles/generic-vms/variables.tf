@@ -37,8 +37,9 @@ variable "vsphere_cluster" {
 }
 
 variable "vsphere_datastore" {
-  description = "Default Datastore name for virtual machine storage."
+  description = "Default Datastore name for virtual machine storage (optional if all VMs define datastore_name)."
   type        = string
+  default     = ""
 }
 
 variable "vsphere_template_name" {
@@ -156,6 +157,7 @@ variable "vms" {
     dns_servers            = optional(list(string), null)
     domain_name            = optional(string, null)
     workgroup              = optional(string, null)
+    admin_password         = optional(string, null)
     role                   = optional(string, "generic")
     extra_config           = optional(map(string), {})
   }))

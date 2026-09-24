@@ -147,6 +147,7 @@ variable "vms" {
     template_network_interface_type = optional(string, null)
     template_disk_thin_provisioned  = optional(bool, null)
     workgroup                       = optional(string, null)
+    admin_password                  = optional(string, null)
     extra_config                    = optional(map(string), {})
   }))
 }

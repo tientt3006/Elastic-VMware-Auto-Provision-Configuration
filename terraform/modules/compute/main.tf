@@ -65,7 +65,12 @@ resource "vsphere_virtual_machine" "vm" {
         for_each = can(regex("(?i)win", coalesce(try(each.value.template_guest_id, null), var.template_guest_id))) ? [1] : []
         content {
           computer_name  = substr(replace(each.value.hostname, "_", "-"), 0, 15)
-          admin_password = var.windows_admin_password != "" && var.windows_admin_password != null ? var.windows_admin_password : null
+          admin_password = try(
+            each.value.admin_password != null && each.value.admin_password != "" ? each.value.admin_password : (
+              var.windows_admin_password != null && var.windows_admin_password != "" ? var.windows_admin_password : null
+            ),
+            null
+          )
           workgroup      = coalesce(try(each.value.workgroup, null), var.windows_workgroup, "WORKGROUP")
           auto_logon     = false
         }
