@@ -118,6 +118,17 @@ variable "vms" {
     cpu_count                       = number
     memory_mb                       = number
     disk_size_gb                    = number
+    disk_thin_provisioned           = optional(bool, null)
+    disk_eagerly_scrub              = optional(bool, null)
+    extra_disks = optional(list(object({
+      size_gb          = number
+      label            = optional(string, null)
+      thin_provisioned = optional(bool, true)
+      eagerly_scrub    = optional(bool, false)
+      datastore_name   = optional(string, null)
+    })), [])
+    cpu_hot_add_enabled             = optional(bool, null)
+    memory_hot_add_enabled          = optional(bool, null)
     network_id                      = string
     ip_address                      = string
     netmask                         = number
@@ -127,7 +138,7 @@ variable "vms" {
     host_name                       = optional(string, null)
     folder_name                     = optional(string, null)
     domain_name                     = optional(string, null)
-    role                            = optional(string, "standard")
+    role                            = optional(string, "generic")
     template_name                   = optional(string, null)
     template_id                     = optional(string, null)
     template_guest_id               = optional(string, null)

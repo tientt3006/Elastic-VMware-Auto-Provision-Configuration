@@ -128,25 +128,36 @@ variable "ssh_public_key" {
 variable "vms" {
   description = "Map of virtual machines and their resource specifications."
   type = map(object({
-    name           = string
-    hostname       = string
-    vm_id          = optional(number, null)
-    template_name  = optional(string, null)
-    cpu_count      = number
-    memory_mb      = number
-    disk_size_gb   = number
-    network_name   = string
-    ip_address     = string
-    netmask        = number
-    gateway        = string
-    datastore_name = optional(string, null)
-    host_name      = optional(string, null)
-    folder_name    = optional(string, null)
-    dns_servers    = optional(list(string), null)
-    domain_name    = optional(string, null)
-    workgroup      = optional(string, null)
-    role           = optional(string, "generic")
-    extra_config   = optional(map(string), {})
+    name                   = string
+    hostname               = string
+    vm_id                  = optional(number, null)
+    template_name          = optional(string, null)
+    cpu_count              = number
+    memory_mb              = number
+    disk_size_gb           = number
+    disk_thin_provisioned  = optional(bool, null)
+    disk_eagerly_scrub     = optional(bool, null)
+    extra_disks = optional(list(object({
+      size_gb          = number
+      label            = optional(string, null)
+      thin_provisioned = optional(bool, true)
+      eagerly_scrub    = optional(bool, false)
+      datastore_name   = optional(string, null)
+    })), [])
+    cpu_hot_add_enabled    = optional(bool, null)
+    memory_hot_add_enabled = optional(bool, null)
+    network_name           = string
+    ip_address             = string
+    netmask                = number
+    gateway                = string
+    datastore_name         = optional(string, null)
+    host_name              = optional(string, null)
+    folder_name            = optional(string, null)
+    dns_servers            = optional(list(string), null)
+    domain_name            = optional(string, null)
+    workgroup              = optional(string, null)
+    role                   = optional(string, "generic")
+    extra_config           = optional(map(string), {})
   }))
 }
 

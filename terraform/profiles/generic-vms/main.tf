@@ -28,6 +28,23 @@ locals {
     var.vsphere_template_name != "" && var.vsphere_template_name != null ? [var.vsphere_template_name] : [],
     [for k, vm in var.vms : vm.template_name if vm.template_name != null && vm.template_name != ""]
   )))
+
+  extra_datastore_names = flatten([
+    for k, vm in var.vms : [
+      for d in coalesce(try(vm.extra_disks, null), []) : d.datastore_name if d.datastore_name != null && d.datastore_name != ""
+    ]
+  ])
+
+  all_custom_datastores = toset(compact(concat(
+    [for k, vm in var.vms : vm.datastore_name if vm.datastore_name != null && vm.datastore_name != ""],
+    local.extra_datastore_names
+  )))
+
+  all_custom_folders = toset(compact(concat(
+    var.vm_folders,
+    var.vm_target_folder != "" ? [var.vm_target_folder] : [],
+    [for k, vm in var.vms : vm.folder_name if vm.folder_name != null && vm.folder_name != ""]
+  )))
 }
 
 data "vsphere_virtual_machine" "source_templates" {
@@ -38,13 +55,13 @@ data "vsphere_virtual_machine" "source_templates" {
 
 # Dynamic Data Sources for Per-VM Overrides
 data "vsphere_datastore" "vm_datastores" {
-  for_each      = toset([for k, vm in var.vms : vm.datastore_name if vm.datastore_name != null])
+  for_each      = local.all_custom_datastores
   name          = each.value
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
 
 data "vsphere_host" "vm_hosts" {
-  for_each      = toset([for k, vm in var.vms : vm.host_name if vm.host_name != null])
+  for_each      = toset([for k, vm in var.vms : vm.host_name if vm.host_name != null && vm.host_name != ""])
   name          = each.value
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
@@ -56,7 +73,7 @@ module "folder" {
   source = "../../modules/folder"
 
   datacenter_id = data.vsphere_datacenter.datacenter.id
-  folder_names  = var.vm_folders
+  folder_names  = tolist(local.all_custom_folders)
   folder_type   = "vm"
 }
 

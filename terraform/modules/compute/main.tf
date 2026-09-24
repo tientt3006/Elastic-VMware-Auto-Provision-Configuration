@@ -17,7 +17,7 @@ resource "vsphere_virtual_machine" "vm" {
   # Inheritance and Override Pattern for Storage, Host, and Folder
   datastore_id   = try(var.datastore_mapping[each.value.datastore_name], var.datastore_id)
   host_system_id = try(var.host_mapping[each.value.host_name], null)
-  folder         = try(var.folder_mapping[each.value.folder_name], var.folder)
+  folder         = each.value.folder_name != null && each.value.folder_name != "" ? try(var.folder_mapping[each.value.folder_name], each.value.folder_name) : var.folder
 
   num_cpus = each.value.cpu_count
   memory   = each.value.memory_mb
@@ -25,8 +25,8 @@ resource "vsphere_virtual_machine" "vm" {
   guest_id = coalesce(try(each.value.template_guest_id, null), var.template_guest_id)
   firmware = coalesce(try(each.value.template_firmware, null), var.template_firmware)
 
-  memory_hot_add_enabled = true
-  cpu_hot_add_enabled    = true
+  memory_hot_add_enabled = coalesce(try(each.value.memory_hot_add_enabled, null), true)
+  cpu_hot_add_enabled    = coalesce(try(each.value.cpu_hot_add_enabled, null), true)
   cpu_hot_remove_enabled = true
 
   scsi_type = coalesce(try(each.value.template_scsi_type, null), var.template_scsi_type)
@@ -39,7 +39,21 @@ resource "vsphere_virtual_machine" "vm" {
   disk {
     label            = "disk0"
     size             = each.value.disk_size_gb
-    thin_provisioned = coalesce(try(each.value.template_disk_thin_provisioned, null), var.template_disk_thin_provisioned)
+    thin_provisioned = coalesce(try(each.value.disk_thin_provisioned, null), try(each.value.template_disk_thin_provisioned, null), var.template_disk_thin_provisioned)
+    eagerly_scrub    = coalesce(try(each.value.disk_eagerly_scrub, null), false)
+    unit_number      = 0
+  }
+
+  dynamic "disk" {
+    for_each = coalesce(try(each.value.extra_disks, null), [])
+    content {
+      label            = coalesce(disk.value.label, "disk${disk.key + 1}")
+      size             = disk.value.size_gb
+      thin_provisioned = coalesce(try(disk.value.thin_provisioned, null), true)
+      eagerly_scrub    = coalesce(try(disk.value.eagerly_scrub, null), false)
+      unit_number      = disk.key >= 6 ? disk.key + 2 : disk.key + 1
+      datastore_id     = disk.value.datastore_name != null && disk.value.datastore_name != "" ? try(var.datastore_mapping[disk.value.datastore_name], null) : null
+    }
   }
 
   clone {
@@ -71,7 +85,7 @@ resource "vsphere_virtual_machine" "vm" {
         ipv4_netmask = each.value.netmask
       }
       ipv4_gateway    = each.value.gateway
-      dns_server_list = coalesce(each.value.dns_servers, var.default_dns_servers)
+      dns_server_list = try(length(each.value.dns_servers) > 0 ? each.value.dns_servers : null, var.default_dns_servers)
     }
   }
 
