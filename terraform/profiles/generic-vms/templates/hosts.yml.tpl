@@ -4,9 +4,7 @@
 # ==============================================================================
 all:
   vars:
-    ansible_user: ${ssh_username}
-    ansible_ssh_private_key_file: ~/.ssh/id_ed25519
-    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    ansible_python_interpreter: auto_silent
 
   children:
 %{ for role in distinct([for k, vm in vms : vm.role if vm.role != null && vm.role != "" && vm.role != "generic"]) ~}
@@ -16,13 +14,52 @@ all:
 %{ if vm.role == role ~}
         ${vm.name}:
           ansible_host: ${vm.ip_address}
+%{ if can(regex("(?i)win", coalesce(try(vm.template_name, ""), ""))) ~}
+          ansible_user: Administrator
+          ansible_connection: winrm
+          ansible_winrm_server_cert_validation: ignore
+          ansible_port: 5985
+%{ endif ~}
 %{ endif ~}
 %{ endfor ~}
 
 %{ endfor ~}
+    linux_nodes:
+      vars:
+        ansible_user: ${ssh_username}
+        ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+      hosts:
+%{ for k, vm in vms ~}
+%{ if !can(regex("(?i)win", coalesce(try(vm.template_name, ""), ""))) ~}
+        ${vm.name}:
+          ansible_host: ${vm.ip_address}
+%{ endif ~}
+%{ endfor ~}
+
+    windows_nodes:
+      vars:
+        ansible_user: Administrator
+        ansible_connection: winrm
+        ansible_winrm_server_cert_validation: ignore
+        ansible_port: 5985
+      hosts:
+%{ for k, vm in vms ~}
+%{ if can(regex("(?i)win", coalesce(try(vm.template_name, ""), ""))) ~}
+        ${vm.name}:
+          ansible_host: ${vm.ip_address}
+%{ endif ~}
+%{ endfor ~}
+
     all_nodes:
       hosts:
 %{ for k, vm in vms ~}
         ${vm.name}:
           ansible_host: ${vm.ip_address}
+%{ if can(regex("(?i)win", coalesce(try(vm.template_name, ""), ""))) ~}
+          ansible_user: Administrator
+          ansible_connection: winrm
+          ansible_winrm_server_cert_validation: ignore
+          ansible_port: 5985
+%{ endif ~}
 %{ endfor ~}

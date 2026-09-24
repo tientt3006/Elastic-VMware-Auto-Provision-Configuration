@@ -22,8 +22,17 @@ data "vsphere_datastore" "datastore" {
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
 
-data "vsphere_virtual_machine" "source_template" {
-  name          = var.vsphere_template_name
+# Dynamic Multi-Template Discovery
+locals {
+  required_template_names = toset(compact(concat(
+    var.vsphere_template_name != "" && var.vsphere_template_name != null ? [var.vsphere_template_name] : [],
+    [for k, vm in var.vms : vm.template_name if vm.template_name != null && vm.template_name != ""]
+  )))
+}
+
+data "vsphere_virtual_machine" "source_templates" {
+  for_each      = local.required_template_names
+  name          = each.value
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
 
@@ -81,31 +90,43 @@ data "vsphere_network" "networks" {
 module "compute" {
   source = "../../modules/compute"
 
-  datacenter_id                   = data.vsphere_datacenter.datacenter.id
-  resource_pool_id                = data.vsphere_compute_cluster.cluster.resource_pool_id
-  datastore_id                    = data.vsphere_datastore.datastore.id
-  template_id                     = data.vsphere_virtual_machine.source_template.id
-  template_guest_id               = data.vsphere_virtual_machine.source_template.guest_id
-  template_firmware               = data.vsphere_virtual_machine.source_template.firmware
-  template_scsi_type              = data.vsphere_virtual_machine.source_template.scsi_type
-  template_network_interface_type = data.vsphere_virtual_machine.source_template.network_interface_types[0]
-  template_disk_thin_provisioned  = data.vsphere_virtual_machine.source_template.disks[0].thin_provisioned
+  datacenter_id    = data.vsphere_datacenter.datacenter.id
+  resource_pool_id = data.vsphere_compute_cluster.cluster.resource_pool_id
+  datastore_id     = data.vsphere_datastore.datastore.id
+
+  # Global fallbacks (used if a VM does not override)
+  template_id                     = length(local.required_template_names) > 0 ? data.vsphere_virtual_machine.source_templates[tolist(local.required_template_names)[0]].id : ""
+  template_guest_id               = length(local.required_template_names) > 0 ? data.vsphere_virtual_machine.source_templates[tolist(local.required_template_names)[0]].guest_id : "ubuntu64Guest"
+  template_firmware               = length(local.required_template_names) > 0 ? data.vsphere_virtual_machine.source_templates[tolist(local.required_template_names)[0]].firmware : "efi"
+  template_scsi_type              = length(local.required_template_names) > 0 ? data.vsphere_virtual_machine.source_templates[tolist(local.required_template_names)[0]].scsi_type : "pvscsi"
+  template_network_interface_type = length(local.required_template_names) > 0 ? data.vsphere_virtual_machine.source_templates[tolist(local.required_template_names)[0]].network_interface_types[0] : "vmxnet3"
+  template_disk_thin_provisioned  = length(local.required_template_names) > 0 ? data.vsphere_virtual_machine.source_templates[tolist(local.required_template_names)[0]].disks[0].thin_provisioned : true
 
   # Default Global Fallbacks
-  folder                          = var.vm_target_folder != "" ? try(module.folder.folder_paths[var.vm_target_folder], null) : null
-  default_domain_name             = var.default_domain_name
-  default_dns_servers             = var.default_dns_servers
-  ssh_public_key                  = var.ssh_public_key
-  ssh_username                    = var.ssh_username
+  folder                 = var.vm_target_folder != "" ? try(module.folder.folder_paths[var.vm_target_folder], null) : null
+  default_domain_name    = var.default_domain_name
+  default_dns_servers    = var.default_dns_servers
+  ssh_public_key         = var.ssh_public_key
+  ssh_username           = var.ssh_username
+  windows_admin_password = var.windows_admin_password
+  windows_workgroup      = var.windows_workgroup
 
   # Override Mappings
-  datastore_mapping               = { for k, v in data.vsphere_datastore.vm_datastores : k => v.id }
-  host_mapping                    = { for k, v in data.vsphere_host.vm_hosts : k => v.id }
-  folder_mapping                  = module.folder.folder_paths
+  datastore_mapping = { for k, v in data.vsphere_datastore.vm_datastores : k => v.id }
+  host_mapping      = { for k, v in data.vsphere_host.vm_hosts : k => v.id }
+  folder_mapping    = module.folder.folder_paths
 
   vms = {
     for k, vm in var.vms : k => merge(vm, {
       network_id = data.vsphere_network.networks[vm.network_name].id
+
+      # Dynamic Per-VM Template Metadata Resolution
+      template_id                     = data.vsphere_virtual_machine.source_templates[vm.template_name != null && vm.template_name != "" ? vm.template_name : var.vsphere_template_name].id
+      template_guest_id               = data.vsphere_virtual_machine.source_templates[vm.template_name != null && vm.template_name != "" ? vm.template_name : var.vsphere_template_name].guest_id
+      template_firmware               = data.vsphere_virtual_machine.source_templates[vm.template_name != null && vm.template_name != "" ? vm.template_name : var.vsphere_template_name].firmware
+      template_scsi_type              = data.vsphere_virtual_machine.source_templates[vm.template_name != null && vm.template_name != "" ? vm.template_name : var.vsphere_template_name].scsi_type
+      template_network_interface_type = data.vsphere_virtual_machine.source_templates[vm.template_name != null && vm.template_name != "" ? vm.template_name : var.vsphere_template_name].network_interface_types[0]
+      template_disk_thin_provisioned  = data.vsphere_virtual_machine.source_templates[vm.template_name != null && vm.template_name != "" ? vm.template_name : var.vsphere_template_name].disks[0].thin_provisioned
     })
   }
 
@@ -135,7 +156,7 @@ resource "local_file" "ansible_inventory" {
   count           = var.generate_ansible_inventory ? 1 : 0
   filename        = var.ansible_inventory_path != "" ? var.ansible_inventory_path : "${path.module}/hosts.yml"
   file_permission = "0644"
-  content         = templatefile("${path.module}/templates/hosts.yml.tpl", {
+  content = templatefile("${path.module}/templates/hosts.yml.tpl", {
     vms          = var.vms
     ssh_username = var.ssh_username
   })

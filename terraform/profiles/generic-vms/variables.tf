@@ -42,8 +42,22 @@ variable "vsphere_datastore" {
 }
 
 variable "vsphere_template_name" {
-  description = "Name of the existing golden template created by Packer."
+  description = "Default golden template name created by Packer (used if a VM does not specify template_name)."
   type        = string
+  default     = ""
+}
+
+variable "windows_admin_password" {
+  description = "Administrator password to configure during Windows guest customization (optional, null to preserve template password)."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "windows_workgroup" {
+  description = "Default workgroup name for Windows guest customization."
+  type        = string
+  default     = "WORKGROUP"
 }
 
 # ==============================================================================
@@ -117,6 +131,7 @@ variable "vms" {
     name           = string
     hostname       = string
     vm_id          = optional(number, null)
+    template_name  = optional(string, null)
     cpu_count      = number
     memory_mb      = number
     disk_size_gb   = number
@@ -129,6 +144,7 @@ variable "vms" {
     folder_name    = optional(string, null)
     dns_servers    = optional(list(string), null)
     domain_name    = optional(string, null)
+    workgroup      = optional(string, null)
     role           = optional(string, "generic")
     extra_config   = optional(map(string), {})
   }))

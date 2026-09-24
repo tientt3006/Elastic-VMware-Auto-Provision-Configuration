@@ -21,34 +21,51 @@ resource "vsphere_virtual_machine" "vm" {
 
   num_cpus = each.value.cpu_count
   memory   = each.value.memory_mb
-  guest_id = var.template_guest_id
-  firmware = var.template_firmware
+
+  guest_id = coalesce(try(each.value.template_guest_id, null), var.template_guest_id)
+  firmware = coalesce(try(each.value.template_firmware, null), var.template_firmware)
 
   memory_hot_add_enabled = true
   cpu_hot_add_enabled    = true
   cpu_hot_remove_enabled = true
 
-  scsi_type = var.template_scsi_type
+  scsi_type = coalesce(try(each.value.template_scsi_type, null), var.template_scsi_type)
 
   network_interface {
     network_id   = each.value.network_id
-    adapter_type = var.template_network_interface_type
+    adapter_type = coalesce(try(each.value.template_network_interface_type, null), var.template_network_interface_type)
   }
 
   disk {
     label            = "disk0"
     size             = each.value.disk_size_gb
-    thin_provisioned = var.template_disk_thin_provisioned
+    thin_provisioned = coalesce(try(each.value.template_disk_thin_provisioned, null), var.template_disk_thin_provisioned)
   }
 
   clone {
-    template_uuid = var.template_id
+    template_uuid = coalesce(try(each.value.template_id, null), var.template_id)
 
     customize {
-      linux_options {
-        host_name = each.value.hostname
-        domain    = coalesce(each.value.domain_name, var.default_domain_name)
+      # Windows Guest Customization (Sysprep)
+      dynamic "windows_options" {
+        for_each = can(regex("(?i)win", coalesce(try(each.value.template_guest_id, null), var.template_guest_id))) ? [1] : []
+        content {
+          computer_name  = substr(replace(each.value.hostname, "_", "-"), 0, 15)
+          admin_password = var.windows_admin_password != "" && var.windows_admin_password != null ? var.windows_admin_password : null
+          workgroup      = coalesce(try(each.value.workgroup, null), var.windows_workgroup, "WORKGROUP")
+          auto_logon     = false
+        }
       }
+
+      # Linux Guest Customization (Open-VM-Tools / Cloud-Init)
+      dynamic "linux_options" {
+        for_each = !can(regex("(?i)win", coalesce(try(each.value.template_guest_id, null), var.template_guest_id))) ? [1] : []
+        content {
+          host_name = each.value.hostname
+          domain    = coalesce(each.value.domain_name, var.default_domain_name)
+        }
+      }
+
       network_interface {
         ipv4_address = each.value.ip_address
         ipv4_netmask = each.value.netmask
@@ -65,19 +82,19 @@ resource "vsphere_virtual_machine" "vm" {
     merge(
       each.value.vm_id != null ? { "guestinfo.node.id" = tostring(each.value.vm_id) } : {},
       each.value.role != null && each.value.role != "" && each.value.role != "generic" && each.value.role != "standard" ? { "guestinfo.node.role" = each.value.role } : {},
-      {
-        "guestinfo.metadata"          = base64encode(<<-EOF
+      !can(regex("(?i)win", coalesce(try(each.value.template_guest_id, null), var.template_guest_id))) ? {
+        "guestinfo.metadata" = base64encode(<<-EOF
           instance-id: "${each.value.name}"
           local-hostname: "${each.value.hostname}"
         EOF
         )
-        "guestinfo.metadata.encoding"  = "base64"
-      "guestinfo.userdata"          = base64encode(<<-EOF
+        "guestinfo.metadata.encoding" = "base64"
+        "guestinfo.userdata" = base64encode(<<-EOF
         #cloud-config
         hostname: ${each.value.hostname}
         fqdn: ${each.value.hostname}.${coalesce(each.value.domain_name, var.default_domain_name)}
         manage_etc_hosts: true
-%{ if var.ssh_username != "" && !can(regex("<.*>", var.ssh_username)) && var.ssh_public_key != "" && !can(regex("<.*>", var.ssh_public_key)) ~}
+%{if var.ssh_username != "" && !can(regex("<.*>", var.ssh_username)) && var.ssh_public_key != "" && !can(regex("<.*>", var.ssh_public_key))~}
 
         runcmd:
           - mkdir -p /home/${var.ssh_username}/.ssh
@@ -86,11 +103,11 @@ resource "vsphere_virtual_machine" "vm" {
           - chown -R ${var.ssh_username}:${var.ssh_username} /home/${var.ssh_username}/.ssh
           - chmod 700 /home/${var.ssh_username}/.ssh
           - chmod 600 /home/${var.ssh_username}/.ssh/authorized_keys
-%{ endif ~}
+%{endif~}
       EOF
-      )
-        "guestinfo.userdata.encoding"  = "base64"
-      }
+        )
+        "guestinfo.userdata.encoding" = "base64"
+      } : {}
     ),
     try(each.value.extra_config, {})
   )

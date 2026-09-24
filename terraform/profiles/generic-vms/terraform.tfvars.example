@@ -11,7 +11,12 @@ vsphere_insecure_connection = true
 vsphere_datacenter    = "<VCENTER_DATACENTER>"
 vsphere_cluster       = "<VCENTER_CLUSTER>"
 vsphere_datastore     = "<VCENTER_DATASTORE>"
-vsphere_template_name = "<VM_TEMPLATE_NAME>"
+# Default Golden Template fallback (used if a VM in 'vms' does not specify 'template_name')
+vsphere_template_name = "<DEFAULT_VM_TEMPLATE_NAME>"
+
+# [TÙY CHỌN] Mật khẩu Administrator cho máy ảo Windows qua Sysprep (bỏ qua nếu muốn giữ mật khẩu gốc của template)
+# windows_admin_password = "<WINDOWS_ADMIN_PASSWORD>"
+# windows_workgroup      = "WORKGROUP"
 
 # ==============================================================================
 # Inventory Folder Configuration
@@ -30,7 +35,7 @@ default_domain_name = "lab.local"
 default_dns_servers = ["8.8.8.8", "1.1.1.1"]
 
 # ==============================================================================
-# OS Credentials (Ansible Integration)
+# OS Credentials (Ansible Integration for Linux VMs)
 # ==============================================================================
 ssh_username   = "<SSH_USER>"
 ssh_public_key = "<YOUR_SSH_PUBLIC_KEY>"
@@ -42,40 +47,52 @@ enable_drs_rule    = false
 drs_rule_mandatory = false
 
 # ==============================================================================
-# Virtual Machine Workloads (Customizable Map of N Virtual Machines)
+# Virtual Machine Workloads (Hỗ trợ đa hệ điều hành đồng thời: Ubuntu, Rocky, Windows)
 # ==============================================================================
 vms = {
-  "web_01" = {
-    name         = "<VM_NAME_1>"
-    hostname     = "web-01"
-    cpu_count    = 2
-    memory_mb    = 4096
-    disk_size_gb = 40
-    network_name = "<VCENTER_NETWORK>"
-    ip_address   = "<VM_IP_1>"
-    netmask      = 24
-    gateway      = "<GATEWAY_IP>"
-    # [TÙY CHỌN] Tên nhóm trong Ansible inventory (nếu không khai báo, mặc định là "generic")
-    role         = "web_server"
-
-    # [TÙY CHỌN - GHI ĐÈ] Ghi đè cấu hình hạ tầng cho từng máy ảo riêng biệt
-    # host_name      = "<ESXI_HOST_01>"
-    # datastore_name = "<DS_LOCAL_1>"
-    # folder_name    = "<CUSTOM_FOLDER_NAME>"
-    # dns_servers    = ["1.1.1.1", "8.8.8.8"]
-    # domain_name    = "custom.local"
+  # 1. Máy ảo Ubuntu Linux (sử dụng template_name riêng hoặc fallback)
+  "web_ubuntu" = {
+    name          = "<VM_NAME_1>"
+    hostname      = "web-ubuntu-01"
+    template_name = "template-ubuntu-24.04"
+    cpu_count     = 2
+    memory_mb     = 4096
+    disk_size_gb  = 40
+    network_name  = "<VCENTER_NETWORK>"
+    ip_address    = "<VM_IP_1>"
+    netmask       = 24
+    gateway       = "<GATEWAY_IP>"
+    role          = "web_server"
   },
-  "db_01" = {
-    name         = "<VM_NAME_2>"
-    hostname     = "db-01"
-    cpu_count    = 4
-    memory_mb    = 8192
-    disk_size_gb = 80
-    network_name = "<VCENTER_NETWORK>"
-    ip_address   = "<VM_IP_2>"
-    netmask      = 24
-    gateway      = "<GATEWAY_IP>"
-    role         = "database"
+
+  # 2. Máy ảo Rocky Linux 9 (sử dụng template Rocky Linux)
+  "app_rocky" = {
+    name          = "<VM_NAME_2>"
+    hostname      = "app-rocky-01"
+    template_name = "template-rocky-9"
+    cpu_count     = 2
+    memory_mb     = 4096
+    disk_size_gb  = 40
+    network_name  = "<VCENTER_NETWORK>"
+    ip_address    = "<VM_IP_2>"
+    netmask       = 24
+    gateway       = "<GATEWAY_IP>"
+    role          = "app_server"
+  },
+
+  # 3. Máy ảo Windows Server (tự động cấu hình sysprep windows_options & WinRM)
+  "win_srv" = {
+    name          = "<VM_NAME_3>"
+    hostname      = "win-srv-01"
+    template_name = "template-windows-server-2025"
+    cpu_count     = 4
+    memory_mb     = 6144
+    disk_size_gb  = 60
+    network_name  = "<VCENTER_NETWORK>"
+    ip_address    = "<VM_IP_3>"
+    netmask       = 24
+    gateway       = "<GATEWAY_IP>"
+    role          = "windows_server"
   }
 }
 
