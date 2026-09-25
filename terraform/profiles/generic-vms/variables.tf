@@ -37,13 +37,28 @@ variable "vsphere_cluster" {
 }
 
 variable "vsphere_datastore" {
-  description = "Default Datastore name for virtual machine storage."
+  description = "Default Datastore name for virtual machine storage (optional if all VMs define datastore_name)."
   type        = string
+  default     = ""
 }
 
 variable "vsphere_template_name" {
-  description = "Name of the existing golden template created by Packer."
+  description = "Default golden template name created by Packer (used if a VM does not specify template_name)."
   type        = string
+  default     = ""
+}
+
+variable "windows_admin_password" {
+  description = "Administrator password to configure during Windows guest customization (optional, null to preserve template password)."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "windows_workgroup" {
+  description = "Default workgroup name for Windows guest customization."
+  type        = string
+  default     = "WORKGROUP"
 }
 
 # ==============================================================================
@@ -114,23 +129,37 @@ variable "ssh_public_key" {
 variable "vms" {
   description = "Map of virtual machines and their resource specifications."
   type = map(object({
-    name           = string
-    hostname       = string
-    vm_id          = optional(number, null)
-    cpu_count      = number
-    memory_mb      = number
-    disk_size_gb   = number
-    network_name   = string
-    ip_address     = string
-    netmask        = number
-    gateway        = string
-    datastore_name = optional(string, null)
-    host_name      = optional(string, null)
-    folder_name    = optional(string, null)
-    dns_servers    = optional(list(string), null)
-    domain_name    = optional(string, null)
-    role           = optional(string, "generic")
-    extra_config   = optional(map(string), {})
+    name                   = string
+    hostname               = string
+    vm_id                  = optional(number, null)
+    template_name          = optional(string, null)
+    cpu_count              = number
+    memory_mb              = number
+    disk_size_gb           = number
+    disk_thin_provisioned  = optional(bool, null)
+    disk_eagerly_scrub     = optional(bool, null)
+    extra_disks = optional(list(object({
+      size_gb          = number
+      label            = optional(string, null)
+      thin_provisioned = optional(bool, true)
+      eagerly_scrub    = optional(bool, false)
+      datastore_name   = optional(string, null)
+    })), [])
+    cpu_hot_add_enabled    = optional(bool, null)
+    memory_hot_add_enabled = optional(bool, null)
+    network_name           = string
+    ip_address             = string
+    netmask                = number
+    gateway                = string
+    datastore_name         = optional(string, null)
+    host_name              = optional(string, null)
+    folder_name            = optional(string, null)
+    dns_servers            = optional(list(string), null)
+    domain_name            = optional(string, null)
+    workgroup              = optional(string, null)
+    admin_password         = optional(string, null)
+    role                   = optional(string, "generic")
+    extra_config           = optional(map(string), {})
   }))
 }
 

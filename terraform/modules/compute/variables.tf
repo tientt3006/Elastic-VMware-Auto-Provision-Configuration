@@ -87,34 +87,68 @@ variable "default_dns_servers" {
 variable "ssh_username" {
   description = "The OS username used for SSH connections."
   type        = string
+  default     = ""
 }
 
 variable "ssh_public_key" {
   description = "Public SSH key to inject into authorized_keys for Ansible automation."
   type        = string
-  default     = "<YOUR_SSH_PUBLIC_KEY>"
+  default     = ""
+}
+
+variable "windows_admin_password" {
+  description = "Administrator password to configure during Windows guest customization (optional, null to preserve template password)."
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "windows_workgroup" {
+  description = "Default workgroup name for Windows guest customization."
+  type        = string
+  default     = "WORKGROUP"
 }
 
 variable "vms" {
   description = "Map of virtual machines and their resource specifications."
   type = map(object({
-    name         = string
-    hostname     = string
-    vm_id        = optional(number, null)
-    cpu_count    = number
-    memory_mb    = number
-    disk_size_gb = number
-    network_id   = string
-    ip_address   = string
-    netmask      = number
-    gateway      = string
-    dns_servers  = optional(list(string), null)
-    datastore_name = optional(string, null)
-    host_name      = optional(string, null)
-    folder_name    = optional(string, null)
-    domain_name  = optional(string, null)
-    role         = optional(string, "standard")
-    extra_config = optional(map(string), {})
+    name                            = string
+    hostname                        = string
+    vm_id                           = optional(number, null)
+    cpu_count                       = number
+    memory_mb                       = number
+    disk_size_gb                    = number
+    disk_thin_provisioned           = optional(bool, null)
+    disk_eagerly_scrub              = optional(bool, null)
+    extra_disks = optional(list(object({
+      size_gb          = number
+      label            = optional(string, null)
+      thin_provisioned = optional(bool, true)
+      eagerly_scrub    = optional(bool, false)
+      datastore_name   = optional(string, null)
+    })), [])
+    cpu_hot_add_enabled             = optional(bool, null)
+    memory_hot_add_enabled          = optional(bool, null)
+    network_id                      = string
+    ip_address                      = string
+    netmask                         = number
+    gateway                         = string
+    dns_servers                     = optional(list(string), null)
+    datastore_name                  = optional(string, null)
+    host_name                       = optional(string, null)
+    folder_name                     = optional(string, null)
+    domain_name                     = optional(string, null)
+    role                            = optional(string, "generic")
+    template_name                   = optional(string, null)
+    template_id                     = optional(string, null)
+    template_guest_id               = optional(string, null)
+    template_firmware               = optional(string, null)
+    template_scsi_type              = optional(string, null)
+    template_network_interface_type = optional(string, null)
+    template_disk_thin_provisioned  = optional(bool, null)
+    workgroup                       = optional(string, null)
+    admin_password                  = optional(string, null)
+    extra_config                    = optional(map(string), {})
   }))
-
 }
+
