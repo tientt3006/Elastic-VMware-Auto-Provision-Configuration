@@ -170,7 +170,9 @@ sync_packer_vars_from_terraform() {
     [[ ! -f "${pkr_file}" ]] && return 0
 
     local tf_file=""
-    for candidate in "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" \
+    for candidate in "${REPO_ROOT}/terraform/profiles/bvnt-oracle-linux/terraform.tfvars" \
+                     "${REPO_ROOT}/terraform/profiles/bvnt-windows-server/terraform.tfvars" \
+                     "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" \
                      "${REPO_ROOT}/terraform/profiles/elastic-stack/terraform.tfvars"; do
         if [[ -f "${candidate}" ]]; then
             local test_server

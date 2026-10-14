@@ -23,6 +23,7 @@ source "vsphere-iso" "windows-server-2025" {
   # --- vSphere Infrastructure Placement ---
   datacenter    = var.vcenter_datacenter
   cluster       = var.vcenter_cluster
+  host          = var.vcenter_host != "" ? var.vcenter_host : null
   datastore     = var.vcenter_datastore
   folder        = var.vcenter_folder
   resource_pool = var.vcenter_resource_pool

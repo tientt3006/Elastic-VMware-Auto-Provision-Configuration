@@ -77,7 +77,10 @@ ensure_govc_session() {
 
     # 2. Tra cứu từ tệp Terraform tfvars nếu chưa có
     if [[ -z "${detected_server}" || "${detected_server}" == *"<"*">"* ]]; then
-        for tf_path in "${repo_base}/terraform/profiles/generic-vms/terraform.tfvars" "${repo_base}/terraform/profiles/elastic-stack/terraform.tfvars"; do
+        for tf_path in "${repo_base}/terraform/profiles/bvnt-oracle-linux/terraform.tfvars" \
+                       "${repo_base}/terraform/profiles/bvnt-windows-server/terraform.tfvars" \
+                       "${repo_base}/terraform/profiles/generic-vms/terraform.tfvars" \
+                       "${repo_base}/terraform/profiles/elastic-stack/terraform.tfvars"; do
             if [[ -f "${tf_path}" ]]; then
                 local s u
                 s=$(grep -E '^\s*vsphere_server\s*=' "${tf_path}" | head -n 1 | cut -d'"' -f2 || true)

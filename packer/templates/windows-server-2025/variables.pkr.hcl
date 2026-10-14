@@ -35,6 +35,12 @@ variable "vcenter_cluster" {
   description = "Target vSphere Compute Cluster name hosting ESXi hypervisors."
 }
 
+variable "vcenter_host" {
+  type        = string
+  description = "Target ESXi host within the cluster (optional, useful for clusters with disconnected hosts)."
+  default     = ""
+}
+
 variable "vcenter_datastore" {
   type        = string
   description = "Target datastore name used for VM disk allocation."

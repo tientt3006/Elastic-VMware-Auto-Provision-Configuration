@@ -1,0 +1,63 @@
+# ==============================================================================
+# Terraform Variables Assignment - Windows Server 2025 Profile (BVNT Site)
+# Target Environment: vcsa.bvnttwhcm.int
+# ==============================================================================
+
+vsphere_server              = "vcsa.bvnttwhcm.int"
+vsphere_user                = "administrator@vsphere.local"
+vsphere_password            = "" # Mật khẩu nạp an toàn từ RAM qua run.sh (TF_VAR_vsphere_password)
+vsphere_insecure_connection = true
+
+# Infrastructure Placement
+vsphere_datacenter    = "DC"
+vsphere_cluster       = "BVNT-Cluster"
+vsphere_host          = "10.0.6.101" # Single active ESXi host
+vsphere_datastore     = "DS-LD01-SSD"
+vsphere_resource_pool = "Resources"
+vsphere_template_name = "tpl-windows-server-2025-golden"
+vm_target_folder      = "HIS-EMR VM"
+
+# Windows Guest Customization
+windows_admin_password = "ayBHCMhtnnd2026"
+windows_timezone_code  = 205 # SE Asia Standard Time (UTC+07:00)
+windows_workgroup      = "WORKGROUP"
+default_domain_name    = "bvnttwhcm.int"
+default_dns_servers    = ["8.8.8.8", "8.8.4.4"]
+
+generate_ansible_inventory = true
+
+# ==============================================================================
+# Virtual Machine Workloads: 1 Web Server + 1 Database Server (Windows 2025)
+# Sizing based on technical requirements:
+# - Web Server: 8 vCPU, 16 GB RAM, 500 GB Disk, Portgroup APP_12, IP 10.0.2.42
+# - Database Server: 16 vCPU, 32 GB RAM, 500 GB Disk, Portgroup DB_17, IP 10.0.7.42
+# ==============================================================================
+vms = {
+  # Server 1: Web Server (Windows Server 2025)
+  "web" = {
+    name         = "WEB-BVNT-01"
+    hostname     = "WEB-BVNT-01"
+    cpu_count    = 8
+    memory_mb    = 16384
+    disk_size_gb = 500
+    network_name = "APP_12"
+    ip_address   = "10.0.2.42"
+    netmask      = 24
+    gateway      = "10.0.2.1"
+    role         = "web"
+  }
+
+  # Server 2: Database Server (Windows Server 2025)
+  "database" = {
+    name         = "DB-BVNT-02"
+    hostname     = "DB-BVNT-02"
+    cpu_count    = 16
+    memory_mb    = 32768
+    disk_size_gb = 500
+    network_name = "DB_17"
+    ip_address   = "10.0.7.42"
+    netmask      = 24
+    gateway      = "10.0.7.1"
+    role         = "db"
+  }
+}

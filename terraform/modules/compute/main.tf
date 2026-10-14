@@ -16,7 +16,7 @@ resource "vsphere_virtual_machine" "vm" {
 
   # Inheritance and Override Pattern for Storage, Host, and Folder
   datastore_id   = try(var.datastore_mapping[each.value.datastore_name], var.datastore_id)
-  host_system_id = try(var.host_mapping[each.value.host_name], null)
+  host_system_id = try(var.host_mapping[each.value.host_name], var.host_system_id, null)
   folder         = each.value.folder_name != null && each.value.folder_name != "" ? try(var.folder_mapping[each.value.folder_name], each.value.folder_name) : var.folder
 
   num_cpus = each.value.cpu_count
@@ -72,6 +72,7 @@ resource "vsphere_virtual_machine" "vm" {
             null
           )
           workgroup      = coalesce(try(each.value.workgroup, null), var.windows_workgroup, "WORKGROUP")
+          time_zone      = try(each.value.time_zone, var.windows_timezone_code, null)
           auto_logon     = false
         }
       }
@@ -82,6 +83,7 @@ resource "vsphere_virtual_machine" "vm" {
         content {
           host_name = each.value.hostname
           domain    = coalesce(each.value.domain_name, var.default_domain_name)
+          time_zone = try(each.value.timezone, var.timezone, null)
         }
       }
 

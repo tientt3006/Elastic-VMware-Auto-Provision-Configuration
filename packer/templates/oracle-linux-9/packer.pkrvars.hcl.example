@@ -1,0 +1,40 @@
+# ==============================================================================
+# Variables Definition File: Oracle Linux 9 Template Pipeline (BVNT Site)
+# ==============================================================================
+
+# --- vCenter Server Credentials & Target Host ---
+# Mật khẩu vcenter_password được nạp an toàn từ RAM qua biến PKR_VAR_vcenter_password
+vcenter_server              = "vcsa.bvnttwhcm.int"
+vcenter_user                = "administrator@vsphere.local"
+vcenter_insecure_connection = true
+
+# --- vSphere Topology Placement ---
+vcenter_datacenter    = "DC"
+vcenter_cluster       = "BVNT-Cluster"
+vcenter_host          = "10.0.6.101" # Single active ESXi host
+vcenter_datastore     = "DS-LD01-SSD"
+vcenter_network       = "TMP_Internet_VM"
+vcenter_folder        = "Template"
+vcenter_resource_pool = "Resources"
+
+# --- Removable Media Configuration ---
+iso_paths = [
+  "[DS-LD01-SSD] iso/OracleLinux-R9-U8-x86_64-dvd.iso"
+]
+
+# --- Target Virtual Machine Specifications ---
+vm_name          = "tpl-oracle-linux-9-golden"
+vm_guest_os_type = "oracleLinux9_64Guest"
+vm_firmware      = "efi"
+boot_order       = "disk,cdrom"
+
+# --- Compute Sizing during Build ---
+vm_cpu_cores = 2
+vm_mem_size  = 4096
+vm_disk_size = 40960
+vm_disk_thin = true
+
+# --- Communicator Specification (SSH) ---
+# Mật khẩu ssh_password được nạp an toàn từ RAM qua biến PKR_VAR_ssh_password
+ssh_username = "sysadmin"
+ssh_timeout  = "30m"

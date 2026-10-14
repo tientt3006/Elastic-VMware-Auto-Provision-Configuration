@@ -1,0 +1,63 @@
+# ==============================================================================
+# Terraform Variables Assignment - Oracle Linux 9 Profile (BVNT Site)
+# Target Environment: vcsa.bvnttwhcm.int
+# ==============================================================================
+
+vsphere_server              = "vcsa.bvnttwhcm.int"
+vsphere_user                = "administrator@vsphere.local"
+vsphere_password            = "" # Mật khẩu nạp an toàn từ RAM qua run.sh (TF_VAR_vsphere_password)
+vsphere_insecure_connection = true
+
+# Infrastructure Placement
+vsphere_datacenter    = "DC"
+vsphere_cluster       = "BVNT-Cluster"
+vsphere_host          = "10.0.6.101" # Single active ESXi host
+vsphere_datastore     = "DS-LD01-SSD"
+vsphere_resource_pool = "Resources"
+vsphere_template_name = "tpl-oracle-linux-9-golden"
+vm_target_folder      = "HIS-EMR VM"
+
+default_domain_name = "bvnttwhcm.int"
+default_dns_servers = ["8.8.8.8", "8.8.4.4"]
+timezone            = "Asia/Ho_Chi_Minh"
+ssh_username        = "sysadmin"
+
+generate_ansible_inventory = true
+
+# ==============================================================================
+# Virtual Machine Workloads: 1 Application VM + 1 Database VM
+# Hardware Profile from specification table:
+# - RAM: 16 GB (16384 MB)
+# - Core CPU: 8 vCPU
+# - DISK: 250 GB Thin-provisioned
+# - IP: .41 on respective networks
+# ==============================================================================
+vms = {
+  # Server 1: Application Server
+  "application" = {
+    name         = "APP-BVNT-01"
+    hostname     = "APP-BVNT-01"
+    cpu_count    = 8
+    memory_mb    = 16384
+    disk_size_gb = 250
+    network_name = "APP_12"
+    ip_address   = "10.0.2.41"
+    netmask      = 24
+    gateway      = "10.0.2.1"
+    role         = "app"
+  }
+
+  # Server 2: Database Server
+  "database" = {
+    name         = "DB-BVNT-01"
+    hostname     = "DB-BVNT-01"
+    cpu_count    = 8
+    memory_mb    = 16384
+    disk_size_gb = 250
+    network_name = "DB_17"
+    ip_address   = "10.0.7.41"
+    netmask      = 24
+    gateway      = "10.0.7.1"
+    role         = "db"
+  }
+}

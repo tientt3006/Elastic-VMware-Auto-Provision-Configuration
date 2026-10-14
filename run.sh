@@ -9,6 +9,8 @@ LOG_FILE="${REPO_ROOT}/deploy_$(date +%Y%m%d_%H%M%S).log"
 
 # Cấp quyền thực thi cho toàn bộ script
 chmod +x "${REPO_ROOT}/packer/build.sh" \
+         "${REPO_ROOT}/terraform/profiles/bvnt-oracle-linux/run.sh" \
+         "${REPO_ROOT}/terraform/profiles/bvnt-windows-server/run.sh" \
          "${REPO_ROOT}/terraform/profiles/elastic-stack/run.sh" \
          "${REPO_ROOT}/ansible/products/elastic-stack/run_deploy.sh" \
          "${REPO_ROOT}/ansible/products/elastic-stack/run_observability.sh" \
@@ -158,9 +160,14 @@ run_platform_tools_menu() {
                     default_ds=$(grep -E '^\s*vcenter_datastore\s*=' "${pkr_file}" | head -n 1 | cut -d'"' -f2 || true)
                 fi
                 if [[ -z "${default_ds}" || "${default_ds}" == *"<"*">"* ]]; then
-                    if [[ -f "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" ]]; then
-                        default_ds=$(grep -E '^\s*vsphere_datastore\s*=' "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars" | head -n 1 | cut -d'"' -f2 || true)
-                    fi
+                    for cand_tf in "${REPO_ROOT}/terraform/profiles/bvnt-oracle-linux/terraform.tfvars" \
+                                   "${REPO_ROOT}/terraform/profiles/bvnt-windows-server/terraform.tfvars" \
+                                   "${REPO_ROOT}/terraform/profiles/generic-vms/terraform.tfvars"; do
+                        if [[ -f "${cand_tf}" ]]; then
+                            default_ds=$(grep -E '^\s*vsphere_datastore\s*=' "${cand_tf}" | head -n 1 | cut -d'"' -f2 || true)
+                            [[ -n "${default_ds}" && "${default_ds}" != *"<"*">"* ]] && break
+                        fi
+                    done
                 fi
                 if [[ -z "${default_ds}" || "${default_ds}" == *"<"*">"* ]]; then
                     if [[ -f "${REPO_ROOT}/products/elastic-stack/product.conf" ]]; then

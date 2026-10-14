@@ -1,31 +1,32 @@
 # ==============================================================================
-# Variables Definition File: Windows Server 2025 Template Pipeline
+# Variables Definition File: Windows Server 2025 Template Pipeline (BVNT Site)
 # ==============================================================================
 
 # --- vCenter Server Credentials & Target Host ---
 # Mật khẩu vcenter_password được nạp an toàn từ RAM qua biến PKR_VAR_vcenter_password
-vcenter_server              = "<VCENTER_IP>"
-vcenter_user                = "<VCENTER_USER>"
+vcenter_server              = "vcsa.bvnttwhcm.int"
+vcenter_user                = "administrator@vsphere.local"
 vcenter_insecure_connection = true
 
 # --- vSphere Topology Placement ---
-vcenter_datacenter    = "<DATACENTER_NAME>"
-vcenter_cluster       = "<CLUSTER_NAME>"
-vcenter_datastore     = "<DATASTORE_NAME>"
-vcenter_network       = "<NETWORK>"
-vcenter_folder        = "<FOLDER>"
-vcenter_resource_pool = ""
+vcenter_datacenter    = "DC"
+vcenter_cluster       = "BVNT-Cluster"
+vcenter_host          = "10.0.6.101" # Single active ESXi host
+vcenter_datastore     = "DS-LD01-SSD"
+vcenter_network       = "TMP_Internet_VM"
+vcenter_folder        = "Template"
+vcenter_resource_pool = "Resources"
 
 # --- Removable Media Configuration ---
 # Item 1: Đường dẫn tệp ISO Windows Server 2025 (Content Library hoặc Datastore)
 # Item 2: Đĩa VMware Tools ISO có sẵn trên ESXi host để nạp driver PVSCSI
 iso_paths = [
-  "Content Lib DS_100_3_1/Windows_Server_2025_Eval_x64/Windows_Server_2025_Eval_x64.iso",
+  "[DS-LD01-SSD] iso/26100.32230.260111-0550.lt_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso",
   "[] /vmimages/tools-isoimages/windows.iso"
 ]
 
 # --- Target Virtual Machine Specifications ---
-vm_name       = "template-windows-server-2025"
+vm_name       = "tpl-windows-server-2025-golden"
 guest_os_type = "windows2022srvNext_64Guest"
 vm_firmware   = "efi-secure"
 vm_cdrom_type = "sata"
@@ -48,7 +49,7 @@ vm_inst_os_image     = "Windows Server 2025 SERVERSTANDARD"
 vm_inst_os_eval      = true
 vm_guest_os_language = "en-US"
 vm_guest_os_keyboard = "en-US"
-vm_guest_os_timezone = "UTC"
+vm_guest_os_timezone = "SE Asia Standard Time"
 
 # --- WinRM Communicator Configuration ---
 # Mật khẩu winrm_password sẽ được nạp an toàn từ RAM qua biến PKR_VAR_winrm_password

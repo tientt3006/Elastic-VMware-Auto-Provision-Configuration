@@ -109,6 +109,24 @@ variable "windows_workgroup" {
   default     = "WORKGROUP"
 }
 
+variable "host_system_id" {
+  description = "Fallback default ESXi Host System Managed Object ID if not specified per VM."
+  type        = string
+  default     = null
+}
+
+variable "windows_timezone_code" {
+  description = "Default Windows standard timezone code (e.g. 205 for SE Asia Standard Time)."
+  type        = number
+  default     = null
+}
+
+variable "timezone" {
+  description = "Default Linux timezone string (e.g. Asia/Ho_Chi_Minh)."
+  type        = string
+  default     = null
+}
+
 variable "vms" {
   description = "Map of virtual machines and their resource specifications."
   type = map(object({
@@ -148,6 +166,8 @@ variable "vms" {
     template_disk_thin_provisioned  = optional(bool, null)
     workgroup                       = optional(string, null)
     admin_password                  = optional(string, null)
+    timezone                        = optional(string, null)
+    time_zone                       = optional(number, null)
     extra_config                    = optional(map(string), {})
   }))
 }
