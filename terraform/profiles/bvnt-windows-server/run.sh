@@ -100,11 +100,11 @@ log_banner "KHỞI CHẠY TERRAFORM INIT"
 terraform init
 
 log_banner "KHỞI CHẠY TERRAFORM PLAN"
-terraform plan
+terraform plan -var="vsphere_password=${VSPHERE_PASSWORD}"
 
 if confirm_action "Xác nhận áp dụng (apply) cấu hình máy ảo Windows Server 2025 trên vCenter?" "N"; then
     log_banner "KHỞI CHẠY TERRAFORM APPLY (-parallelism=1)"
-    terraform apply -parallelism=1
+    terraform apply -parallelism=1 -var="vsphere_password=${VSPHERE_PASSWORD}"
     log_success "Hoàn tất cấp phát hạ tầng Windows Server 2025 (bvnt-windows-server)."
 else
     log_info "Đã dừng trước bước apply theo yêu cầu."

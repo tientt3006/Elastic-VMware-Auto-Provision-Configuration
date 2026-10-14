@@ -100,11 +100,11 @@ log_banner "KHỞI CHẠY TERRAFORM INIT"
 terraform init
 
 log_banner "KHỞI CHẠY TERRAFORM PLAN"
-terraform plan
+terraform plan -var="vsphere_password=${VSPHERE_PASSWORD}"
 
 if confirm_action "Xác nhận áp dụng (apply) cấu hình máy ảo Oracle Linux 9 trên vCenter?" "N"; then
     log_banner "KHỞI CHẠY TERRAFORM APPLY (-parallelism=1)"
-    terraform apply -parallelism=1
+    terraform apply -parallelism=1 -var="vsphere_password=${VSPHERE_PASSWORD}"
     log_success "Hoàn tất cấp phát hạ tầng Oracle Linux 9 (bvnt-oracle-linux)."
 else
     log_info "Đã dừng trước bước apply theo yêu cầu."

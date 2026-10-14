@@ -5,7 +5,8 @@
 
 vsphere_server              = "vcsa.bvnttwhcm.int"
 vsphere_user                = "administrator@vsphere.local"
-vsphere_password            = "" # Mật khẩu nạp an toàn từ RAM qua run.sh (TF_VAR_vsphere_password)
+# Lưu ý: Mật khẩu vsphere_password được nạp an toàn từ bộ nhớ RAM qua run.sh
+# Tuyệt đối không khai báo vsphere_password dạng plain-text tại đây để tránh ghi đè biến môi trường TF_VAR_
 vsphere_insecure_connection = true
 
 # Infrastructure Placement
@@ -14,7 +15,7 @@ vsphere_cluster       = "BVNT-Cluster"
 vsphere_host          = "10.0.6.101" # Single active ESXi host
 vsphere_datastore     = "DS-LD01-SSD"
 vsphere_resource_pool = "Resources"
-vsphere_template_name = "tpl-oracle-linux-9-golden"
+vsphere_template_name = "template-oracle-linux-9"
 vm_target_folder      = "HIS-EMR VM"
 
 default_domain_name = "bvnttwhcm.int"
